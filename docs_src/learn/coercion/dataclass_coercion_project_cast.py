@@ -1,29 +1,49 @@
 from dataclasses import dataclass
 
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StringType, StructField, StructType
+from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import Schema
 
 
 @dataclass
-class Customer:
-    customer_id: int
-    name: str
+class SubModel:
+    subfield1: str
+    subfield2: str
+
+
+@dataclass
+class Model:
+    field1: str
+    field2: str
+    sub_schema: SubModel
+
+
+schema = Schema(Model)
+
+
+@dataclass
+class ModelWithExtraFieldAndDifferentType:
+    field1: int
+    field2: str
+    sub_schema: SubModel
+
+
+input_schema = Schema(ModelWithExtraFieldAndDifferentType)
 
 
 spark = SparkSession.builder.getOrCreate()
-df = spark.createDataFrame(
-    [("1", "Alice", "England"), ("2", "Bob", "France")],
-    schema=StructType(
-        [
-            StructField("customer_id", StringType(), nullable=True),
-            StructField("name", StringType(), nullable=True),
-            StructField("country", StringType(), nullable=True),
-        ]
-    ),
+
+input_df = input_schema.create_dataframe(
+    [
+        ModelWithExtraFieldAndDifferentType(
+            field1=123,
+            field2="value2",
+            sub_schema=SubModel(subfield1="subvalue1", subfield2="subvalue2"),
+        )
+    ],
+    DataFrame,
+    session=spark,
 )
 
-df = Schema(Customer).coerce_dataframe(df, mode="project_cast")
-df.show()
-print(Schema(Customer).native_schema(StructType).treeString())
+coerced_df = schema.coerce_dataframe(input_df, mode="project_cast")
+coerced_df.show(truncate=50)

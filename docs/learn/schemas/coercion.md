@@ -52,13 +52,13 @@ Strict does not care about ordering of the fields.
 `project_top_level` projects only the model's top-level columns. If there is a difference in struct fields it will fail:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns.py"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field.log"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field_stdout.log"
 ```
 
 ### Project (Default)
@@ -79,13 +79,13 @@ the model:
 Project will still fail if there are missing columns:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_column.py"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_column_stdout.log"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns_stdout.log"
 ```
 
 ### Project Cast
@@ -104,7 +104,6 @@ you want to easily align your DataFrame with the model's schema. It will also st
 --8<-- "docs_src/learn/coercion/dataclass_coercion_project_cast_stdout.log"
 ```
 
-Type casting in Data Joinery follows the Spark casting rules described in
-the [spark documentation](https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html#cast). If the cast is
-permitted then the field will be wrapped in a `cast` function to try to change the data type. This could still
+Type casting in Data Joinery follows the backend's casting rules. If the cast is
+permitted then a conversion attempt will happen to try to change the data type. This could still
 raise a runtime error if the cast is not possible for a specific value in your dataframe.

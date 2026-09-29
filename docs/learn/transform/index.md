@@ -27,7 +27,7 @@ def filter_active_customers(
     return customers.filter(customers.is_active)
 ```
 
-For read steps of wide/nested tables you might want to use `Project` as the coercion mode
+For read steps of wide/nested tables you might want to use `Project` as the output coercion mode
 instead of writing out the full schema explicitly. This can be especially useful if you only
 want to select a few fields of highly nested data:
 
@@ -40,7 +40,7 @@ def read_nested_event_data(
     return spark.read.parquet(path)
 ```
 
-# Running Transformations
+## Running Transformations
 
 You can use transformations like you would normally in a Spark job. For example:
 

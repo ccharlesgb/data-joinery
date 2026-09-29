@@ -68,5 +68,5 @@ dataclasses or Pydantic models:
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/schemas/index/dataclass_example_nested_stdout.log"
+--8<-- "docs_src/learn/schemas/index/dataclass_nested_example_stdout.log"
 ```
