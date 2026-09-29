@@ -1,6 +1,6 @@
 # Overriding types
 
-Types can be overriden for a specific backend by annotating the fields in your models. If you need to
+Types can be overridden for a specific backend by annotating the fields in your models. If you need to
 override the default type for multiple backends you can just annotate more than once. Take this
 example schema where we override the default types for a python `int`. Only if the annotation is present
 for the backend does the type get overridden. Normally you will only want a Schema to be compatible with

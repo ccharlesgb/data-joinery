@@ -23,7 +23,7 @@ The method [native_schema](/reference/schemas/#data_joinery.Schema.native_schema
 generate the schema for a specific backend, such as PySpark or Polars.
 
 It doesn't matter what dataclass configuration you choose (frozen, slots, etc.) However if you decide to
-use dataclass inheritence it is best practice to use `kw_only=True` to avoid issues with field ordering:
+use dataclass inheritance it is best practice to use `kw_only=True` to avoid issues with field ordering:
 
 ``` python
 --8<-- "docs_src/learn/schemas/index/dataclass_inheritance_example.py"

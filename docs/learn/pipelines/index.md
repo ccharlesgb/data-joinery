@@ -107,7 +107,7 @@ generic containers. An unsupported annotation fails when the transform is define
 Wrap structured values in a named class when their internal types are important to the
 pipeline contract.
 
-Similarly to best practice with [context](context.md), you should avoid primative types such as
+Similarly to best practice with [context](context.md), you should avoid primitive types such as
 `int`, `datetime`, etc and prefer either wrapper types or classes to be explicit on input/outputs:
 
 ``` python

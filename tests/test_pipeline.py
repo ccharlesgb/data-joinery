@@ -589,10 +589,10 @@ def test_run_validates_all_override_names_before_execution(spark: SparkSession):
     pipeline = Pipeline(SparkContext)
     pipeline.add_step(read_users, "read")
 
-    with pytest.raises(PipelineOverrideError, match="unknown step 'raed'"):
+    with pytest.raises(PipelineOverrideError, match="unknown step 'read_'"):
         pipeline.run(
             SparkContext(spark),
-            transform_overrides={"raed": replacement},
+            transform_overrides={"read_": replacement},
         )
 
     assert not called
