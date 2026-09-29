@@ -10,7 +10,7 @@
 - Documentation is generated using `zensical`
 - The just command to build docs is `just docs-build`
 - The documentation relies on `docs_src` for runnable code snippets which `just docs-examples` updates for you
-- When including a snipper the format should be:
+- When including a snippet the format should be:
 
     ``` python
     --8<-- "docs_src/my_snippet.py"
@@ -34,3 +34,10 @@ except Exception:
 
 - If the snippet is an example of writing a test then the filename should 
 begin with `test_` and the documentation script will run it with pytest.
+
+## Tone of voice
+
+- Documentation should be clear and only reference the framework's behaviour and not it's internal 
+  implementation. UNLESS the page is in the `internals` section
+
+- Try to keep wording simple so that even somebody not an expert in Python can still understand it.
