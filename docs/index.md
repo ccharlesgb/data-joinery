@@ -2,12 +2,12 @@
 
 <figure markdown="span">
 ![Image title](images/data-joinery-logo.png){ width="300" }
-<figcaption>Schema first spark transformations</figcaption>
+<figcaption>Schema first data transformations</figcaption>
 </figure>
 
 ## Overview
 
-Data Joinery is a small framework that allows you to build complex spark jobs with an emphasis on
+Data Joinery is a small framework that allows you to build complex transformation jobs with an emphasis on
 testability. It helps you break apart complex transformations into testable units, whilst
 allowing you to annotate these transformations with the upstream/downstream schemas. In pyspark
 codebases you often see a transformation declared as:
@@ -38,24 +38,4 @@ pip install data-joinery
 
 ``` bash title="Install with uv"
 uv add data-joinery
-```
-
-## Migrating from Spark Joinery
-
-The project was renamed for the initial Data Joinery release, version 0.1.0. Replace
-`spark-joinery` with `data-joinery` in dependency declarations and replace
-`spark_joinery` with `data_joinery` in Python imports.
-
-## Example
-
-A minimum example pipeline is:
-
-``` python
---8<-- "docs_src/index/minimum_example.py"
-```
-
-:fontawesome-solid-code: Outputs:
-
-``` md
---8<-- "docs_src/index/minimum_example_stdout.log"
 ```
