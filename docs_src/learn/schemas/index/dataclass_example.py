@@ -1,8 +1,7 @@
 from dataclasses import dataclass
-from decimal import Decimal
-from typing import Annotated
 
-from pyspark.sql.types import DecimalType, StructType
+import polars as pl
+from pyspark.sql.types import StructType
 
 from data_joinery import Schema
 
@@ -13,8 +12,10 @@ class Customer:
     name: str
     is_active: bool
     discount_rate: float
-    max_billing_amount: Annotated[Decimal, DecimalType(precision=10, scale=2)]
 
 
 schema = Schema(Customer)
+print("PySpark:")
 print(schema.native_schema(StructType).treeString())
+print("Polars:")
+print(schema.native_schema(pl.Schema))

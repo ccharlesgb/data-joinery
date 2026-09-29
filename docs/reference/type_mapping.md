@@ -1,5 +1,7 @@
 # Type Mappings
 
+## Spark
+
 There is no 1:1 mapping between Python types and Spark SQL data types. Therefore it is necessary to chose a
 sensible default to go from the annotated model type to a Spark type. However you can always use `Annotated` to
 override this default. Below is the [reference](https://spark.apache.org/docs/latest/api/python/tutorial/sql/type_conversions.html#all-conversions) mapping from pyspark types to Python types:
@@ -39,3 +41,19 @@ will be used unless overridden with `Annotated`. The default mapping is currentl
 | `datetime.timedelta` | `DayTimeIntervalType()` |
 | `decimal.Decimal`    | `DecimalType(38, 18)`   |
 | `bytes`              | `BinaryType()`          |
+
+## Polars
+
+The default mapping from Python annotations to Polars data types is:
+
+| Python type          | Default Polars data type             |
+| -------------------- | ------------------------------------ |
+| `int`                | `pl.Int64`                           |
+| `str`                | `pl.String`                          |
+| `float`              | `pl.Float64`                         |
+| `bool`               | `pl.Boolean`                         |
+| `datetime.datetime`  | `pl.Datetime("us")`                  |
+| `datetime.date`      | `pl.Date`                            |
+| `datetime.timedelta` | `pl.Duration("us")`                  |
+| `decimal.Decimal`    | `pl.Decimal(precision=38, scale=18)` |
+| `bytes`              | `pl.Binary`                          |

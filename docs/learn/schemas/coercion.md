@@ -6,19 +6,10 @@ are several modes available to control how strict/relaxed the coercion process s
 Use `Schema(Model).coerce_dataframe()` to take an input DataFrame and return either a new DataFrame that
 matches the model's schema or raise a validation error if coercion fails based on the mode's strictness.
 
-By default Data Joinery will project the input DataFrame
-onto the desired schema, including nested struct fields. It will **not** perform any type casting, and it will
-**not** add missing columns, this default mode is called `project`. The below example shows how this works
-in practice, the input DataFrame has an extra column that is removed when we coerce it to the `Customer` model:
+Let's take the following schema and walk through how each mode works:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion.py"
-```
-
-:fontawesome-solid-code: Outputs:
-
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_stdout.log"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_schemas.py"
 ```
 
 ## Coercion Modes
@@ -33,27 +24,41 @@ Field order and nullability are ignored, and the input field order is preserved.
 has an extra column so will fail the `strict` validation check:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_strict.py"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_strict_stdout.log"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column_stdout.log"
 ```
+
+However if the Dataframe is equivalent it will pass and return the same DataFrame:
+
+``` python
+--8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy.py"
+```
+
+:fontawesome-solid-code: Outputs:
+
+``` python
+--8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy_stdout.log"
+```
+
+Strict does not care about ordering of the fields.
 
 ### Project Top Level
 
 `project_top_level` projects only the model's top-level columns. If there is a difference in struct fields it will fail:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level.py"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_stdout.log"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field.log"
 ```
 
 ### Project (Default)
@@ -62,13 +67,25 @@ The mode `project` projects nested struct fields, removing all fields that are n
 the model:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project.py"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_stdout.log"
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy_stdout.log"
+```
+
+Project will still fail if there are missing columns:
+
+``` python
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_column.py"
+```
+
+:fontawesome-solid-code: Outputs:
+
+``` python
+--8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_column_stdout.log"
 ```
 
 ### Project Cast
