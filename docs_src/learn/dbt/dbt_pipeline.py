@@ -3,7 +3,9 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Dbt, Pipeline, Project, SparkContext, transform
+from data_joinery import Context, Pipeline, Project, transform
+from data_joinery.backends.spark import SparkContext
+from data_joinery.dbt import Dbt
 
 
 @dataclass

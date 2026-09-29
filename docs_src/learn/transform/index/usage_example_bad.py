@@ -34,7 +34,7 @@ def get_customer_count(
     return customers.groupBy().count()
 
 
-spark = SparkSession.builder.appName("example").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 
 customer_schema = Schema(Customer)
 

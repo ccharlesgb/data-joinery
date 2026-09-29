@@ -4,7 +4,8 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, SparkContext, Strict, transform
+from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery.backends.spark import SparkContext
 from data_joinery.pipeline import PipelineConnectionError
 
 

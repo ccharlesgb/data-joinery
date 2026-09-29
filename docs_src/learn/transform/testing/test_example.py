@@ -22,7 +22,7 @@ def filter_active_customers(
 
 
 def test_filter_active_customers():
-    spark = SparkSession.builder.appName("test").getOrCreate()
+    spark = SparkSession.builder.getOrCreate()
     customer_schema = Schema(Customer)
 
     customers = customer_schema.create_dataframe(

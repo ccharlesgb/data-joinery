@@ -34,11 +34,7 @@ class PathConfig:
 
 @pytest.fixture(scope="session")
 def spark() -> Generator[SparkSession, None, None]:
-    spark = (
-        SparkSession.builder.appName("pyspark-schemas-transform-tests")
-        .master("local[*]")
-        .getOrCreate()
-    )
+    spark = SparkSession.builder.master("local[*]").getOrCreate()
     yield spark
     spark.stop()
 

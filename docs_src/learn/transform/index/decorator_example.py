@@ -20,7 +20,7 @@ def filter_active_customers(
     return customers.filter(customers.is_active)
 
 
-spark = SparkSession.builder.appName("example").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 
 customers = spark.createDataFrame(
     [

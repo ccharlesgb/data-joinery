@@ -10,10 +10,10 @@ from data_joinery import (
 )
 from data_joinery import (
     Project,
-    SparkContext,
     Strict,
     transform,
 )
+from data_joinery.backends.spark import SparkContext
 from data_joinery.dependencies import Context
 from data_joinery.pipeline import (
     Pipeline,
@@ -63,11 +63,7 @@ class FittedModel:
 
 @pytest.fixture(scope="session")
 def spark() -> Generator[SparkSession, None, None]:
-    spark = (
-        SparkSession.builder.appName("pyspark-schemas-pipeline-tests")
-        .master("local[*]")
-        .getOrCreate()
-    )
+    spark = SparkSession.builder.master("local[*]").getOrCreate()
     yield spark
     spark.stop()
 

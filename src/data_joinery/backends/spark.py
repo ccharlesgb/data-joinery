@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any, Protocol
 from typing import cast as type_cast
 
@@ -20,6 +21,11 @@ from data_joinery.schema_types import (
 
 from .. import type_inspection
 from .base import register_backend
+
+
+@dataclass(frozen=True)
+class SparkContext:
+    spark: SparkSession
 
 
 def _schema_diff(given: types.StructType, expected: types.StructType) -> SchemaDiff:

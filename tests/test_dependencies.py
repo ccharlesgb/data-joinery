@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 from pyspark.sql import SparkSession
 
-from data_joinery import SparkContext
+from data_joinery.backends.spark import SparkContext
 from data_joinery.dependencies import inspect_context_type
 
 

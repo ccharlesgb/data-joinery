@@ -17,7 +17,7 @@ class Customer:
     address: Address
 
 
-spark = SparkSession.builder.appName("OrderMetricsApp").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 df = spark.createDataFrame(
     [(1, ("London", "England")), (2, ("Paris", "France"))],
     schema=StructType(

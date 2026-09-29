@@ -5,8 +5,7 @@ from .contract import (
     ProjectTopLevel,
     Strict,
 )
-from .dbt import Dbt
-from .dependencies import Context, SparkContext
+from .dependencies import Context
 from .pipeline import (
     Pipeline,
     PipelineExecutionError,
@@ -18,7 +17,6 @@ from .transform import transform
 
 __all__ = [
     "Context",
-    "Dbt",
     "Pipeline",
     "PipelineExecutionError",
     "PipelineOverrideError",
@@ -26,7 +24,6 @@ __all__ = [
     "ProjectCast",
     "ProjectTopLevel",
     "Schema",
-    "SparkContext",
     "Step",
     "Strict",
     "main",

@@ -85,7 +85,8 @@ def _load_builtin_backends() -> None:
     if _BUILTINS_LOADED:
         return
     _BUILTINS_LOADED = True
-    import_module("data_joinery.backends.spark")
+    if find_spec("pyspark") is not None:
+        import_module("data_joinery.backends.spark")
     if find_spec("polars") is not None:
         import_module("data_joinery.backends.polars")
 

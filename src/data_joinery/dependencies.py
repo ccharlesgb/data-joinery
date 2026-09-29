@@ -1,14 +1,5 @@
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import fields, is_dataclass
 from typing import Any, get_type_hints
-
-from pyspark.sql import SparkSession
-
-
-@dataclass(frozen=True)
-class SparkContext:
-    """Pipeline context containing only a Spark session."""
-
-    spark: SparkSession
 
 
 class Context:

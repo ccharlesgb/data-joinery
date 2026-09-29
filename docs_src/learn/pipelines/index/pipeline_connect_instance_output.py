@@ -6,7 +6,8 @@ from pyspark.ml.linalg import VectorUDT
 from pyspark.ml.regression import LinearRegression, LinearRegressionModel
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, SparkContext, Strict, transform
+from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery.backends.spark import SparkContext
 
 
 @dataclass
@@ -52,7 +53,9 @@ def prepare_features(
 def fit_model(
     housing: Annotated[DataFrame, Strict(PreparedHousing)],
 ) -> LinearRegressionModel:
-    return LinearRegression(featuresCol="features", labelCol="price").fit(housing)
+    return LinearRegression(
+        featuresCol="features", labelCol="price", regParam=1e-3
+    ).fit(housing)
 
 
 @transform

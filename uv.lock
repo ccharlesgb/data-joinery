@@ -244,16 +244,24 @@ name = "data-joinery"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pyspark" },
     { name = "rustworkx" },
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "matplotlib" },
+    { name = "polars" },
+    { name = "pydantic" },
+    { name = "pyspark" },
+]
 polars = [
     { name = "polars" },
 ]
 pydantic = [
     { name = "pydantic" },
+]
+pyspark = [
+    { name = "pyspark" },
 ]
 vis = [
     { name = "matplotlib" },
@@ -278,13 +286,17 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.10.8" },
     { name = "matplotlib", marker = "extra == 'vis'", specifier = ">=3.10.8" },
+    { name = "polars", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "polars", marker = "extra == 'polars'", specifier = ">=1.0.0" },
+    { name = "pydantic", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.0.0" },
-    { name = "pyspark", specifier = ">=4.2.0" },
+    { name = "pyspark", marker = "extra == 'all'", specifier = ">=4.1.0" },
+    { name = "pyspark", marker = "extra == 'pyspark'", specifier = ">=4.1.0" },
     { name = "rustworkx", specifier = ">=0.18.1" },
 ]
-provides-extras = ["polars", "pydantic", "vis"]
+provides-extras = ["all", "pyspark", "polars", "pydantic", "vis"]
 
 [package.metadata.requires-dev]
 dev = [

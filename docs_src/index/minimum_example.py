@@ -5,7 +5,8 @@ from typing import Annotated
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import DoubleType, StructType
 
-from data_joinery import Context, Pipeline, Schema, SparkContext, Strict, transform
+from data_joinery import Context, Pipeline, Schema, Strict, transform
+from data_joinery.backends.spark import SparkContext
 
 
 @dataclass
@@ -63,6 +64,6 @@ print_metrics_step = order_metrics.add_step(print_metrics)
 
 read_orders_step >> get_metrics_step >> print_metrics_step
 
-spark = SparkSession.builder.appName("OrderMetricsApp").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 
 order_metrics.run(SparkContext(spark))

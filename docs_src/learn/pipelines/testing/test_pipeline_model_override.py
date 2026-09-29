@@ -4,7 +4,8 @@ from typing import Annotated
 import pytest
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, Project, SparkContext, transform
+from data_joinery import Context, Pipeline, Project, transform
+from data_joinery.backends.spark import SparkContext
 
 
 @dataclass

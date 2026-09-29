@@ -12,7 +12,7 @@ class Customer:
     is_active: bool
 
 
-spark = SparkSession.builder.appName("example").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 
 rows = [
     Customer("1", "Alice", True),

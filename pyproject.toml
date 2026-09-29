@@ -7,7 +7,6 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "pyspark>=4.2.0",
     "rustworkx>=0.18.1",
 ]
 
@@ -22,6 +21,15 @@ search-path = [
 ]
 
 [project.optional-dependencies]
+all = [
+    "matplotlib>=3.10.8",
+    "polars>=1.0.0",
+    "pydantic>=2.0.0",
+    "pyspark>=4.1.0",
+]
+pyspark = [
+    "pyspark>=4.1.0",
+]
 polars = [
     "polars>=1.0.0",
 ]

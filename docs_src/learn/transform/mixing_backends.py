@@ -35,7 +35,7 @@ def spark_to_polars(
     return cast(pl.DataFrame, pl.from_arrow(records.toArrow()))
 
 
-spark = SparkSession.builder.master("local[1]").appName("mixing-backends").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 
 polars_records = record_schema.create_dataframe(
     [Record(1, "first"), Record(2, "second")], pl.DataFrame

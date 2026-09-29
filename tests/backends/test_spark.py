@@ -14,11 +14,7 @@ from data_joinery.backends.spark import Project, ProjectCast, ProjectTopLevel, S
 
 @pytest.fixture(scope="session")
 def spark() -> Generator[SparkSession, None, None]:
-    spark = (
-        SparkSession.builder.appName("pyspark-schemas-tests")
-        .master("local[*]")
-        .getOrCreate()
-    )
+    spark = SparkSession.builder.master("local[*]").getOrCreate()
     yield spark
     spark.stop()
 

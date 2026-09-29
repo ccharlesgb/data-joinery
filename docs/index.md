@@ -30,12 +30,32 @@ schemas match the type annotations.
 
 ## Installation
 
-Install the package `data-joinery` with your favourite package manager:
+Data joinery can work with Polars or PySpark. To install everything, use:
 
 ``` bash title="Install with pip"
-pip install data-joinery
+pip install "data-joinery[all]"
 ```
 
 ``` bash title="Install with uv"
-uv add data-joinery
+uv add "data-joinery[all]"
+```
+
+### Just PySpark
+
+``` bash title="Install with pip"
+pip install "data-joinery[pyspark]"
+```
+
+``` bash title="Install with uv"
+uv add "data-joinery[pyspark]"
+```
+
+### Just Polars
+
+``` bash title="Install with pip"
+pip install "data-joinery[polars]"
+```
+
+``` bash title="Install with uv"
+uv add "data-joinery[polars]"
 ```

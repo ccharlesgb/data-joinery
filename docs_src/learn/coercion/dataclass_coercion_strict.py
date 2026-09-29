@@ -14,7 +14,7 @@ class Customer:
     name: str
 
 
-spark = SparkSession.builder.appName("OrderMetricsApp").getOrCreate()
+spark = SparkSession.builder.getOrCreate()
 df = spark.createDataFrame(
     [
         ("1", "Alice", "England"),
