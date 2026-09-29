@@ -1,4 +1,4 @@
-# Pipeline Tests
+# Testing
 
 !!! example
 

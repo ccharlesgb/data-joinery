@@ -10,8 +10,12 @@ nav = [
   { "Data Joinery" = "index.md" },
   { "Learn" = [
     "learn/index.md",
-    "learn/schemas.md",
-    "learn/coercion.md",
+    { "Schemas" = [
+      "learn/schemas/index.md",
+      "learn/schemas/overriding_types.md",
+      "learn/schemas/creating_dataframes.md",
+      "learn/schemas/coercion.md",
+    ] },
     { "Transformations" = [
       "learn/transform/index.md",
       "learn/transform/testing.md",

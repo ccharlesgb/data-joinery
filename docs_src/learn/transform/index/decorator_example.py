@@ -4,6 +4,7 @@ from typing import Annotated
 from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import Project, Strict, transform
+from data_joinery.schemas import Schema
 
 
 @dataclass
@@ -22,13 +23,14 @@ def filter_active_customers(
 
 spark = SparkSession.builder.getOrCreate()
 
-customers = spark.createDataFrame(
+customers = Schema(Customer).create_dataframe(
     [
-        ("1", "Alice", True),
-        ("2", "Bob", False),
-        ("3", "Charlie", True),
+        Customer(customer_id="1", name="Alice", is_active=True),
+        Customer(customer_id="2", name="Bob", is_active=False),
+        Customer(customer_id="3", name="Charlie", is_active=True),
     ],
-    ["customer_id", "name", "is_active"],
+    DataFrame,
+    session=spark,
 )
 
 active_customers = filter_active_customers(customers)

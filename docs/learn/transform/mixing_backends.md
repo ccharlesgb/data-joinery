@@ -1,8 +1,6 @@
 # Mixing Backends
 
-Transform's do not just have to work with Spark dataframes, if you specify a Polars 
-dataframe as an input or output then the transform will work with that backend. It is possible to
-write a transformation that takes a dataframe in one backend and outputs it in another. A common
+It is possible to write a transformation that takes a dataframe in one backend and outputs it in another. A common
 use case of this is to collect a spark frame to a Polars dataframe onto the driver node after an
 aggregation.
 

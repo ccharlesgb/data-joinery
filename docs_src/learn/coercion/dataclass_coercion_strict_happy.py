@@ -22,21 +22,21 @@ schema = Schema(Model)
 
 
 @dataclass
-class ModelWithExtraFieldAndDifferentType:
-    field1: int
+class SubModel2:
     field2: str
+    field1: str
     sub_schema: SubModel
 
 
-input_schema = Schema(ModelWithExtraFieldAndDifferentType)
+input_schema = Schema(SubModel2)
 
 
 spark = SparkSession.builder.getOrCreate()
 
 input_df = input_schema.create_dataframe(
     [
-        ModelWithExtraFieldAndDifferentType(
-            field1=123,
+        SubModel2(
+            field1="value1",
             field2="value2",
             sub_schema=SubModel(subfield1="subvalue1", subfield2="subvalue2"),
         )
@@ -45,5 +45,5 @@ input_df = input_schema.create_dataframe(
     session=spark,
 )
 
-coerced_df = schema.coerce_dataframe(input_df, mode="project_cast")
-coerced_df.show(truncate=50)
+coerced_df = schema.coerce_dataframe(input_df, mode="strict")
+coerced_df.show()

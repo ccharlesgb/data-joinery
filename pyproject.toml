@@ -80,3 +80,13 @@ tests = "tests"
 
 [tool.ruff.format]
 exclude = ["*.md"]
+
+[tool.typos.files]
+extend-exclude = [
+    "dist/",
+    "docs/images/",
+    "htmlcov/",
+    "site/",
+    "site_build/",
+    "uv.lock",
+]

@@ -1,8 +1,10 @@
+import traceback
 from dataclasses import dataclass
 
 from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import Schema
+from data_joinery.schema_types import SchemaCoercionError
 
 
 @dataclass
@@ -22,22 +24,20 @@ schema = Schema(Model)
 
 
 @dataclass
-class ModelWithExtraFieldAndDifferentType:
-    field1: int
-    field2: str
+class ModelWithMissingColumn:
+    field1: str
     sub_schema: SubModel
 
 
-input_schema = Schema(ModelWithExtraFieldAndDifferentType)
+input_schema = Schema(ModelWithMissingColumn)
 
 
 spark = SparkSession.builder.getOrCreate()
 
 input_df = input_schema.create_dataframe(
     [
-        ModelWithExtraFieldAndDifferentType(
-            field1=123,
-            field2="value2",
+        ModelWithMissingColumn(
+            field1="value1",
             sub_schema=SubModel(subfield1="subvalue1", subfield2="subvalue2"),
         )
     ],
@@ -45,5 +45,7 @@ input_df = input_schema.create_dataframe(
     session=spark,
 )
 
-coerced_df = schema.coerce_dataframe(input_df, mode="project_cast")
-coerced_df.show(truncate=50)
+try:
+    schema.coerce_dataframe(input_df, mode="project")
+except SchemaCoercionError:
+    print(traceback.format_exc(limit=1))

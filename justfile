@@ -35,3 +35,6 @@ docs-build:
 
 docs-examples:
     uv run python scripts/run_docs_examples.py
+
+typos:
+    typos
