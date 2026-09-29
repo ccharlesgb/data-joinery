@@ -65,9 +65,7 @@ def build_pipeline() -> Pipeline[OrderPipelineContext]:
 
 @pytest.fixture(scope="module")
 def spark():
-    session = SparkSession.builder.master("local[1]").getOrCreate()
-    yield session
-    session.stop()
+    return SparkSession.builder.master("local[1]").getOrCreate()
 
 
 def test_order_pipeline_end_to_end(spark: SparkSession):

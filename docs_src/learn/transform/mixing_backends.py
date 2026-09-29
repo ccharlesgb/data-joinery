@@ -46,5 +46,3 @@ polars_records_back = spark_to_polars(spark_records)
 print("Polars:\n", polars_records.schema)
 print("Spark:\n", spark_records.schema)
 print("Polars Back:\n", polars_records_back.schema)
-
-spark.stop()

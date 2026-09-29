@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import re
+import runpy
 import subprocess
 import sys
+import traceback
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +36,31 @@ def write_log(script_path: Path, stream_name: str, content: str) -> None:
         log_path.unlink()
 
 
+def run_python_example(script_path: Path) -> subprocess.CompletedProcess[str]:
+    stdout = StringIO()
+    stderr = StringIO()
+
+    try:
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            runpy.run_path(str(script_path), run_name="__main__")
+    except Exception:  # noqa: BLE001 - report example failures like a subprocess would
+        with redirect_stderr(stderr):
+            traceback.print_exc()
+        return subprocess.CompletedProcess(
+            [sys.executable, str(script_path)],
+            returncode=1,
+            stdout=stdout.getvalue(),
+            stderr=stderr.getvalue(),
+        )
+
+    return subprocess.CompletedProcess(
+        [sys.executable, str(script_path)],
+        returncode=0,
+        stdout=stdout.getvalue(),
+        stderr=stderr.getvalue(),
+    )
+
+
 def run_example(script_path: Path) -> None:
     print(f"Running {script_path}", flush=True)
     is_test = script_path.name.startswith("test_")
@@ -43,15 +72,15 @@ def run_example(script_path: Path) -> None:
             "-rn",
             "--show-capture=stdout",
         ]
+        result = subprocess.run(
+            executable + [str(script_path)],
+            capture_output=True,
+            check=False,
+            cwd=REPOSITORY_ROOT,
+            text=True,
+        )
     else:
-        executable = [sys.executable]
-    result = subprocess.run(
-        executable + [str(script_path)],
-        capture_output=True,
-        check=False,
-        cwd=REPOSITORY_ROOT,
-        text=True,
-    )
+        result = run_python_example(script_path)
 
     if not is_test:
         write_log(script_path, "stdout", result.stdout)
@@ -72,8 +101,19 @@ def run_example(script_path: Path) -> None:
 
 def main() -> None:
     script_paths = sorted(DOCS_SOURCE_DIRECTORY.rglob("*.py"))
+    python_examples = [
+        path for path in script_paths if not path.name.startswith("test_")
+    ]
+    test_examples = [path for path in script_paths if path.name.startswith("test_")]
+
+    # stdout and stderr redirection is process-global, so ordinary examples must run
+    # sequentially. Keeping them in this process allows PySpark's getOrCreate() to
+    # reuse its active Spark session instead of starting a JVM for every script.
+    for script_path in python_examples:
+        run_example(script_path)
+
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        list(executor.map(run_example, script_paths))
+        list(executor.map(run_example, test_examples))
 
 
 if __name__ == "__main__":

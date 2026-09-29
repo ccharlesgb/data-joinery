@@ -61,9 +61,7 @@ def build_pipeline() -> Pipeline[SparkContext]:
 
 @pytest.fixture(scope="module")
 def spark():
-    session = SparkSession.builder.master("local[1]").getOrCreate()
-    yield session
-    session.stop()
+    return SparkSession.builder.master("local[1]").getOrCreate()
 
 
 def test_model_pipeline_with_dummy_training(spark: SparkSession):
