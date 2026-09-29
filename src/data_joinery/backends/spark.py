@@ -482,7 +482,16 @@ def _project_fields(
         if cast
         else diff.type_mismatches
     )
-    violations = (*diff.missing, *type_mismatches)
+    nested_additional = (
+        tuple(
+            difference
+            for difference in diff.additional
+            if "." in difference.path or "[]" in difference.path
+        )
+        if not recurse
+        else ()
+    )
+    violations = (*diff.missing, *nested_additional, *type_mismatches)
     if violations:
         raise SchemaCoercionError(mode, violations)
 

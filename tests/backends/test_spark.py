@@ -720,6 +720,46 @@ def test_coerce_dataframe_project_top_level_raises_for_missing_column(
         ProjectTopLevel()(dataframe, schema)
 
 
+def test_coerce_dataframe_project_top_level_rejects_nested_additional_field(
+    spark: SparkSession,
+):
+    dataframe = spark.createDataFrame(
+        [((1, "reject"),)],
+        types.StructType(
+            [
+                types.StructField(
+                    "nested",
+                    types.StructType(
+                        [
+                            types.StructField("value", types.IntegerType(), True),
+                            types.StructField("nested_extra", types.StringType(), True),
+                        ]
+                    ),
+                    True,
+                )
+            ]
+        ),
+    )
+    schema = types.StructType(
+        [
+            types.StructField(
+                "nested",
+                types.StructType(
+                    [types.StructField("value", types.IntegerType(), True)]
+                ),
+                True,
+            )
+        ]
+    )
+
+    with pytest.raises(schemas.SchemaCoercionError) as error:
+        ProjectTopLevel()(dataframe, schema)
+
+    assert [(item.kind, item.path) for item in error.value.violations] == [
+        ("additional", "nested.nested_extra")
+    ]
+
+
 def test_coerce_dataframe_project_raises_for_type_mismatch(spark: SparkSession):
     dataframe = spark.createDataFrame(
         [(1,)], types.StructType([types.StructField("a", types.IntegerType(), True)])
