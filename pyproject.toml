@@ -1,0 +1,74 @@
+[project]
+name = "data-joinery"
+version = "0.1.0"
+description = "Schema safety for DataFrame transformations"
+authors = [
+    { name = "Connor Charles", email = "ccharles.gb@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pyspark>=4.2.0",
+    "rustworkx>=0.18.1",
+]
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+search-path = [
+    "src",
+    "docs_src",
+]
+
+[project.optional-dependencies]
+polars = [
+    "polars>=1.0.0",
+]
+pydantic = [
+    "pydantic>=2.0.0",
+]
+vis = [
+    "matplotlib>=3.10.8",
+]
+
+[project.scripts]
+data-joinery = "data_joinery:main"
+
+[build-system]
+requires = ["uv_build>=0.9.27,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "deptry>=0.25.1",
+    "ipykernel>=7.3.0",
+    "mkdocstrings-python>=2.0.8",
+    "pandas>=2.0.0,<3.0.0",
+    "polars>=1.0.0",
+    "pyarrow>=25.0.1",
+    "pydantic>=2.0.0",
+    "pyrefly>=1.2.0",
+    "pytest>=9.1.0",
+    "pytest-layout-enforcer>=0.1.0",
+    "ruff>=0.15.17",
+    "scikit-learn>=1.9.1",
+    "zensical>=0.0.45",
+]
+
+[tool.pytest-layout-enforcer]
+enabled = true
+feature-pattern = "[a-z][a-z0-9_]*"
+feature-separator = "__"
+require-tests = false
+include-init = false
+
+exclude-sources = []
+exclude-tests = []
+
+[[tool.pytest-layout-enforcer.layouts]]
+source = "src/data_joinery"
+tests = "tests"
+
+[tool.ruff.format]
+exclude = ["*.md"]

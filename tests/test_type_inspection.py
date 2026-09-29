@@ -1,0 +1,51 @@
+import datetime
+import decimal
+from typing import Annotated, Literal, Optional
+
+import pytest
+from pyspark.sql import types
+
+from data_joinery import type_inspection
+
+
+@pytest.mark.parametrize(
+    "python_type, expected_spark_type",
+    [
+        (int, types.LongType()),
+        (str, types.StringType()),
+        (float, types.DoubleType()),
+        (bool, types.BooleanType()),
+        (Optional[int], types.LongType()),  # noqa: UP045 - exercise typing.Optional
+        (int | None, types.LongType()),
+        (Annotated[int, types.ShortType()], types.ShortType()),
+        (Annotated[int, types.IntegerType()], types.IntegerType()),
+        (Annotated[int, types.StringType()], types.StringType()),
+        (Literal["a", "b"], types.StringType()),
+        (Literal[1, 2], types.LongType()),
+        (Literal[True, False], types.BooleanType()),
+        (Annotated[Literal[1, 2], types.IntegerType()], types.IntegerType()),
+        (Annotated[Literal[1, 2], types.StringType()], types.StringType()),
+        (datetime.datetime, types.TimestampType()),
+        (datetime.date, types.DateType()),
+        (datetime.timedelta, types.DayTimeIntervalType()),
+        (
+            decimal.Decimal,
+            types.DecimalType(
+                type_inspection.SPARK_MAX_DECIMAL_PRECISION,
+                type_inspection.DEFAULT_FRACTIONAL_DIGITS,
+            ),
+        ),
+        (bytes, types.BinaryType()),
+    ],
+)
+def test_get_spark_type_from_python_type(python_type, expected_spark_type):
+    actual_spark_type = type_inspection.get_spark_type_from_python_type(python_type)
+    assert actual_spark_type == expected_spark_type
+
+
+def test_get_spark_type_from_python_type_raises_value_error_for_mixed_literal_types():
+    with pytest.raises(
+        ValueError,
+        match=r"Literal values must resolve to a single Spark type",
+    ):
+        type_inspection.get_spark_type_from_python_type(Literal[1, "a"])

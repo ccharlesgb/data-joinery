@@ -1,0 +1,17 @@
+{
+  "description": "Run the repository checks before Codex finishes a turn with changes.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/run_just_check.py\"",
+            "timeout": 600,
+            "statusMessage": "Running just check"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,109 @@
+[project]
+site_name = "data-joinery"
+site_url = "https://ccharlesgb.github.io/data-joinery/"
+site_description = "data-joinery documentation"
+site_author = "Connor Charles"
+repo_url = "https://github.com/ccharlesgb/data-joinery"
+repo_name = "ccharlesgb/data-joinery/"
+
+nav = [
+  { "Data Joinery" = "index.md" },
+  { "Learn" = [
+    "learn/index.md",
+    "learn/schemas.md",
+    "learn/coercion.md",
+    { "Transformations" = [
+      "learn/transform/index.md",
+      "learn/transform/testing.md",
+      "learn/transform/mixing_backends.md",
+    ]},
+    { "Pipelines" = [
+      "learn/pipelines/index.md",
+      "learn/pipelines/context.md",
+      "learn/pipelines/testing.md",
+    ]
+    },
+    "learn/dbt.md",
+  ] },
+  { "Reference" = [
+    "reference/schemas.md",
+    "reference/contract.md",
+    "reference/transform.md",
+    "reference/Pipeline.md",
+    "reference/type_mapping.md"
+  ]},
+  { "Internals" = [
+    "internals/backends.md"
+  ]}
+]
+
+[project.theme]
+logo = "images/data-joinery-logo.png"
+favicon = "images/favicon.png"
+language = "en"
+features = [
+    "content.code.copy",
+    "navigation.footer",
+    "navigation.instant",
+    "navigation.instant.progress",
+    "navigation.tabs",
+    "navigation.tabs.sticky",
+    "navigation.path",
+    "navigation.top",
+    "navigation.tracking",
+    "navigation.indexes",
+    "search.highlight",
+   
+]
+
+# Palette toggle for light mode
+[[project.theme.palette]] 
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+# Palette toggle for dark mode
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions]
+pymdownx.highlight.anchor_linenums = true
+pymdownx.highlight.line_spans = "__span"
+pymdownx.highlight.pygments_lang_class = true
+pymdownx.inlinehilite = {}
+pymdownx.snippets = {}
+pymdownx.details = {}
+pymdownx.superfences = {}
+admonition = {}
+attr_list = {}
+md_in_html = {}
+pymdownx.blocks.caption = {}
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji" 
+
+[project.plugins.mkdocstrings]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+show_root_heading = true
+show_if_no_docstring = true
+inherited_members = true
+members_order = "source"
+separate_signature = true
+unwrap_annotated = true
+filters = ["!^_"]
+merge_init_into_class = true
+docstring_section_style = "spacy"
+signature_crossrefs = true
+show_symbol_type_heading = true
+show_symbol_type_toc = true
+
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/ccharlesgb/data-joinery"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/linkedin"
+link = "https://www.linkedin.com/in/connor-charles-1a7956123/"
