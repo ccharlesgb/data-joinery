@@ -28,3 +28,5 @@ __output
 
 # Agents
 .DS_Store
+
+test-report.xml

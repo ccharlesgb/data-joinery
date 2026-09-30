@@ -12,19 +12,34 @@ run:
 test:
     uv run pytest --ignore=docs_src/
 
-lint:
+lint-code:
     uv run ruff check . --fix
 
-dep-lint:
+lint-deps:
     uv run deptry src
 
-types:
+lint-types:
     uv run pyrefly check
 
-format:
+lint-format:
     uv run ruff format .
 
-check: dep-lint lint types format test
+lint: lint-deps lint-code lint-types lint-format
+
+check: lint test
+
+agent-clear-test-report:
+    rm -f test-report.xml
+
+agent-lint-code:
+    uv run ruff check . --fix --output-format concise
+
+agent-test: agent-clear-test-report
+    uv run pytest --ignore=docs_src/ --tb=short --junitxml=test-report.xml
+
+agent-lint: lint-deps agent-lint-code lint-types lint-format
+
+agent-check: agent-lint agent-test
 
 docs-serve:
     uv run zensical build --clean

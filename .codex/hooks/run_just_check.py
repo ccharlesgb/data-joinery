@@ -20,7 +20,7 @@ def main() -> int:
         return 0
 
     check = subprocess.run(
-        ["just", "check"],
+        ["just", "agent-check"],
         cwd=REPOSITORY_ROOT,
         check=False,
         capture_output=True,
@@ -29,7 +29,7 @@ def main() -> int:
     if check.returncode:
         output = "\n".join(part for part in (check.stdout, check.stderr) if part)
         output = output[-MAX_FAILURE_OUTPUT:]
-        print(f"`just check` failed:\n{output}", file=sys.stderr)
+        print(f"`just agent-check` failed:\n{output}", file=sys.stderr)
         return 2
 
     print(json.dumps({"continue": True, "suppressOutput": True}))
