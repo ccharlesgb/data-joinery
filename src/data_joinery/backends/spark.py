@@ -127,7 +127,8 @@ def _schema_diff(given: types.StructType, expected: types.StructType) -> SchemaD
 _NUMERIC = types.NumericType()
 _STRING = types.StringType()
 _DATE = types.DateType()
-_TIME = types.TimeType()
+_TIME_TYPE = getattr(types, "TimeType", None)
+_TIME = _TIME_TYPE() if _TIME_TYPE is not None else None
 _TIMESTAMP = types.TimestampType()
 _TIMESTAMP_NTZ = types.TimestampNTZType()
 _INTERVAL = types.DayTimeIntervalType()
@@ -137,7 +138,9 @@ _ARRAY = types.ArrayType(types.NullType())
 _MAP = types.MapType(types.NullType(), types.NullType())
 _STRUCT = types.StructType()
 
-CAST_MATRIX: dict[tuple[types.DataType, types.DataType], bool] = {
+_CAST_MATRIX_WITH_OPTIONAL_TIME: dict[
+    tuple[types.DataType | None, types.DataType | None], bool
+] = {
     (_NUMERIC, _NUMERIC): True,
     (_NUMERIC, _STRING): True,
     (_NUMERIC, _DATE): False,
@@ -284,6 +287,12 @@ CAST_MATRIX: dict[tuple[types.DataType, types.DataType], bool] = {
     (_STRUCT, _STRUCT): True,
 }
 
+CAST_MATRIX: dict[tuple[types.DataType, types.DataType], bool] = {
+    (source, target): allowed
+    for (source, target), allowed in _CAST_MATRIX_WITH_OPTIONAL_TIME.items()
+    if source is not None and target is not None
+}
+
 
 def _cast_matrix_type(data_type: types.DataType) -> types.DataType | None:
     if isinstance(data_type, types.NumericType):
@@ -298,7 +307,7 @@ def _cast_matrix_type(data_type: types.DataType) -> types.DataType | None:
         return _STRING
     if isinstance(data_type, types.DateType):
         return _DATE
-    if isinstance(data_type, types.TimeType):
+    if _TIME_TYPE is not None and isinstance(data_type, _TIME_TYPE):
         return _TIME
     if isinstance(data_type, types.TimestampNTZType):
         return _TIMESTAMP_NTZ

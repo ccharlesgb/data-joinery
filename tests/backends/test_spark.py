@@ -364,7 +364,8 @@ def test_schema_diff_reports_all_nested_differences():
 _NUMERIC = types.NumericType()
 _STRING = types.StringType()
 _DATE = types.DateType()
-_TIME = types.TimeType()
+_TIME_TYPE = getattr(types, "TimeType", None)
+_TIME = _TIME_TYPE() if _TIME_TYPE is not None else None
 _TIMESTAMP = types.TimestampType()
 _TIMESTAMP_NTZ = types.TimestampNTZType()
 _INTERVAL = types.DayTimeIntervalType()
@@ -374,7 +375,7 @@ _ARRAY = types.ArrayType(types.NullType())
 _MAP = types.MapType(types.NullType(), types.NullType())
 _STRUCT = types.StructType()
 
-_TEST_CAST_MATRIX = {
+_TEST_CAST_MATRIX_WITH_OPTIONAL_TIME = {
     (_NUMERIC, _NUMERIC): True,
     (_NUMERIC, _STRING): True,
     (_NUMERIC, _DATE): False,
@@ -521,6 +522,12 @@ _TEST_CAST_MATRIX = {
     (_STRUCT, _STRUCT): True,
 }
 
+_TEST_CAST_MATRIX = {
+    (source, target): allowed
+    for (source, target), allowed in _TEST_CAST_MATRIX_WITH_OPTIONAL_TIME.items()
+    if source is not None and target is not None
+}
+
 
 @pytest.mark.parametrize(
     ("source", "target", "allowed"),
@@ -531,6 +538,10 @@ _TEST_CAST_MATRIX = {
 )
 def test_is_cast_compatible_matches_ansi_matrix(source, target, allowed):
     assert spark_backend._is_cast_compatible(source, target) is allowed
+
+
+def test_cast_matrix_only_includes_available_types():
+    assert spark_backend.CAST_MATRIX == _TEST_CAST_MATRIX
 
 
 def test_schema_coercion_error_exposes_all_violations():

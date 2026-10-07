@@ -277,6 +277,7 @@ dev = [
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pyrefly" },
+    { name = "pyspark" },
     { name = "pytest" },
     { name = "pytest-layout-enforcer" },
     { name = "ruff" },
@@ -292,8 +293,8 @@ requires-dist = [
     { name = "polars", marker = "extra == 'polars'", specifier = ">=1.0.0" },
     { name = "pydantic", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.0.0" },
-    { name = "pyspark", marker = "extra == 'all'", specifier = ">=4.1.0" },
-    { name = "pyspark", marker = "extra == 'pyspark'", specifier = ">=4.1.0" },
+    { name = "pyspark", marker = "extra == 'all'", specifier = ">=4.0.0" },
+    { name = "pyspark", marker = "extra == 'pyspark'", specifier = ">=4.0.0" },
     { name = "rustworkx", specifier = ">=0.18.1" },
 ]
 provides-extras = ["all", "pyspark", "polars", "pydantic", "vis"]
@@ -308,6 +309,7 @@ dev = [
     { name = "pyarrow", specifier = ">=25.0.1" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pyrefly", specifier = ">=1.2.0" },
+    { name = "pyspark", specifier = "==4.0.0" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-layout-enforcer", specifier = ">=0.1.0" },
     { name = "ruff", specifier = ">=0.15.17" },
@@ -1486,12 +1488,12 @@ wheels = [
 
 [[package]]
 name = "pyspark"
-version = "4.2.0"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "py4j" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/33/c987434f5d50aa802779a004ca0fd45ee4350caab50554ad7283d5a22b50/pyspark-4.2.0.tar.gz", hash = "sha256:5ad689d53570ee1674193fd4f9bda065f0db3be9363a27d2a3406cc457b70b61", size = 450129423, upload-time = "2026-07-14T22:16:46Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/0e/5b38d51f1b1c2618cccfbf35093268665af9a3bdb493e5a3ecd991def633/pyspark-4.0.0.tar.gz", hash = "sha256:38db1b4f6095a080d7605e578d775528990e66dc326311d93e94a71cfc24e5a5", size = 434132212, upload-time = "2025-05-23T03:29:33.916Z" }
 
 [[package]]
 name = "pytest"

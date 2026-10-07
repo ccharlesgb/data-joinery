@@ -25,10 +25,10 @@ all = [
     "matplotlib>=3.10.8",
     "polars>=1.0.0",
     "pydantic>=2.0.0",
-    "pyspark>=4.1.0",
+    "pyspark>=4.0.0",
 ]
 pyspark = [
-    "pyspark>=4.1.0",
+    "pyspark>=4.0.0",
 ]
 polars = [
     "polars>=1.0.0",
@@ -62,6 +62,7 @@ dev = [
     "ruff>=0.15.17",
     "scikit-learn>=1.9.1",
     "zensical>=0.0.45",
+    "pyspark==4.0.0", # Older Databricks LTS
 ]
 
 [tool.pytest-layout-enforcer]
