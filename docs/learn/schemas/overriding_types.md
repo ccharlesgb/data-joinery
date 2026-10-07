@@ -3,25 +3,37 @@
 Types can be overridden for a specific backend by annotating the fields in your models. If you need to
 override the default type for multiple backends you can just annotate more than once. Take this
 example schema where we override the default types for a python `int`. Only if the annotation is present
-for the backend does the type get overridden. Normally you will only want a Schema to be compatible with
-one backend:
+for the backend does the type get overridden. The tabs show backend-specific overrides for the same Python field types:
 
-``` python
---8<-- "docs_src/learn/schemas/overriding_types/annotated_example_intro.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/schemas/overriding_types/annotated_example_intro_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/schemas/overriding_types/annotated_example_intro_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/schemas/overriding_types/annotated_example_intro_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/schemas/overriding_types/annotated_example_intro_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/schemas/overriding_types/annotated_example_intro_spark_stdout.log"
+    ```
 
 ## Backend specific type behaviour
 
 It isn't a perfect mapping between Python types and backend-specific types, and there may not be
-equivalent types between Polars and PySpark as well. In the example above, Polars does not provide a
-2 byte integer that PySpark has so if you are converting between backends you may see overflow errors
-or a loss of precision.
+equivalent types between Polars and PySpark as well. The backends offer different integer widths, so converting a frame between them may
+change the available precision or raise an overflow error.
 
 ### Spark
 
@@ -37,13 +49,13 @@ see [default type mappings.](../../reference/type_mapping.md#spark)
 The below example shows the effect of annotating your fields has on the resulting schema:
 
 ``` python
---8<-- "docs_src/learn/schemas/annotated_example.py"
+--8<-- "docs_src/learn/schemas/annotated_example_spark.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/schemas/annotated_example_stdout.log"
+--8<-- "docs_src/learn/schemas/annotated_example_spark_stdout.log"
 ```
 
 !!! warning "Nullability in Spark"

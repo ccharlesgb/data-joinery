@@ -41,15 +41,15 @@ agent-lint: lint-deps agent-lint-code lint-types lint-format
 
 agent-check: agent-lint agent-test
 
-docs-serve:
-    uv run zensical build --clean
-    uv run zensical serve
+docs-serve: docs-examples
+    uv run --extra all zensical build --clean
+    uv run --extra all zensical serve
 
-docs-build:
-    uv run zensical build --clean
+docs-build: docs-examples
+    uv run --extra all zensical build --clean
 
 docs-examples:
-    uv run python scripts/run_docs_examples.py
+    uv run --extra all python scripts/run_docs_examples.py
 
 typos:
     typos

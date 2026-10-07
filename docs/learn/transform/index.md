@@ -3,29 +3,35 @@
 Data Joinery provides a decorator for defining transformations on DataFrames. This allows you to
 annotate input and output schemas making it much clearer what the transformation does:
 
-``` python
---8<-- "docs_src/learn/transform/index/decorator_example.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/transform/index/decorator_example_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/transform/index/decorator_example_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/transform/index/decorator_example_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/transform/index/decorator_example_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/transform/index/decorator_example_spark_stdout.log"
+    ```
 
 ## Defining a contract
 
 You can define an input contract by annotating any input parameters with a valid [coercion mode](../../reference/contract.md) and
-schema. This example shows a transform that will project any input dataframe but it will be strict
-on it's output schema. This would be a transformation following the [robustness principle](https://en.wikipedia.org/wiki/Robustness_principle):
-
-``` python
-@transform
-def filter_active_customers(
-    customers: Annotated[DataFrame, Project(Customer)],
-) -> Annotated[DataFrame, Strict(Customer)]:
-    return customers.filter(customers.is_active)
-```
+schema. The example above accepts a projected input and checks its output strictly. The contract
+lets the transformation accept input with extra fields while keeping its output precise.
 
 For read steps of wide/nested tables you might want to use `Project` as the output coercion mode
 instead of writing out the full schema explicitly. This can be especially useful if you only
@@ -42,32 +48,59 @@ def read_nested_event_data(
 
 ## Running Transformations
 
-You can use transformations like you would normally in a Spark job. For example:
+Call a transformation on a DataFrame. You can chain transformations in either backend:
 
-``` python
---8<-- "docs_src/learn/transform/index/usage_example_happy.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/transform/index/usage_example_happy_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/transform/index/usage_example_happy_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
 
-If something is wrong with your transformation chain then you will get a runtime error, because of
-the lazy evaluation model in Spark this will happen even before any work is done*:
+    ``` text
+    --8<-- "docs_src/learn/transform/index/usage_example_happy_polars_stdout.log"
+    ```
 
-``` python
---8<-- "docs_src/learn/transform/index/usage_example_bad.py"
-```
+=== "PySpark"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/transform/index/usage_example_happy_spark.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/transform/index/usage_example_bad_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/transform/index/usage_example_happy_spark_stdout.log"
+    ```
+
+A schema mismatch in a transformation chain raises an error:
+
+=== "Polars"
+
+    ``` python
+    --8<-- "docs_src/learn/transform/index/usage_example_bad_polars.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/transform/index/usage_example_bad_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/transform/index/usage_example_bad_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/transform/index/usage_example_bad_spark_stdout.log"
+    ```
 
 !!! warning
 
-    If your transformations perform actions, for example `collect()`, then Spark may do significant
-    processing before the `SchemaCoercionError` occurs.
+    A PySpark transformation that performs an action such as `collect()` may process data
+    before a later schema check raises `SchemaCoercionError`.

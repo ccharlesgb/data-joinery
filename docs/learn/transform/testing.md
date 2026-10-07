@@ -4,12 +4,26 @@ You can unit test your transformations in the same way you would normally but no
 you have already defined the input and output schemas for your production code you can now
 use them as a convenient way to produce input fixtures for your tests:
 
-``` python
---8<-- "docs_src/learn/transform/testing/test_example.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/transform/testing/test_example_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/transform/testing/test_example_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/transform/testing/test_example_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/transform/testing/test_example_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/transform/testing/test_example_spark_stdout.log"
+    ```

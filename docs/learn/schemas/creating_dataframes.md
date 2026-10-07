@@ -4,12 +4,26 @@ You can easily create example DataFrames from lists of model instances. This is 
 useful for building test fixtures for a transformation. Pass the desired frame class to select
 its backend. Spark also requires its session through the `session` keyword:
 
-``` python
---8<-- "docs_src/learn/schemas/fixture_example.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/schemas/fixture_example_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/schemas/fixture_example_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/schemas/fixture_example_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/schemas/fixture_example_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/schemas/fixture_example_spark_stdout.log"
+    ```

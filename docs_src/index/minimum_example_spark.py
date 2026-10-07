@@ -54,7 +54,7 @@ def get_metrics(
 
 @transform
 def print_metrics(metrics_table: Annotated[DataFrame, Strict(OrderMetrics)]) -> None:
-    metrics_table.show()
+    metrics_table.orderBy("customer_id").show()
 
 
 order_metrics = Pipeline(SparkContext)
@@ -64,6 +64,6 @@ print_metrics_step = order_metrics.add_step(print_metrics)
 
 read_orders_step >> get_metrics_step >> print_metrics_step
 
-spark = SparkSession.builder.getOrCreate()
+spark = SparkSession.builder.config("spark.sql.session.timeZone", "UTC").getOrCreate()
 
 order_metrics.run(SparkContext(spark))

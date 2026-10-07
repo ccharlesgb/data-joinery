@@ -16,58 +16,114 @@ transformation multiple times within the same pipeline. Once the transformations
 you must connect them together using the `connect` method. This method will verify that the
 transformations are compatible and can be connected together:
 
-``` python
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_happy.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_happy_polars.py"
+    ```
 
-``` md
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_happy_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_happy_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_happy_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_happy_spark_stdout.log"
+    ```
 
 ## Validating the pipeline
 
 The pipeline will validate itself as you connect transformations. If there is a schema or type
 incompatibility then you will see a `PipelineConnectionError`. An example of this is shown below:
 
-``` python
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_mismatch.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_mismatch_polars.py"
+    ```
 
-``` md
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_mismatch_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_mismatch_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_mismatch_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_mismatch_spark_stdout.log"
+    ```
 
 The pipeline will also fail to run if you have left a transformation 'dangling', meaning that it
 is missing a connection for one of it's upstream dependencies:
 
-``` python
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_dangling_transformation.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_dangling_transformation_polars.py"
+    ```
 
-``` md
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_dangling_transformation_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_dangling_transformation_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_dangling_transformation_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_dangling_transformation_spark_stdout.log"
+    ```
 
 ## Detecting cycles
 
 The pipeline will automatically detect cycles as you build it to ensure that the end result is
 runnable. The below example shows how the error is raised as you are connecting transformations:
 
-``` python
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_cycle.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_cycle_polars.py"
+    ```
 
-``` md
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_cycle_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_cycle_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_cycle_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_cycle_spark_stdout.log"
+    ```
 
 ## Instance inputs/outputs
 
@@ -76,18 +132,17 @@ typed objects such as machine learning models, pandas DataFrames or any general 
 between steps in the pipeline. For instance contracts, the pipeline only validates that the runtime class is
 compatible between the input and output; it does not perform schema coercion.
 
-The below example shows
-a common use case where data is read, then features are engineered and an ML model is trained. You
-could then write this to MLflow for experiment tracking and model management:
+This PySpark example reads data, engineers features, and trains an ML model.
+The trained model is passed as an instance value:
 
 ``` python
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_output.py"
+--8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_output_spark.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` md
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_output_stdout.log"
+--8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_output_spark_stdout.log"
 ```
 
 Generic type annotations such as `list[str]` are not supported for instance
@@ -110,18 +165,31 @@ pipeline contract.
 Similarly to best practice with [context](context.md), you should avoid primitive types such as
 `int`, `datetime`, etc and prefer either wrapper types or classes to be explicit on input/outputs:
 
-``` python
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_good_practice.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_good_practice_polars.py"
+    ```
 
-``` md
---8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_good_practice_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_good_practice_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_good_practice_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_connect_instance_good_practice_spark_stdout.log"
+    ```
 
 !!! warning "Don't crash your driver node!"
 
-    Instance values in most cases will be created or collected on the driver node in your
-    spark cluster. If you are collecting a dataset to pandas/polars for example ensure you have enough
-    memory on your driver node to accommodate the dataset.
+    Instance values are held in the process running the pipeline. In PySpark, collecting
+    a large DataFrame into an instance value uses driver memory.

@@ -12,7 +12,39 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 DOCS_SOURCE_DIRECTORY = REPOSITORY_ROOT / "docs_src"
+DOCS_DIRECTORY = REPOSITORY_ROOT / "docs"
 MAX_WORKERS = 8
+SNIPPET = re.compile(r'--8<-- "(docs_src/[^"\n]+)"')
+
+
+def validate_snippets() -> None:
+    """Keep every displayed backend example and its generated output together."""
+    for page in DOCS_DIRECTORY.rglob("*.md"):
+        references = {
+            reference.split(":", 1)[0]
+            for reference in SNIPPET.findall(page.read_text())
+        }
+        for reference in references:
+            path = REPOSITORY_ROOT / reference
+            if not path.is_file():
+                raise FileNotFoundError(f"{page}: missing snippet {reference}")
+            if path.suffix == ".py":
+                for backend, other_backend in (
+                    ("spark", "polars"),
+                    ("polars", "spark"),
+                ):
+                    if not path.stem.endswith(f"_{backend}"):
+                        continue
+                    partner = path.with_name(
+                        f"{path.stem.removesuffix(f'_{backend}')}_{other_backend}.py"
+                    )
+                    if (
+                        partner.exists()
+                        and str(partner.relative_to(REPOSITORY_ROOT)) not in references
+                    ):
+                        raise ValueError(
+                            f"{page}: missing {other_backend} tab for {reference}"
+                        )
 
 
 def _report_failure(
@@ -92,9 +124,9 @@ def run_example(script_path: Path) -> None:
             r" in \d+(?:\.\d+)?s(?= ={2,}\n)", "", result.stdout
         )
         write_log(script_path, "stdout", std_out_no_duration)
-        if result.returncode > 1:
+        if result.returncode != 0:
             _report_failure(script_path, result)
-        assert result.returncode <= 1, (
+        assert result.returncode == 0, (
             f"Tests at {script_path} exited with {result.returncode}"
         )
 
@@ -114,6 +146,8 @@ def main() -> None:
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         list(executor.map(run_example, test_examples))
+
+    validate_snippets()
 
 
 if __name__ == "__main__":

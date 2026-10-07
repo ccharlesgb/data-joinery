@@ -47,6 +47,7 @@ favicon = "images/favicon.png"
 language = "en"
 features = [
     "content.code.copy",
+    "content.tabs.link",
     "navigation.footer",
     "navigation.instant",
     "navigation.instant.progress",
@@ -80,6 +81,7 @@ pymdownx.inlinehilite = {}
 pymdownx.snippets = {}
 pymdownx.details = {}
 pymdownx.superfences = {}
+pymdownx.tabbed.alternate_style = true
 admonition = {}
 attr_list = {}
 md_in_html = {}

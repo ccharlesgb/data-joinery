@@ -23,27 +23,55 @@ specified model. Any extra columns, missing columns or type mismatches will resu
 Field order and nullability are ignored, and the input field order is preserved. This DataFrame
 has an extra column so will fail the `strict` validation check:
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_fail_extra_column_spark_stdout.log"
+    ```
 
 However if the Dataframe is equivalent it will pass and return the same DataFrame:
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_strict_happy_spark_stdout.log"
+    ```
 
 Strict does not care about ordering of the fields.
 
@@ -51,58 +79,114 @@ Strict does not care about ordering of the fields.
 
 `project_top_level` projects only the model's top-level columns. If there is a difference in struct fields it will fail:
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field_spark_stdout.log"
+    ```
 
 ### Project (Default)
 
 The mode `project` projects nested struct fields, removing all fields that are not in
 the model:
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_happy_spark_stdout.log"
+    ```
 
 Project will still fail if there are missing columns:
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_fail_missing_columns_spark_stdout.log"
+    ```
 
 ### Project Cast
 
 The most relaxed mode, `project_cast`, recursively projects fields and casts values to the model's field types. This
-will still fail if the types cannot be safely cast by spark but this can be useful if reading external data and
+will still fail if the backend cannot cast a type safely, but this can be useful if reading external data and
 you want to easily align your DataFrame with the model's schema. It will also still fail if there are missing columns:
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_cast.py"
-```
+=== "Polars"
 
-:fontawesome-solid-code: Outputs:
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_cast_polars.py"
+    ```
 
-``` python
---8<-- "docs_src/learn/coercion/dataclass_coercion_project_cast_stdout.log"
-```
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_cast_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_cast_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/coercion/dataclass_coercion_project_cast_spark_stdout.log"
+    ```
 
 Type casting in Data Joinery follows the backend's casting rules. If the cast is
 permitted then a conversion attempt will happen to try to change the data type. This could still

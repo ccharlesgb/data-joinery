@@ -37,7 +37,7 @@ def test_filter_active_customers():
     expected_active_customers = customer_schema.create_dataframe(
         [
             Customer("1", "Alice", True),
-            Customer("3", "Charlie", False),
+            Customer("3", "Charlie", True),
         ],
         DataFrame,
         session=spark,

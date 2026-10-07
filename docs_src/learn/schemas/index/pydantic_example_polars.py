@@ -1,6 +1,5 @@
 import polars as pl
 from pydantic import BaseModel, Field
-from pyspark.sql.types import StructType
 
 from data_joinery import Schema
 
@@ -13,7 +12,4 @@ class Customer(BaseModel):
 
 
 schema = Schema(Customer)
-print("PySpark:")
-print(schema.native_schema(StructType).treeString())
-print("Polars:")
 print(schema.native_schema(pl.Schema))
