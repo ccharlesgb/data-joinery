@@ -30,3 +30,8 @@ __output
 .DS_Store
 
 test-report.xml
+# roborev snapshots
+/.roborev/
+
+# scratch
+scratch

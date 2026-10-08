@@ -1,1 +1,21 @@
-agent = "copilot"
+agent = "codex"                  # AI agent to use
+# model = "gpt-5.6-Terra"  # Model override for this repo
+review_context_count = 5   # Recent reviews to include as context
+
+# Legacy levels: fast, standard, thorough, maximum
+# Exact agent efforts: low, medium, high, xhigh, max
+review_reasoning = "medium"  # For code reviews (default: thorough)
+refine_reasoning = "medium"  # For refine command (default: standard)
+
+# Severity filtering
+review_min_severity = "medium"  # Low findings are reported but do not fail reviews
+fix_min_severity = "medium"     # Skip low-severity findings in fix
+refine_min_severity = "medium"  # Skip low-severity findings in refine
+
+# Auto-close passing reviews
+auto_close_passing_reviews = true
+
+# Project-specific review guidelines
+review_guidelines = """
+Backwards compatibility not essential
+"""
