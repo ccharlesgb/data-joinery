@@ -31,7 +31,8 @@ class ModelSchema[T]:
     def from_model(cls, model: type[T]) -> "ModelSchema[T]":
         if not is_schema_model(model):
             raise ValueError(
-                f"{model.__name__} is neither a dataclass nor a pydantic model"
+                f"{model.__name__} is neither a dataclass nor a pydantic model. "
+                "Decorate it with @dataclass or use a Pydantic BaseModel."
             )
         return cls(
             model=model,
@@ -46,8 +47,8 @@ class ModelSchema[T]:
         for index, row in enumerate(rows):
             if not isinstance(row, self.model):
                 raise ValueError(  # noqa: TRY004
-                    f"Row {index} of type {row.__class__.__name__}. "
-                    f"Expected type {self.model.__name__}"
+                    f"Row {index}: expected {self.model.__name__}, got "
+                    f"{type(row).__name__}. Pass {self.model.__name__} instances."
                 )
             model_dump = getattr(row, "model_dump", None)
             serialized.append(
@@ -81,4 +82,7 @@ def get_model_fields(klass: type[Any]) -> list[tuple[str, Any]]:
             if field_info.annotation is not None
         ]
 
-    raise ValueError(f"{klass.__name__} is neither a dataclass nor a pydantic model")
+    raise ValueError(
+        f"{klass.__name__} is neither a dataclass nor a pydantic model. "
+        "Decorate it with @dataclass or use a Pydantic BaseModel."
+    )

@@ -16,7 +16,12 @@ except ModuleNotFoundError as error:
 else:
     _MATPLOTLIB_AVAILABLE = True
 
-from data_joinery.contract import Contract, VoidContract
+from data_joinery.contract import (
+    Contract,
+    DataFrameContract,
+    VoidContract,
+    describe_contract,
+)
 from data_joinery.dependencies import inspect_context_type
 from data_joinery.transform import Transform
 from data_joinery.visualisation import draw_pipeline
@@ -51,7 +56,9 @@ class Step:
 
     def __rshift__(self, other: Step) -> Step:
         if not isinstance(other, Step):
-            raise TypeError("Can only connect Step instances using >>")
+            raise TypeError(
+                f"Can only connect Step instances using >>; got {type(other).__name__}."
+            )
         self._pipeline.connect(self, other)
         return other
 
@@ -81,8 +88,9 @@ class Pipeline[ContextT]:
         if unsupported_parameters:
             unsupported = min(unsupported_parameters)
             raise TypeError(
-                "pipeline steps only support contract and Context-annotated "
-                f"parameters; unsupported parameter '{unsupported}'"
+                f"Transform '{transform.default_name}' parameter '{unsupported}' has no "
+                "supported contract. Annotate it with a runtime class, a DataFrame "
+                "contract, or Context()."
             )
 
     def add_step(self, transform: Transform, name: str | None = None) -> Step:
@@ -99,14 +107,22 @@ class Pipeline[ContextT]:
             ValueError: If the step name is already registered or cannot be inferred.
             TypeError: If the transform has unsupported parameters or lacks required inputs.
         """
+        if not isinstance(transform, Transform):
+            raise TypeError(
+                "add_step() requires a function decorated with @transform; "
+                f"got {type(transform).__name__}."
+            )
         if name is None:
             name = transform.default_name
         if name is None:
             raise ValueError(
-                f"Step name of '{transform}' could not be inferred. Pass name=<desired_name>"
+                "Cannot infer a name for this transform. Pass name='step_name' "
+                "to add_step()."
             )
         if name in self._steps_by_name:
-            raise ValueError(f"step name '{name}' is already registered")
+            raise ValueError(
+                f"Step name '{name}' is already registered. Choose a unique name."
+            )
 
         self._validate_transform_parameters(transform)
         self._validate_transform_context(transform)
@@ -122,10 +138,10 @@ class Pipeline[ContextT]:
         return step
 
     def _validate_transform_context(self, transform: Transform) -> None:
-        for (
+        for parameter_name, (
             param_type,
             marker,
-        ) in transform.__transform_spec__.context_parameters.values():
+        ) in transform.__transform_spec__.context_parameters.items():
             dependency_type = marker.type or param_type
             if dependency_type not in self._context_fields:
                 transform_name = transform.default_name or repr(transform)
@@ -135,20 +151,34 @@ class Pipeline[ContextT]:
                     else "a context-free pipeline"
                 )
                 raise TypeError(
-                    f"transform '{transform_name}' requires context dependency "
-                    f"{dependency_type.__name__}, but {context_name} does not provide it"
+                    f"Transform '{transform_name}' parameter '{parameter_name}' requires "
+                    f"context dependency {dependency_type.__name__}, but {context_name} "
+                    "does not provide it. Add a field of that type to the context "
+                    "dataclass or change the Context annotation."
                 )
 
     def connect(
         self, upstream: Step, downstream: Step, *, param: str | None = None
     ) -> None:
+        for role, step in (("upstream", upstream), ("downstream", downstream)):
+            if not isinstance(step, Step):
+                raise TypeError(
+                    f"{role.capitalize()} must be a Step; got {type(step).__name__}."
+                )
+            if step._pipeline is not self:
+                raise PipelineConnectionError(
+                    f"{role.capitalize()} step '{step.name}' belongs to another "
+                    "pipeline. Add it to this pipeline before connecting it."
+                )
+
         downstream_spec = downstream.transform.__transform_spec__
         upstream_spec = upstream.transform.__transform_spec__
 
         upstream_contract = upstream_spec.output_contract
         if isinstance(upstream_contract, VoidContract):
             raise PipelineConnectionError(
-                f"upstream step '{upstream.name}' does not produce an output"
+                f"Upstream step '{upstream.name}' produces None. Declare an output "
+                "contract on its transform or connect a step that produces a value."
             )
 
         compatible_specs: dict[str, Contract] = {}
@@ -158,22 +188,54 @@ class Pipeline[ContextT]:
 
         if len(compatible_specs) > 1:
             if param is None:
+                names = ", ".join(sorted(compatible_specs))
                 raise PipelineConnectionError(
-                    f"Multiple compatible input contracts found for upstream step '{upstream.name}' "
-                    f"and downstream step '{downstream.name}', but no parameter was specified"
+                    f"Step '{upstream.name}' produces {describe_contract(upstream_contract)}, "
+                    f"which matches multiple inputs on '{downstream.name}': {names}. "
+                    "Pass param='input_name' to connect()."
                 )
-            else:
-                downstream_parameter_name = param
+            if param not in compatible_specs:
+                names = ", ".join(sorted(compatible_specs))
+                raise PipelineConnectionError(
+                    f"Input '{param}' on step '{downstream.name}' is not compatible "
+                    f"with '{upstream.name}' ({describe_contract(upstream_contract)}). "
+                    f"Choose one of: {names}."
+                )
+            downstream_parameter_name = param
         elif len(compatible_specs) == 1:
             compatible_parameter = next(iter(compatible_specs))
             if param is not None and param != compatible_parameter:
                 raise PipelineConnectionError(
-                    f"Specified parameter '{param}' does not match the compatible input contract '{compatible_parameter}'"
+                    f"Input '{param}' on step '{downstream.name}' does not match "
+                    f"the output of '{upstream.name}' ({describe_contract(upstream_contract)}). "
+                    f"Connect to the compatible input '{compatible_parameter}'."
                 )
             downstream_parameter_name = compatible_parameter
         else:
+            inputs = [
+                f"    '{name}': {describe_contract(contract)}"
+                for name, contract in downstream_spec.input_contracts.items()
+            ] or ["    none"]
+            inputs_text = "\n".join(inputs)
+            requested = f"\n  Requested input: '{param}'" if param else ""
+            action = (
+                "Add an annotated input parameter to the downstream transform."
+                if not downstream_spec.input_contracts
+                else (
+                    "Change an input or output annotation so their DataFrame "
+                    "backends, types, and schema models match."
+                    if isinstance(upstream_contract, DataFrameContract)
+                    else "Change an input or output annotation so the produced "
+                    "value type matches an input."
+                )
+            )
             raise PipelineConnectionError(
-                f"No compatible contract between steps '{upstream.name}' and '{downstream.name}'"
+                f"No compatible contract between steps '{upstream.name}' and "
+                f"'{downstream.name}':\n"
+                f"  Output of '{upstream.name}': {describe_contract(upstream_contract)}\n"
+                f"  Inputs of '{downstream.name}':\n"
+                f"{inputs_text}{requested}\n"
+                f"{action}"
             )
 
         downstream_index = self._node_indices[downstream]
@@ -187,7 +249,8 @@ class Pipeline[ContextT]:
             connected_upstream = self._dag[connected_upstream_index]
             raise PipelineConnectionError(
                 f"Step '{connected_upstream.name}' is already connected to "
-                f"'{downstream.name}'"
+                f"'{downstream.name}' input '{downstream_parameter_name}'. "
+                "Disconnect that input before connecting another step."
             )
 
         try:
@@ -198,7 +261,8 @@ class Pipeline[ContextT]:
             )
         except rx.DAGWouldCycle:
             raise PipelineCycleError(
-                f"Connecting upstream step '{upstream.name}' to downstream step '{downstream.name}' would create a cycle"
+                f"Connecting step '{upstream.name}' to '{downstream.name}' would "
+                "create a cycle. Remove a connection so the steps form a DAG."
             )
 
     def connect_many(
@@ -207,7 +271,10 @@ class Pipeline[ContextT]:
         downstream: Step,
     ) -> None:
         if not upstream_steps:
-            raise ValueError("connect_many requires at least one upstream step")
+            raise ValueError(
+                "connect_many requires at least one upstream step. Pass a nonempty "
+                "sequence of Step instances."
+            )
         for upstream in upstream_steps:
             self.connect(upstream, downstream)
 
@@ -225,7 +292,9 @@ class Pipeline[ContextT]:
                 and step.transform.__transform_spec__.input_contracts
             ):
                 raise PipelineExecutionError(
-                    f"first pipeline step '{step.name}' requires upstream inputs"
+                    f"Pipeline step '{step.name}' requires upstream inputs: "
+                    f"{', '.join(step.transform.__transform_spec__.input_contracts)}. "
+                    "Connect steps that produce these inputs."
                 )
 
     def _validate_transform_override(self, step: Step, replacement: Transform) -> None:
@@ -244,14 +313,19 @@ class Pipeline[ContextT]:
         for name, original_contract in original.input_contracts.items():
             if not override.input_contracts[name].accepts(original_contract):
                 raise PipelineOverrideError(
-                    f"transform override for step '{step.name}' has an incompatible "
-                    f"contract for input parameter '{name}'"
+                    f"Transform override for step '{step.name}' has an incompatible "
+                    f"contract for input '{name}': expected "
+                    f"{describe_contract(original_contract)}, got "
+                    f"{describe_contract(override.input_contracts[name])}. "
+                    "Declare a compatible input contract."
                 )
 
         if original.output_contract != override.output_contract:
             raise PipelineOverrideError(
-                f"transform override for step '{step.name}' must declare the same "
-                "output contract"
+                f"Transform override for step '{step.name}' must declare the same "
+                f"output contract: expected {describe_contract(original.output_contract)}, "
+                f"got {describe_contract(override.output_contract)}. "
+                "Change the replacement's return annotation."
             )
 
         original_context_types = {
@@ -269,7 +343,8 @@ class Pipeline[ContextT]:
             )
             raise PipelineOverrideError(
                 f"transform override for step '{step.name}' introduces context "
-                f"dependencies not required by the original transform: {added}"
+                f"dependencies not required by the original transform: {added}. "
+                "Remove these dependencies from the replacement."
             )
 
     def _resolve_transform_overrides(
@@ -288,7 +363,7 @@ class Pipeline[ContextT]:
             if not isinstance(replacement, Transform):
                 raise PipelineOverrideError(
                     f"transform override for step '{name}' must be decorated "
-                    "with @transform"
+                    f"with @transform; got {type(replacement).__name__}."
                 )
 
             self._validate_transform_override(step, replacement)
@@ -320,15 +395,20 @@ class Pipeline[ContextT]:
     ) -> dict[str, Any]:
         if self._context_type is None:
             if context is not None:
-                raise TypeError("a context-free pipeline does not accept a context")
+                raise TypeError(
+                    "A context-free pipeline does not accept a context; "
+                    f"got {type(context).__name__}. Call run() without one."
+                )
         elif context is None:
             raise TypeError(
-                f"Pipeline[{self._context_type.__name__}] requires a context"
+                f"Pipeline[{self._context_type.__name__}] requires a context. "
+                f"Pass a {self._context_type.__name__} instance to run()."
             )
         elif not isinstance(context, self._context_type):
             raise TypeError(
                 f"expected context of type {self._context_type.__name__}, "
-                f"got {type(context).__name__}"
+                f"got {type(context).__name__}. Pass a "
+                f"{self._context_type.__name__} instance to run()."
             )
 
         overrides = self._resolve_transform_overrides(transform_overrides)
@@ -353,13 +433,22 @@ class Pipeline[ContextT]:
                 context_field = self._context_fields[dependency_type]
                 arguments[parameter_name] = getattr(context, context_field)
 
+            missing = set(spec.input_contracts) - arguments.keys()
+            if missing:
+                names = ", ".join(sorted(missing))
+                raise PipelineExecutionError(
+                    f"Pipeline step '{step.name}' has unconnected inputs: {names}. "
+                    "Connect an upstream step to each input."
+                )
+
             try:
                 result = effective_transform(**arguments)
             except Exception as error:
                 if isinstance(error, PipelineExecutionError):
                     raise
                 raise PipelineExecutionError(
-                    f"Pipeline step '{step.name}' failed"
+                    f"Pipeline step '{step.name}' failed: "
+                    f"{type(error).__name__}: {error}"
                 ) from error
 
             if result is not None:

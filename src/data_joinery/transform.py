@@ -22,6 +22,7 @@ from .contract import (
     _UncheckedContract,
 )
 from .dependencies import Context
+from .schema_types import SchemaCoercionError
 from .utils import get_callable_name
 
 
@@ -95,7 +96,12 @@ def _inspect_transform(f: Any) -> TransformSpec:
             continue
 
         if not _is_annotated_dataframe(parameter_type):
-            input_schemas[parameter_name] = InstanceContract(parameter_type)
+            try:
+                input_schemas[parameter_name] = InstanceContract(parameter_type)
+            except TypeError as error:
+                raise TypeError(
+                    f"Transform '{f.__name__}' parameter '{parameter_name}': {error}"
+                ) from None
 
     output_contract: Contract = VoidContract()
     return_type = type_hints.get("return")
@@ -106,7 +112,12 @@ def _inspect_transform(f: Any) -> TransformSpec:
         elif _is_annotated_dataframe(return_type):
             output_contract = _UncheckedContract()
         else:
-            output_contract = InstanceContract(return_type)
+            try:
+                output_contract = InstanceContract(return_type)
+            except TypeError as error:
+                raise TypeError(
+                    f"Transform '{f.__name__}' return annotation: {error}"
+                ) from None
 
     return TransformSpec(
         input_contracts=input_schemas,
@@ -134,12 +145,22 @@ def _wrap_transform[**P, R](
                 )
             except ContractTypeMismatch as e:
                 raise TypeError(
-                    f"Parameter '{parameter_name}' must be {e.expected_type}"
+                    f"Transform '{fn.__name__}' parameter '{parameter_name}' must be "
+                    f"{e.expected_type}; got {type(value).__name__}."
+                ) from None
+            except SchemaCoercionError as e:
+                raise SchemaCoercionError(
+                    e.mode,
+                    e.violations,
+                    location=(
+                        f"Transform '{fn.__name__}' parameter '{parameter_name}'"
+                        + (f", {e.location}" if e.location else "")
+                    ),
                 ) from None
             except ValueError as e:
                 raise ValueError(
-                    f"Schema mismatch for parameter '{parameter_name}'"
-                ) from e
+                    f"Transform '{fn.__name__}' parameter '{parameter_name}': {e}"
+                ) from None
 
         result = fn(*bound_arguments.args, **bound_arguments.kwargs)
 
@@ -147,10 +168,20 @@ def _wrap_transform[**P, R](
             result = cast(R, spec.output_contract.validate(result))
         except ContractTypeMismatch as e:
             raise TypeError(
-                f"Return value from '{fn.__name__}' must be {e.expected_type}"
+                f"Return value from '{fn.__name__}' must be {e.expected_type}; "
+                f"got {type(result).__name__}."
+            ) from None
+        except SchemaCoercionError as e:
+            raise SchemaCoercionError(
+                e.mode,
+                e.violations,
+                location=(
+                    f"Transform '{fn.__name__}' return value"
+                    + (f", {e.location}" if e.location else "")
+                ),
             ) from None
         except ValueError as e:
-            raise ValueError(f"Return schema mismatch for '{fn.__name__}'") from e
+            raise ValueError(f"Transform '{fn.__name__}' return value: {e}") from None
 
         return result
 

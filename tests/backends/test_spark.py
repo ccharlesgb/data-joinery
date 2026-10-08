@@ -93,7 +93,7 @@ def test_schema_create_dataframe_rejects_rows_of_a_different_type(
 
     rows = [MyDataClass(1, "a"), MyDataClass2(2)]
     with pytest.raises(
-        ValueError, match="Row 1 of type MyDataClass2. Expected type MyDataClass"
+        ValueError, match="Row 1: expected MyDataClass, got MyDataClass2"
     ):
         Schema(MyDataClass).create_dataframe(rows, DataFrame, session=spark)  # type: ignore
 
@@ -554,11 +554,11 @@ def test_schema_coercion_error_exposes_all_violations():
     assert error.mode == "project_cast"
     assert error.violations == violations
     assert str(error) == (
-        "Cannot coerce dataframe using mode 'project_cast':\n"
-        "  Missing fields:\n"
-        "    - customer.postcode (expected StringType())\n"
-        "  Unsupported type casts:\n"
-        "    - active: BinaryType() -> BooleanType()"
+        "Cannot coerce DataFrame (mode='project_cast'):\n"
+        "  - Missing field 'customer.postcode': expected StringType(). "
+        "Add the field or update the model.\n"
+        "  - Field 'active': expected BooleanType(), got BinaryType(). "
+        "Convert the values to the expected type before coercion."
     )
 
 

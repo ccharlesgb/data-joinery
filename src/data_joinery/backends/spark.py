@@ -567,14 +567,18 @@ class SparkBackend:
     schema_types = (types.StructType,)
 
     def compile_schema(self, schema: ModelSchema[Any]) -> types.StructType:
-        return types.StructType(
-            [
-                types.StructField(
-                    field.name, _get_spark_field_type(field.annotation), True
-                )
-                for field in schema.fields
-            ]
-        )
+        fields = []
+        for field in schema.fields:
+            try:
+                field_type = _get_spark_field_type(field.annotation)
+            except ValueError as error:
+                raise ValueError(
+                    f"Schema '{schema.model.__name__}' field '{field.name}' "
+                    f"({field.annotation!r}): {error}. Use a supported Python "
+                    "type or an Annotated Spark type."
+                ) from error
+            fields.append(types.StructField(field.name, field_type, True))
+        return types.StructType(fields)
 
     def create_dataframe(
         self,
@@ -593,14 +597,17 @@ class SparkBackend:
         mode: CoercionMode,
     ) -> DataFrame:
         if not isinstance(dataframe, DataFrame):
-            raise TypeError("Spark backend requires a pyspark.sql.DataFrame")
-        try:
-            handler = _MODE_HANDLERS[mode]
-            return _make_dataframe_nullable(
-                handler(dataframe, self.compile_schema(schema))
+            raise TypeError(
+                "Spark coercion requires a pyspark.sql.DataFrame; "
+                f"got {type(dataframe).__name__}."
             )
-        except KeyError as e:
-            raise ValueError(f"Unsupported coercion mode: {mode}") from e
+        if mode not in _MODE_HANDLERS:
+            raise ValueError(
+                f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
+                "'project_top_level', or 'project_cast'."
+            )
+        handler = _MODE_HANDLERS[mode]
+        return _make_dataframe_nullable(handler(dataframe, self.compile_schema(schema)))
 
 
 SPARK_BACKEND = SparkBackend()

@@ -165,8 +165,8 @@ def test_transform_rejects_generic_instance_parameter():
     with pytest.raises(
         TypeError,
         match=(
-            r"InstanceContract requires an unsubscripted runtime class, "
-            r"got list\[str\]"
+            r"Transform 'count_paths' parameter 'paths': InstanceContract requires "
+            r"an unsubscripted runtime class, got list\[str\]"
         ),
     ):
 
@@ -179,8 +179,8 @@ def test_transform_rejects_generic_instance_return_type():
     with pytest.raises(
         TypeError,
         match=(
-            r"InstanceContract requires an unsubscripted runtime class, "
-            r"got list\[str\]"
+            r"Transform 'get_paths' return annotation: InstanceContract requires "
+            r"an unsubscripted runtime class, got list\[str\]"
         ),
     ):
 
@@ -204,7 +204,9 @@ def test_transform_validates_instances_through_contract_interface():
 
     assert get_path(PathConfig("users")) == "users"
 
-    with pytest.raises(TypeError, match="Parameter 'config' must be a PathConfig"):
+    with pytest.raises(
+        TypeError, match="parameter 'config' must be a PathConfig; got str"
+    ):
         get_path("users")  # type: ignore[arg-type]
 
 

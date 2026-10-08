@@ -325,12 +325,17 @@ class PolarsBackend:
     schema_types = (pl.Schema,)
 
     def compile_schema(self, schema: ModelSchema[Any]) -> pl.Schema:
-        return pl.Schema(
-            {
-                field.name: _get_polars_field_type(field.annotation)
-                for field in schema.fields
-            }
-        )
+        fields: dict[str, PolarsDataType] = {}
+        for field in schema.fields:
+            try:
+                fields[field.name] = _get_polars_field_type(field.annotation)
+            except ValueError as error:
+                raise ValueError(
+                    f"Schema '{schema.model.__name__}' field '{field.name}' "
+                    f"({field.annotation!r}): {error}. Use a supported Python "
+                    "type or an Annotated Polars type."
+                ) from error
+        return pl.Schema(fields)
 
     def create_dataframe(
         self,
@@ -352,7 +357,10 @@ class PolarsBackend:
         mode: CoercionMode,
     ) -> pl.DataFrame:
         if not isinstance(dataframe, pl.DataFrame):
-            raise TypeError("Polars backend requires a polars.DataFrame")
+            raise TypeError(
+                "Polars coercion requires a polars.DataFrame; "
+                f"got {type(dataframe).__name__}."
+            )
 
         expected = self.compile_schema(schema)
         if mode == "strict":
@@ -373,7 +381,10 @@ class PolarsBackend:
             return _project_fields(
                 dataframe, expected, mode=mode, cast=True, recurse=True
             )
-        raise ValueError(f"Unsupported coercion mode: {mode}")
+        raise ValueError(
+            f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
+            "'project_top_level', or 'project_cast'."
+        )
 
 
 POLARS_BACKEND = PolarsBackend()

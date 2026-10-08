@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from .backends import backend_for_frame_type, backend_for_value, get_backend
-from .schemas import CoercionMode, Schema
+from .schemas import CoercionMode, Schema, SchemaCoercionError
 
 
 class Contract(Protocol):
@@ -15,6 +15,24 @@ class ContractTypeMismatch(TypeError):
     def __init__(self, expected_type: str):
         self.expected_type = expected_type
         super().__init__(f"expected {expected_type}")
+
+
+def describe_contract(contract: Contract) -> str:
+    """Describe the value a pipeline connection or override declares."""
+    if isinstance(contract, DataFrameContract):
+        frame = (
+            f"{contract.backend_name} DataFrame"
+            if contract.backend_name is not None
+            else "DataFrame"
+        )
+        return f"{frame}[{contract.schema.model.__name__}] ({contract.coercion_mode})"
+    if isinstance(contract, InstanceContract):
+        return contract.value_type.__name__
+    if isinstance(contract, VoidContract):
+        return "None"
+    if isinstance(contract, _UncheckedContract):
+        return "unvalidated DataFrame"
+    return type(contract).__name__
 
 
 @dataclass(frozen=True)
@@ -93,9 +111,16 @@ class DataFrameContract:
                 else "registered dataframe"
             )
             raise ContractTypeMismatch(f"a {expected}")
-        return backend.coerce_dataframe(
-            value, self.schema.model_schema, self.coercion_mode
-        )
+        try:
+            return backend.coerce_dataframe(
+                value, self.schema.model_schema, self.coercion_mode
+            )
+        except SchemaCoercionError as error:
+            raise SchemaCoercionError(
+                error.mode,
+                error.violations,
+                location=f"Schema '{self.schema.model.__name__}'",
+            ) from None
 
 
 @dataclass(frozen=True)

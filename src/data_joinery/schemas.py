@@ -27,7 +27,10 @@ def _require_backend(
     kind: str,
 ) -> DataFrameBackend:
     if backend is None:
-        raise TypeError(f"No {kind} backend is registered for {value_type.__name__}")
+        raise TypeError(
+            f"No {kind} backend is registered for {value_type.__name__}. "
+            "Use a supported type or register a backend for it."
+        )
     return backend
 
 
@@ -52,8 +55,9 @@ class Schema[T]:
         native_schema = backend.compile_schema(self._model_schema)
         if not isinstance(native_schema, schema_type):
             raise TypeError(
-                f"Backend '{backend.name}' returned "
-                f"{type(native_schema).__name__}, expected {schema_type.__name__}"
+                f"Backend '{backend.name}' returned schema type "
+                f"{type(native_schema).__name__}; expected {schema_type.__name__}. "
+                "Fix the backend's compile_schema() result."
             )
         return native_schema
 
@@ -70,8 +74,9 @@ class Schema[T]:
         frame = backend.create_dataframe(rows, self._model_schema, **kwargs)
         if not isinstance(frame, frame_type):
             raise TypeError(
-                f"Backend '{backend.name}' returned {type(frame).__name__}, "
-                f"expected {frame_type.__name__}"
+                f"Backend '{backend.name}' returned DataFrame type "
+                f"{type(frame).__name__}; expected {frame_type.__name__}. "
+                "Fix the backend's create_dataframe() result."
             )
         return frame
 
@@ -81,11 +86,19 @@ class Schema[T]:
         backend = _require_backend(
             backend_for_value(dataframe), type(dataframe), kind="dataframe"
         )
-        frame = backend.coerce_dataframe(dataframe, self._model_schema, mode)
+        try:
+            frame = backend.coerce_dataframe(dataframe, self._model_schema, mode)
+        except SchemaCoercionError as error:
+            raise SchemaCoercionError(
+                error.mode,
+                error.violations,
+                location=f"Schema '{self.model.__name__}'",
+            ) from None
         if not isinstance(frame, type(dataframe)):
             raise TypeError(
-                f"Backend '{backend.name}' returned {type(frame).__name__}, "
-                f"expected {type(dataframe).__name__}"
+                f"Backend '{backend.name}' returned DataFrame type "
+                f"{type(frame).__name__}; expected {type(dataframe).__name__}. "
+                "Fix the backend's coerce_dataframe() result."
             )
         return cast(FrameT, frame)
 
