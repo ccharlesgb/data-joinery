@@ -141,6 +141,74 @@ def test_pipeline_names_unconnected_parameter():
         pipeline.run()
 
 
+def test_pipeline_uses_default_for_unconnected_input():
+    @transform
+    def produce() -> str:
+        return "hello world"
+
+    @transform
+    def consume(value: str, limit: int = 10) -> str:
+        return value[:limit]
+
+    pipeline = Pipeline()
+    source = pipeline.add_step(produce)
+    sink = pipeline.add_step(consume)
+    pipeline.connect(source, sink)
+
+    assert pipeline.run()["consume"] == "hello worl"
+
+
+def test_pipeline_runs_root_step_with_only_defaulted_inputs():
+    @transform
+    def read(path: str = "data.csv") -> str:
+        return path
+
+    pipeline = Pipeline()
+    pipeline.add_step(read)
+
+    assert pipeline.run()["read"] == "data.csv"
+
+
+def test_pipeline_runs_root_step_with_defaults_from_override():
+    @transform
+    def read(path: str) -> str:
+        return path
+
+    @transform
+    def replacement(path: str = "fixture.csv") -> str:
+        return path
+
+    pipeline = Pipeline()
+    pipeline.add_step(read)
+
+    assert (
+        pipeline.run(transform_overrides={"read": replacement})["read"] == "fixture.csv"
+    )
+
+
+def test_pipeline_uses_effective_transform_default_for_unconnected_input():
+    @transform
+    def produce() -> str:
+        return "value"
+
+    @transform
+    def consume(value: str, limit: int) -> str:
+        return value[:limit]
+
+    @transform
+    def replacement(value: str, limit: int = 3) -> str:
+        return value[:limit]
+
+    pipeline = Pipeline()
+    source = pipeline.add_step(produce)
+    sink = pipeline.add_step(consume)
+    pipeline.connect(source, sink)
+
+    assert (
+        pipeline.run(transform_overrides={"consume": replacement})["consume"] == "val"
+    )
+
+
 def test_override_error_names_expected_and_actual_output():
     @transform
     def users() -> Annotated[pl.DataFrame, Project(User)]:

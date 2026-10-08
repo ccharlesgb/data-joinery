@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, overload
@@ -285,15 +286,21 @@ class Pipeline[ContextT]:
         node_indices = rx.topological_sort(self._dag)
         return [self._dag[node_index] for node_index in node_indices]
 
-    def _validate_source_steps(self) -> None:
+    def _validate_source_steps(self, overrides: Mapping[str, Transform]) -> None:
         for step, step_index in self._node_indices.items():
-            if (
-                self._dag.in_degree(step_index) == 0
-                and step.transform.__transform_spec__.input_contracts
-            ):
+            if self._dag.in_degree(step_index) != 0:
+                continue
+            effective_transform = overrides.get(step.name, step.transform)
+            signature = effective_transform.get_signature()
+            required = [
+                name
+                for name in effective_transform.__transform_spec__.input_contracts
+                if signature.parameters[name].default is inspect.Parameter.empty
+            ]
+            if required:
                 raise PipelineExecutionError(
                     f"Pipeline step '{step.name}' requires upstream inputs: "
-                    f"{', '.join(step.transform.__transform_spec__.input_contracts)}. "
+                    f"{', '.join(required)}. "
                     "Connect steps that produce these inputs."
                 )
 
@@ -412,7 +419,7 @@ class Pipeline[ContextT]:
             )
 
         overrides = self._resolve_transform_overrides(transform_overrides)
-        self._validate_source_steps()
+        self._validate_source_steps(overrides)
 
         outputs: dict[str, Any] = {}
 
@@ -433,7 +440,13 @@ class Pipeline[ContextT]:
                 context_field = self._context_fields[dependency_type]
                 arguments[parameter_name] = getattr(context, context_field)
 
-            missing = set(spec.input_contracts) - arguments.keys()
+            signature = effective_transform.get_signature()
+            missing = {
+                name
+                for name in spec.input_contracts
+                if name not in arguments
+                and signature.parameters[name].default is inspect.Parameter.empty
+            }
             if missing:
                 names = ", ".join(sorted(missing))
                 raise PipelineExecutionError(
