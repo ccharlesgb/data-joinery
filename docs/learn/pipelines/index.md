@@ -193,3 +193,34 @@ Similarly to best practice with [context](context.md), you should avoid primitiv
 
     Instance values are held in the process running the pipeline. In PySpark, collecting
     a large DataFrame into an instance value uses driver memory.
+
+## Visualizing data flow
+
+Install the `vis` extra and call `pipeline.visualize()` after connecting the steps.
+The figure places steps from left to right in flow order. Each card shows its step name,
+transformation, inputs, and output type. Arrows point to the parameter that receives the
+data. Teal marks DataFrames, purple marks instance values, and grey marks steps without
+an output. Context dependencies appear inside the relevant step card.
+
+This example splits the orders into two branches, combines them, then passes both
+DataFrames and a fitted model into later steps:
+
+![Order pipeline data flow: orders split into clean and priority branches, combine, then feed a model and scoring step before being written.](../../images/pipeline-data-flow.svg)
+
+Open the [full-size figure](../../images/pipeline-data-flow.svg) to inspect each input and output.
+
+??? example "Pipeline used in the figure"
+
+    ``` python
+    --8<-- "docs_src/learn/pipelines/index/pipeline_visualisation_polars.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/pipelines/index/pipeline_visualisation_polars_stdout.log"
+    ```
+
+Pass `show=False` to `visualize()` to get the Matplotlib figure without opening a window.
+Use the returned figure's `savefig()` method to save a PNG or SVG. SVG works well for
+large pipelines because you can zoom in without losing detail.

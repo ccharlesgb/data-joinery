@@ -8,12 +8,10 @@ import rustworkx as rx
 
 try:
     from matplotlib import pyplot as plt
-    from rustworkx.visualization import mpl_draw
 except ModuleNotFoundError as error:
     if error.name != "matplotlib":
         raise
     plt = None
-    mpl_draw = None
     _MATPLOTLIB_AVAILABLE = False
 else:
     _MATPLOTLIB_AVAILABLE = True
@@ -21,7 +19,7 @@ else:
 from data_joinery.contract import Contract, VoidContract
 from data_joinery.dependencies import inspect_context_type
 from data_joinery.transform import Transform
-from data_joinery.visualisation import topological_layout
+from data_joinery.visualisation import draw_pipeline
 
 
 class PipelineExecutionError(RuntimeError):
@@ -369,23 +367,19 @@ class Pipeline[ContextT]:
 
         return outputs
 
-    def visualize(self) -> None:
+    def visualize(self, *, show: bool = True):
+        """Draw the pipeline and return its Matplotlib figure.
+
+        Set ``show=False`` to save or customize the figure without opening a window.
+        """
         if not _MATPLOTLIB_AVAILABLE:
             raise ImportError(
                 "Pipeline visualization requires matplotlib; "
                 "install it with `pip install 'data-joinery[vis]'`."
             )
 
-        assert mpl_draw is not None
         assert plt is not None
-        mpl_draw(
-            self._dag,
-            pos=topological_layout(self._dag),
-            with_labels=True,
-            labels=lambda node: node.name,
-            edge_labels=lambda edge: edge,
-            node_shape="s",
-            node_size=500,
-            font_size=8,
-        )
-        plt.show()
+        figure = draw_pipeline(self._dag)
+        if show:
+            plt.show()
+        return figure
