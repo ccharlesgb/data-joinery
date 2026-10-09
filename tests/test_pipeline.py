@@ -189,10 +189,13 @@ def test_pipeline_allows_write_step_without_output_schema(spark: SparkSession):
     write_step = pipeline.add_step(write_users, "write_users")
     pipeline.connect(read_step, write_step)
 
-    outputs = pipeline.run(SparkContext(spark))
+    result = pipeline.run(SparkContext(spark))
 
-    assert len(written) == 1
-    assert "write_users" not in outputs
+    assert result.get_input(write_step, "users", DataFrame) is result.get_output(
+        read_step
+    )
+    assert [row.asDict() for row in written[0].collect()] == [{"user_id": 1}]
+    assert result.get_output(write_step) is None
 
 
 def test_pipeline_rejects_missing_dataframe_match():
@@ -340,10 +343,10 @@ def test_executable_pipeline_runs_sources_and_downstream_steps(
     filtered = pipeline.add_step(filter_users, "filtered")
     pipeline.connect(users, filtered)
 
-    outputs = pipeline.run(SparkContext(spark))
+    result = pipeline.run(SparkContext(spark))
 
-    assert set(outputs) == {"users", "filtered"}
-    assert outputs["filtered"].collect()[0].user_id == 1
+    assert [step_run.step for step_run in result.step_runs] == [users, filtered]
+    assert result.get_output(filtered).collect()[0].user_id == 1
 
 
 def test_executable_pipeline_passes_instance_outputs(spark: SparkSession):
@@ -370,9 +373,9 @@ def test_executable_pipeline_passes_instance_outputs(spark: SparkSession):
     pipeline.connect(users, model)
     pipeline.connect(model, printer)
 
-    outputs = pipeline.run(SparkContext(spark))
+    result = pipeline.run(SparkContext(spark))
 
-    assert outputs["model"] == FittedModel(coefficient=1.0)
+    assert result.get_output(model) == FittedModel(coefficient=1.0)
     assert printed == [FittedModel(coefficient=1.0)]
 
 
@@ -404,10 +407,10 @@ def test_executable_pipeline_runs_fan_in_and_independent_components(
     joined = pipeline.add_step(join, "joined")
     pipeline.connect_many([users, departments], joined)
 
-    outputs = pipeline.run(SparkContext(spark))
+    result = pipeline.run(SparkContext(spark))
 
-    assert set(outputs) == {"users", "departments", "joined"}
-    assert outputs["joined"].collect()[0].user_id == 1
+    assert len(result.step_runs) == 3
+    assert result.get_output(joined).collect()[0].user_id == 1
 
 
 def test_executable_pipeline_requires_context_for_spark():
@@ -484,12 +487,12 @@ def test_run_resolves_context_parameter_from_dataclass(spark: SparkSession):
         return spark.createDataFrame([(1,)], "user_id BIGINT")
 
     pipeline = Pipeline(UserContext)
-    pipeline.add_step(read_users, "users")
+    users = pipeline.add_step(read_users, "users")
 
     context = UserContext(spark, PathConfig("gs://bucket/users"))
-    outputs = pipeline.run(context)
+    result = pipeline.run(context)
 
-    assert outputs["users"].count() == 1
+    assert result.get_output(users).count() == 1
 
 
 def test_pipeline_rejects_transform_dependency_missing_from_context():
@@ -530,14 +533,14 @@ def test_run_uses_named_transform_overrides_without_mutating_pipeline(
         return fixture_users
 
     pipeline = Pipeline(UserContext)
-    pipeline.add_step(read_users, "read")
+    read = pipeline.add_step(read_users, "read")
 
     context = UserContext(spark, PathConfig("gs://bucket/users"))
     overridden = pipeline.run(context, transform_overrides={"read": read_fixture})
     production = pipeline.run(context)
 
-    assert overridden["read"].collect()[0].user_id == 2
-    assert production["read"].collect()[0].user_id == 1
+    assert overridden.get_output(read).collect()[0].user_id == 2
+    assert production.get_output(read).collect()[0].user_id == 1
     assert production_calls == 1
 
 
@@ -563,12 +566,13 @@ def test_run_overrides_write_step(spark: SparkSession):
     write = pipeline.add_step(write_users, "write")
     read >> write
 
-    outputs = pipeline.run(
+    result = pipeline.run(
         SparkContext(spark), transform_overrides={"write": capture_users}
     )
 
     assert written_ids == [1]
-    assert "write" not in outputs
+    assert result.get_input(write, "users", DataFrame).count() == 1
+    assert result.get_output(write) is None
 
 
 def test_run_validates_all_override_names_before_execution(spark: SparkSession):
@@ -712,14 +716,14 @@ def test_run_compares_override_context_by_lookup_type(spark: SparkSession):
         return spark.createDataFrame([(1,)], "user_id BIGINT")
 
     pipeline = Pipeline(PathContext)
-    pipeline.add_step(read_users, "read")
+    read = pipeline.add_step(read_users, "read")
 
-    outputs = pipeline.run(
+    result = pipeline.run(
         PathContext(PathConfig("gs://bucket/users")),
         transform_overrides={"read": replacement},
     )
 
-    assert outputs["read"].count() == 1
+    assert result.get_output(read).count() == 1
 
 
 def test_run_rejects_override_with_different_output_coercion_mode(

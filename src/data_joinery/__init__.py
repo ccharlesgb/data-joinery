@@ -12,19 +12,31 @@ from .pipeline import (
     PipelineOverrideError,
     Step,
 )
+from .pipeline_result import (
+    BoundInput,
+    ContextSource,
+    DefaultSource,
+    PipelineResult,
+    StepRun,
+)
 from .schemas import Schema
 from .transform import transform
 
 __all__ = [
+    "BoundInput",
     "Context",
+    "ContextSource",
+    "DefaultSource",
     "Pipeline",
     "PipelineExecutionError",
     "PipelineOverrideError",
+    "PipelineResult",
     "Project",
     "ProjectCast",
     "ProjectTopLevel",
     "Schema",
     "Step",
+    "StepRun",
     "Strict",
     "main",
     "transform",

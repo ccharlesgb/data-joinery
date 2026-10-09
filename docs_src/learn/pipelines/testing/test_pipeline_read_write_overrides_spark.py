@@ -72,7 +72,6 @@ def test_order_pipeline_end_to_end(spark: SparkSession):
     fixture_orders = spark.createDataFrame(
         [(1, 10), (2, 25)], "order_id BIGINT, amount BIGINT"
     )
-    captured: list[tuple[int, int]] = []
 
     @transform
     def read_fixture() -> Annotated[DataFrame, Project(Order)]:
@@ -82,9 +81,9 @@ def test_order_pipeline_end_to_end(spark: SparkSession):
     def capture_totals(
         totals: Annotated[DataFrame, Project(OrderTotal)],
     ) -> None:
-        captured.extend((row.order_id, row.total) for row in totals.collect())
+        pass
 
-    build_pipeline().run(
+    result = build_pipeline().run(
         OrderPipelineContext(spark, Storage("unused", "unused")),
         transform_overrides={
             "read": read_fixture,
@@ -92,4 +91,8 @@ def test_order_pipeline_end_to_end(spark: SparkSession):
         },
     )
 
-    assert captured == [(1, 20), (2, 50)]
+    written = result.get_one_input("write", DataFrame)
+    assert [(row.order_id, row.total) for row in written.collect()] == [
+        (1, 20),
+        (2, 50),
+    ]

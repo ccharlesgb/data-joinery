@@ -24,6 +24,12 @@ from data_joinery.contract import (
     describe_contract,
 )
 from data_joinery.dependencies import inspect_context_type
+from data_joinery.pipeline_result import (
+    ContextSource,
+    PipelineResult,
+    StepRun,
+    bound_inputs,
+)
 from data_joinery.transform import Transform
 from data_joinery.visualisation import draw_pipeline
 
@@ -45,17 +51,17 @@ class PipelineOverrideError(ValueError):
 
 
 @dataclass(eq=False, frozen=True)
-class Step:
+class Step[OutputT]:
     """
     Represents a single step in a pipeline, encapsulating a transform and its connections.
     It's purpose is to allow you to use a transformation more than once within the same pipeline.
     """
 
     name: str
-    transform: Transform
+    transform: Transform[..., OutputT]
     _pipeline: Pipeline[Any]
 
-    def __rshift__(self, other: Step) -> Step:
+    def __rshift__[OtherT](self, other: Step[OtherT]) -> Step[OtherT]:
         if not isinstance(other, Step):
             raise TypeError(
                 f"Can only connect Step instances using >>; got {type(other).__name__}."
@@ -73,8 +79,8 @@ class Pipeline[ContextT]:
 
     def __init__(self, context_type: type[ContextT] | None = None):
         self._dag = rx.PyDAG(check_cycle=True)
-        self._node_indices: dict[Step, int] = {}
-        self._steps_by_name: dict[str, Step] = {}
+        self._node_indices: dict[Step[Any], int] = {}
+        self._steps_by_name: dict[str, Step[Any]] = {}
         self._context_type = context_type
         self._context_fields = (
             inspect_context_type(context_type) if context_type is not None else {}
@@ -94,7 +100,9 @@ class Pipeline[ContextT]:
                 "contract, or Context()."
             )
 
-    def add_step(self, transform: Transform, name: str | None = None) -> Step:
+    def add_step[**P, OutputT](
+        self, transform: Transform[P, OutputT], name: str | None = None
+    ) -> Step[OutputT]:
         """Adds a new step to the pipeline.
 
         Args:
@@ -384,7 +392,7 @@ class Pipeline[ContextT]:
         context: None = None,
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
-    ) -> dict[str, Any]: ...
+    ) -> PipelineResult: ...
 
     @overload
     def run(
@@ -392,14 +400,14 @@ class Pipeline[ContextT]:
         context: ContextT,
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
-    ) -> dict[str, Any]: ...
+    ) -> PipelineResult: ...
 
     def run(
         self,
         context: ContextT | None = None,
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
-    ) -> dict[str, Any]:
+    ) -> PipelineResult:
         if self._context_type is None:
             if context is not None:
                 raise TypeError(
@@ -422,16 +430,19 @@ class Pipeline[ContextT]:
         self._validate_source_steps(overrides)
 
         outputs: dict[str, Any] = {}
+        step_runs: list[StepRun[Any]] = []
 
         for step in self.get_steps_in_execution_order():
             effective_transform = overrides.get(step.name, step.transform)
             spec = effective_transform.__transform_spec__
             arguments: dict[str, Any] = {}
+            sources: dict[str, Step[Any] | ContextSource] = {}
             step_index = self._node_indices[step]
 
             for upstream_index, _, parameter_name in self._dag.in_edges(step_index):
                 upstream_step = self._dag[upstream_index]
                 arguments[parameter_name] = outputs[upstream_step.name]
+                sources[parameter_name] = upstream_step
             for parameter_name, (
                 param_type,
                 marker,
@@ -439,6 +450,7 @@ class Pipeline[ContextT]:
                 dependency_type = marker.type or param_type
                 context_field = self._context_fields[dependency_type]
                 arguments[parameter_name] = getattr(context, context_field)
+                sources[parameter_name] = ContextSource(context_field)
 
             signature = effective_transform.get_signature()
             missing = {
@@ -455,6 +467,8 @@ class Pipeline[ContextT]:
                 )
 
             try:
+                bound = signature.bind(**arguments)
+                bound.apply_defaults()
                 result = effective_transform(**arguments)
             except Exception as error:
                 if isinstance(error, PipelineExecutionError):
@@ -467,7 +481,16 @@ class Pipeline[ContextT]:
             if result is not None:
                 outputs[step.name] = result
 
-        return outputs
+            step_runs.append(
+                StepRun(
+                    step=step,
+                    transform=effective_transform,
+                    inputs=bound_inputs(bound.arguments, sources),
+                    output=result,
+                )
+            )
+
+        return PipelineResult(tuple(step_runs))
 
     def visualize(self, *, show: bool = True):
         """Draw the pipeline and return its Matplotlib figure.

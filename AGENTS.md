@@ -5,6 +5,20 @@
 - Use `uv` for Python dependency and command execution.
 - Use `just` recipes where available.
 
+## Tests
+
+- Prefer one meaningful assertion per test. Split distinct behaviors into separate tests instead
+  of stacking assertions about each attribute of a result.
+- Build an expected object and compare the complete value when equality is meaningful:
+  `expected = Object(...)` followed by `assert actual == expected`.
+- Compare whole DataFrames with the backend's test helper:
+  `polars.testing.assert_frame_equal(actual, expected)` for Polars and
+  `pyspark.testing.assertDataFrameEqual(actual, expected)` for PySpark. Construct an expected
+  DataFrame instead of checking its rows, columns, and count separately.
+- Keep separate assertions when they verify genuinely different behavior or when whole-object
+  equality is unsuitable. Do not combine unrelated checks into a tuple merely to reduce the
+  assertion count.
+
 ## Documentation
 
 - Documentation is generated using `zensical`

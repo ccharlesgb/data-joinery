@@ -73,9 +73,10 @@ def test_model_pipeline_with_dummy_training(spark: SparkSession):
         assert observations.count() == 2
         return DummyModel()
 
-    outputs = build_pipeline().run(
+    result = build_pipeline().run(
         SparkContext(spark),
         transform_overrides={"train": train_dummy},
     )
 
-    assert [row.value for row in outputs["predict"].collect()] == [2, 4]
+    predicted = result.get_output("predict", DataFrame)
+    assert [row.value for row in predicted.collect()] == [2, 4]

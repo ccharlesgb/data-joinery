@@ -62,7 +62,6 @@ def build_pipeline() -> Pipeline[OrderPipelineContext]:
 
 def test_order_pipeline_end_to_end():
     fixture_orders = pl.DataFrame({"order_id": [1, 2], "amount": [10, 25]})
-    captured: list[tuple[int, int]] = []
 
     @transform
     def read_fixture() -> Annotated[pl.DataFrame, Project(Order)]:
@@ -72,9 +71,9 @@ def test_order_pipeline_end_to_end():
     def capture_totals(
         totals: Annotated[pl.DataFrame, Project(OrderTotal)],
     ) -> None:
-        captured.extend((row["order_id"], row["total"]) for row in totals.to_dicts())
+        pass
 
-    build_pipeline().run(
+    result = build_pipeline().run(
         OrderPipelineContext(Storage("unused", "unused")),
         transform_overrides={
             "read": read_fixture,
@@ -82,4 +81,8 @@ def test_order_pipeline_end_to_end():
         },
     )
 
-    assert captured == [(1, 20), (2, 50)]
+    written = result.get_one_input("write", pl.DataFrame)
+    assert written.to_dicts() == [
+        {"order_id": 1, "total": 20},
+        {"order_id": 2, "total": 50},
+    ]

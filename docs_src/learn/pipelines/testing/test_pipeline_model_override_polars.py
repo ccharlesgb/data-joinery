@@ -61,8 +61,9 @@ def test_model_pipeline_with_dummy_training():
         assert observations.height == 2
         return DummyModel()
 
-    outputs = build_pipeline().run(
+    result = build_pipeline().run(
         transform_overrides={"train": train_dummy},
     )
 
-    assert outputs["predict"]["value"].to_list() == [2, 4]
+    predicted = result.get_output("predict", pl.DataFrame)
+    assert predicted["value"].to_list() == [2, 4]
