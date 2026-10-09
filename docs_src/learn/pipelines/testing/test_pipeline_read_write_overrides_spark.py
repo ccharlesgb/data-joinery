@@ -3,6 +3,7 @@ from typing import Annotated
 
 import pytest
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.testing import assertDataFrameEqual
 
 from data_joinery import Context, Pipeline, Project, transform
 
@@ -92,7 +93,7 @@ def test_order_pipeline_end_to_end(spark: SparkSession):
     )
 
     written = result.get_one_input("write", DataFrame)
-    assert [(row.order_id, row.total) for row in written.collect()] == [
-        (1, 20),
-        (2, 50),
-    ]
+    expected = spark.createDataFrame(
+        [(1, 20), (2, 50)], "order_id BIGINT, total BIGINT"
+    )
+    assertDataFrameEqual(written, expected)

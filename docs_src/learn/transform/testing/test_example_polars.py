@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
+from polars.testing import assert_frame_equal
 
 from data_joinery import Schema, Strict, transform
 
@@ -40,4 +41,4 @@ def test_filter_active_customers():
     )
 
     active_customers = filter_active_customers(customers)
-    assert active_customers.equals(expected_active_customers)
+    assert_frame_equal(active_customers, expected_active_customers)

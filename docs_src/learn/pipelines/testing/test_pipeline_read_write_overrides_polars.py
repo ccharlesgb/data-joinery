@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
+from polars.testing import assert_frame_equal
 
 from data_joinery import Context, Pipeline, Project, transform
 
@@ -82,7 +83,5 @@ def test_order_pipeline_end_to_end():
     )
 
     written = result.get_one_input("write", pl.DataFrame)
-    assert written.to_dicts() == [
-        {"order_id": 1, "total": 20},
-        {"order_id": 2, "total": 50},
-    ]
+    expected = pl.DataFrame({"order_id": [1, 2], "total": [20, 50]})
+    assert_frame_equal(written, expected)

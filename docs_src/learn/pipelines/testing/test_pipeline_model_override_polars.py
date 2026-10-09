@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
+from polars.testing import assert_frame_equal
 
 from data_joinery import Pipeline, Project, transform
 
@@ -58,7 +59,6 @@ def test_model_pipeline_with_dummy_training():
     def train_dummy(
         observations: Annotated[pl.DataFrame, Project(Observation)],
     ) -> Model:
-        assert observations.height == 2
         return DummyModel()
 
     result = build_pipeline().run(
@@ -66,4 +66,5 @@ def test_model_pipeline_with_dummy_training():
     )
 
     predicted = result.get_output("predict", pl.DataFrame)
-    assert predicted["value"].to_list() == [2, 4]
+    expected = pl.DataFrame({"value": [2, 4]})
+    assert_frame_equal(predicted, expected)

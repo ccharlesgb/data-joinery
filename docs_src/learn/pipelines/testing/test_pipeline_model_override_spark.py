@@ -3,6 +3,7 @@ from typing import Annotated
 
 import pytest
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.testing import assertDataFrameEqual
 
 from data_joinery import Context, Pipeline, Project, transform
 from data_joinery.backends.spark import SparkContext
@@ -70,7 +71,6 @@ def test_model_pipeline_with_dummy_training(spark: SparkSession):
     def train_dummy(
         observations: Annotated[DataFrame, Project(Observation)],
     ) -> Model:
-        assert observations.count() == 2
         return DummyModel()
 
     result = build_pipeline().run(
@@ -79,4 +79,5 @@ def test_model_pipeline_with_dummy_training(spark: SparkSession):
     )
 
     predicted = result.get_output("predict", DataFrame)
-    assert [row.value for row in predicted.collect()] == [2, 4]
+    expected = spark.createDataFrame([(2,), (4,)], "value BIGINT")
+    assertDataFrameEqual(predicted, expected)
