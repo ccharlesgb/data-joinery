@@ -162,16 +162,50 @@ class InstanceContract:
 
 
 def ProjectCast(schema: type) -> DataFrameContract:
+    """Project columns and cast their values to the model's field types.
+
+    Args:
+        schema: Dataclass or Pydantic model that defines the expected fields.
+
+    Returns:
+        A DataFrame contract for use in a transform annotation.
+    """
     return DataFrameContract(coercion_mode="project_cast", schema=Schema(schema))
 
 
 def ProjectTopLevel(schema: type) -> DataFrameContract:
+    """Keep the model's top-level columns and validate nested fields.
+
+    Args:
+        schema: Dataclass or Pydantic model that defines the expected fields.
+
+    Returns:
+        A DataFrame contract for use in a transform annotation.
+    """
     return DataFrameContract(coercion_mode="project_top_level", schema=Schema(schema))
 
 
 def Project(schema: type) -> DataFrameContract:
+    """Keep the model's fields, including fields in nested structs.
+
+    Args:
+        schema: Dataclass or Pydantic model that defines the expected fields.
+
+    Returns:
+        A DataFrame contract for use in a transform annotation.
+    """
     return DataFrameContract(coercion_mode="project", schema=Schema(schema))
 
 
 def Strict(schema: type) -> DataFrameContract:
+    """Require the DataFrame to have exactly the model's fields and types.
+
+    Field order and nullability are ignored.
+
+    Args:
+        schema: Dataclass or Pydantic model that defines the expected fields.
+
+    Returns:
+        A DataFrame contract for use in a transform annotation.
+    """
     return DataFrameContract(coercion_mode="strict", schema=Schema(schema))

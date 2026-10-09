@@ -1,4 +1,3 @@
-from .cli import main
 from .contract import (
     Project,
     ProjectCast,
@@ -38,6 +37,5 @@ __all__ = [
     "Step",
     "StepRun",
     "Strict",
-    "main",
     "transform",
 ]

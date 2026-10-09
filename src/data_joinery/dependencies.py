@@ -3,7 +3,14 @@ from typing import Any, get_type_hints
 
 
 class Context:
-    """Marks a transform parameter as resolved from its pipeline context."""
+    """Mark a transform parameter as supplied by the pipeline context.
+
+    Use with ``Annotated``. By default, the parameter's type selects a field
+    of the same type on the context dataclass.
+
+    Args:
+        type_: Context field type to use instead of the parameter's type.
+    """
 
     def __init__(self, type_: type | None = None) -> None:
         self.type = type_

@@ -14,19 +14,28 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ContextSource:
-    """An input read from a field on the pipeline context."""
+    """Identify the context field that supplied an input.
+
+    Attributes:
+        field: Name of the context field.
+    """
 
     field: str
 
 
 @dataclass(frozen=True)
 class DefaultSource:
-    """An input supplied by a transform parameter's default value."""
+    """Identify an input supplied by a transform parameter default."""
 
 
 @dataclass(frozen=True)
 class BoundInput:
-    """A value bound for a transform call, with its origin."""
+    """Record an input value and where it came from.
+
+    Attributes:
+        value: Value passed to the transform before input coercion.
+        source: Upstream step, context field, or parameter default.
+    """
 
     value: object
     source: Step[Any] | ContextSource | DefaultSource
@@ -34,7 +43,14 @@ class BoundInput:
 
 @dataclass(frozen=True)
 class StepRun[OutputT]:
-    """The call-bound inputs and validated output of one pipeline step."""
+    """Record one step's transform, inputs, and output.
+
+    Attributes:
+        step: Step that ran.
+        transform: Transform used, including any replacement supplied at run time.
+        inputs: Values bound to parameter names before input coercion.
+        output: Validated output, including ``None`` for a writer step.
+    """
 
     step: Step[OutputT]
     transform: Transform[..., OutputT]
@@ -43,7 +59,17 @@ class StepRun[OutputT]:
 
 
 class PipelineResult(Mapping[str, Any]):
-    """A run trace with mapping access to its non-None outputs."""
+    """Record a pipeline run and provide access to its step outputs.
+
+    Mapping access by step name includes only outputs other than ``None``.
+    ``step_runs`` includes every step in execution order.
+
+    Args:
+        step_runs: Run records in execution order.
+
+    Attributes:
+        step_runs: Run records for every step, including steps with no output.
+    """
 
     def __init__(self, step_runs: tuple[StepRun[Any], ...]) -> None:
         self.step_runs = step_runs

@@ -219,6 +219,18 @@ def transform[**P, R](
 def transform[**P, R](
     f: Callable[P, R] | None = None,
 ) -> Transform[P, R] | Callable[[Callable[P, R]], Transform[P, R]]:
+    """Decorate a function to validate its annotated inputs and output.
+
+    Use as ``@transform`` or ``@transform()``. DataFrame contracts in
+    ``Annotated`` control schema validation and coercion. Other supported
+    runtime classes are checked with ``isinstance``.
+
+    Args:
+        f: Function to decorate. Omit when using ``@transform()``.
+
+    Returns:
+        A callable transform that can also be added to a pipeline.
+    """
     if f is None:
         return Transform
 

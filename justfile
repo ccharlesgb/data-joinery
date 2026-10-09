@@ -6,9 +6,6 @@ default:
 install:
     uv sync --all-extras --all-groups
 
-run:
-    uv run data-joinery
-
 test:
     uv run pytest --ignore=docs_src/
 

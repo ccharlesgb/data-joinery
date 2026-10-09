@@ -35,7 +35,7 @@ from data_joinery.visualisation import draw_pipeline
 
 
 class PipelineExecutionError(RuntimeError):
-    pass
+    """A pipeline could not run or one of its steps failed."""
 
 
 class PipelineCycleError(Exception):
@@ -47,14 +47,18 @@ class PipelineConnectionError(Exception):
 
 
 class PipelineOverrideError(ValueError):
-    pass
+    """A replacement transform is unknown or incompatible with its step."""
 
 
 @dataclass(eq=False, frozen=True)
 class Step[OutputT]:
-    """
-    Represents a single step in a pipeline, encapsulating a transform and its connections.
-    It's purpose is to allow you to use a transformation more than once within the same pipeline.
+    """A named use of a transform in a pipeline.
+
+    The same transform can be added as more than one step.
+
+    Attributes:
+        name: Name used to identify the step in its pipeline and result.
+        transform: Transform called when the step runs.
     """
 
     name: str
@@ -62,6 +66,11 @@ class Step[OutputT]:
     _pipeline: Pipeline[Any]
 
     def __rshift__[OtherT](self, other: Step[OtherT]) -> Step[OtherT]:
+        """Connect this step to another and return the downstream step.
+
+        This is shorthand for ``pipeline.connect(self, other)``. Use
+        ``Pipeline.connect`` to choose an input parameter when needed.
+        """
         if not isinstance(other, Step):
             raise TypeError(
                 f"Can only connect Step instances using >>; got {type(other).__name__}."
@@ -71,6 +80,13 @@ class Step[OutputT]:
 
 
 class Pipeline[ContextT]:
+    """Connect transforms and run them in dependency order.
+
+    Args:
+        context_type: Optional context dataclass. Pass its class when
+            transforms use the ``Context`` marker.
+    """
+
     @overload
     def __init__(self: Pipeline[None]) -> None: ...
 
@@ -103,18 +119,19 @@ class Pipeline[ContextT]:
     def add_step[**P, OutputT](
         self, transform: Transform[P, OutputT], name: str | None = None
     ) -> Step[OutputT]:
-        """Adds a new step to the pipeline.
+        """Add a transform as a named step.
 
         Args:
-            transform: The transform to add as a step in the pipeline.
-            name: The name of the step. If None, the name will be inferred from the transform.
+            transform: Function decorated with ``@transform``.
+            name: Step name. Defaults to the transform's function name.
 
         Returns:
-            The newly created Step instance.
+            The new step.
 
         Raises:
-            ValueError: If the step name is already registered or cannot be inferred.
-            TypeError: If the transform has unsupported parameters or lacks required inputs.
+            ValueError: If the name is already used or cannot be inferred.
+            TypeError: If the transform has unsupported parameters or context
+                dependencies that the pipeline cannot supply.
         """
         if not isinstance(transform, Transform):
             raise TypeError(
@@ -169,6 +186,19 @@ class Pipeline[ContextT]:
     def connect(
         self, upstream: Step, downstream: Step, *, param: str | None = None
     ) -> None:
+        """Connect an output to a compatible input on another step.
+
+        Args:
+            upstream: Step that produces the value.
+            downstream: Step that receives the value.
+            param: Downstream parameter name. Required when more than one
+                input can accept the output.
+
+        Raises:
+            PipelineConnectionError: If the steps or their contracts cannot
+                be connected.
+            PipelineCycleError: If the connection would create a cycle.
+        """
         for role, step in (("upstream", upstream), ("downstream", downstream)):
             if not isinstance(step, Step):
                 raise TypeError(
@@ -279,6 +309,19 @@ class Pipeline[ContextT]:
         upstream_steps: Sequence[Step],
         downstream: Step,
     ) -> None:
+        """Connect several upstream steps to one downstream step.
+
+        Each output must match one unambiguous downstream input.
+
+        Args:
+            upstream_steps: Nonempty sequence of steps that provide inputs.
+            downstream: Step that receives the inputs.
+
+        Raises:
+            ValueError: If ``upstream_steps`` is empty.
+            PipelineConnectionError: If an output cannot be connected.
+            PipelineCycleError: If a connection would create a cycle.
+        """
         if not upstream_steps:
             raise ValueError(
                 "connect_many requires at least one upstream step. Pass a nonempty "
@@ -288,9 +331,11 @@ class Pipeline[ContextT]:
             self.connect(upstream, downstream)
 
     def get_upstream_steps(self, step: Step) -> set[Step]:
+        """Return the steps directly connected to ``step`` as inputs."""
         return set(self._dag.predecessors(self._node_indices[step]))
 
     def get_steps_in_execution_order(self) -> list[Step]:
+        """Return all steps in an order that respects their connections."""
         node_indices = rx.topological_sort(self._dag)
         return [self._dag[node_index] for node_index in node_indices]
 
@@ -408,6 +453,24 @@ class Pipeline[ContextT]:
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
     ) -> PipelineResult:
+        """Run each step and return its recorded inputs and outputs.
+
+        Args:
+            context: Instance of the context dataclass, when the pipeline
+                was created with one.
+            transform_overrides: Replacement transforms keyed by step name.
+                Each replacement must have compatible input contracts and the
+                same output contract.
+
+        Returns:
+            A result containing a run record for every step.
+
+        Raises:
+            TypeError: If the context is missing or has the wrong type.
+            PipelineOverrideError: If a replacement is invalid.
+            PipelineExecutionError: If a required input is unconnected or a
+                step fails.
+        """
         if self._context_type is None:
             if context is not None:
                 raise TypeError(
@@ -495,7 +558,12 @@ class Pipeline[ContextT]:
     def visualize(self, *, show: bool = True):
         """Draw the pipeline and return its Matplotlib figure.
 
-        Set ``show=False`` to save or customize the figure without opening a window.
+        Args:
+            show: Whether to display the figure. Set to ``False`` to save or
+                customize it without opening a window.
+
+        Raises:
+            ImportError: If the ``vis`` extra is not installed.
         """
         if not _MATPLOTLIB_AVAILABLE:
             raise ImportError(

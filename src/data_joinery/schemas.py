@@ -35,7 +35,15 @@ def _require_backend(
 
 
 class Schema[T]:
-    """A backend-neutral schema declaration backed by a dataclass or Pydantic model."""
+    """Define DataFrame fields from a dataclass or Pydantic model.
+
+    Args:
+        model: Class whose fields define the schema.
+
+    Attributes:
+        model: Class used to define the schema.
+        model_schema: Parsed fields from the model.
+    """
 
     def __init__(self, model: type[T]):
         self.model = model
@@ -43,12 +51,21 @@ class Schema[T]:
 
     @property
     def model_schema(self) -> ModelSchema[T]:
+        """Return the fields parsed from the model."""
         return self._model_schema
 
     def native_schema[NativeSchemaT](
         self, schema_type: type[NativeSchemaT]
     ) -> NativeSchemaT:
-        """Compile this declaration to the requested native schema type."""
+        """Return this schema in a backend's native schema type.
+
+        Args:
+            schema_type: Native schema class to create, such as a Spark
+                ``StructType`` or Polars ``Schema``.
+
+        Returns:
+            The compiled native schema.
+        """
         backend = _require_backend(
             backend_for_schema_type(schema_type), schema_type, kind="schema"
         )
@@ -67,7 +84,16 @@ class Schema[T]:
         frame_type: type[FrameT],
         **kwargs: object,
     ) -> FrameT:
-        """Create a dataframe of the requested type from model instances."""
+        """Create a DataFrame from model instances.
+
+        Args:
+            rows: Model instances to include in the DataFrame.
+            frame_type: DataFrame class to create.
+            **kwargs: Extra options passed to the DataFrame backend.
+
+        Returns:
+            A DataFrame of the requested type.
+        """
         backend = _require_backend(
             backend_for_frame_type(frame_type), frame_type, kind="dataframe"
         )
@@ -83,6 +109,23 @@ class Schema[T]:
     def coerce_dataframe(
         self, dataframe: FrameT, mode: CoercionMode = "project"
     ) -> FrameT:
+        """Validate and adapt a DataFrame to this schema.
+
+        ``project`` removes extra fields, including nested fields. Use
+        ``strict`` to reject extras, ``project_top_level`` to require nested
+        fields to match, or ``project_cast`` to also cast field types.
+        Missing fields cause an error in every mode.
+
+        Args:
+            dataframe: DataFrame to validate and adapt.
+            mode: Schema coercion mode. Defaults to ``project``.
+
+        Returns:
+            A DataFrame of the same backend type.
+
+        Raises:
+            SchemaCoercionError: If the DataFrame cannot match the schema.
+        """
         backend = _require_backend(
             backend_for_value(dataframe), type(dataframe), kind="dataframe"
         )

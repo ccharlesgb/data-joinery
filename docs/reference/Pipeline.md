@@ -2,6 +2,14 @@
 
 ::: data_joinery.Pipeline
 
+## Steps
+
+::: data_joinery.Step
+
+## Context
+
+::: data_joinery.Context
+
 ## Pipeline results
 
 `Pipeline.run()` returns a `PipelineResult`. Use a `Step` or a step name to
@@ -22,3 +30,16 @@ to non-`None` outputs.
 ::: data_joinery.StepRun
 
 ::: data_joinery.BoundInput
+
+`BoundInput.source` identifies the upstream `Step`, a context field, or a
+parameter default.
+
+::: data_joinery.ContextSource
+
+::: data_joinery.DefaultSource
+
+## Errors
+
+::: data_joinery.PipelineExecutionError
+
+::: data_joinery.PipelineOverrideError
