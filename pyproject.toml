@@ -1,6 +1,6 @@
 [project]
 name = "data-joinery"
-version = "0.1.2"
+version = "0.2.0"
 description = "Schema safety for DataFrame transformations"
 authors = [
     { name = "Connor Charles", email = "ccharles.gb@gmail.com" }
