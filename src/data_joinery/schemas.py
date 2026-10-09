@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from .backends import (
     DataFrameBackend,
@@ -21,11 +21,11 @@ FrameT = TypeVar("FrameT")
 
 
 def _require_backend(
-    backend: DataFrameBackend | None,
+    backend: DataFrameBackend[Any, Any] | None,
     value_type: type,
     *,
     kind: str,
-) -> DataFrameBackend:
+) -> DataFrameBackend[Any, Any]:
     if backend is None:
         raise TypeError(
             f"No {kind} backend is registered for {value_type.__name__}. "

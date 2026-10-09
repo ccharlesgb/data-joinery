@@ -20,7 +20,7 @@ from data_joinery.schema_types import (
 )
 
 from .. import type_inspection
-from .base import register_backend
+from .base import DataFrameBackend, register_backend
 
 
 @dataclass(frozen=True)
@@ -561,10 +561,10 @@ def _session_from_create_options(options: dict[str, object]) -> SparkSession:
     return session
 
 
-class SparkBackend:
+class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
     name = "spark"
-    dataframe_types = (DataFrame,)
-    schema_types = (types.StructType,)
+    dataframe_type = DataFrame
+    schema_type = types.StructType
 
     def compile_schema(self, schema: ModelSchema[Any]) -> types.StructType:
         fields = []
@@ -592,7 +592,7 @@ class SparkBackend:
 
     def coerce_dataframe(
         self,
-        dataframe: object,
+        dataframe: DataFrame,
         schema: ModelSchema[Any],
         mode: CoercionMode,
     ) -> DataFrame:

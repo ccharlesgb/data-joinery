@@ -6,7 +6,12 @@ import pytest
 from pyspark.sql import DataFrame
 
 from data_joinery import Pipeline, Project, Schema, Strict, transform
-from data_joinery.backends import backend_for_schema_type, register_backend
+from data_joinery.backends import (
+    DataFrameBackend,
+    backend_for_frame_type,
+    backend_for_schema_type,
+    register_backend,
+)
 from data_joinery.model_schema import ModelSchema
 from data_joinery.pipeline import PipelineConnectionError
 from data_joinery.schema_types import CoercionMode
@@ -17,20 +22,20 @@ class FakeDataFrame:
     columns: tuple[str, ...]
 
 
-class FakeBackend:
+class FakeBackend(DataFrameBackend[FakeDataFrame, tuple[str, ...]]):
     name = "fake"
-    dataframe_types: tuple[type, ...] = (FakeDataFrame,)
-    schema_types: tuple[type, ...] = (tuple,)
+    dataframe_type = FakeDataFrame
+    schema_type = tuple
 
-    def compile_schema(self, schema: ModelSchema[Any]) -> object:
+    def compile_schema(self, schema: ModelSchema[Any]) -> tuple[str, ...]:
         return tuple(field.name for field in schema.fields)
 
     def coerce_dataframe(
         self,
-        dataframe: object,
+        dataframe: FakeDataFrame,
         schema: ModelSchema[Any],
         mode: CoercionMode,
-    ) -> object:
+    ) -> FakeDataFrame:
         if not isinstance(dataframe, FakeDataFrame):
             raise TypeError
         expected = tuple(field.name for field in schema.fields)
@@ -43,7 +48,7 @@ class FakeBackend:
         rows: Sequence[object],
         schema: ModelSchema[Any],
         **kwargs: object,
-    ) -> object:
+    ) -> FakeDataFrame:
         if kwargs:
             raise TypeError
         schema.serialize_rows(rows)
@@ -72,10 +77,21 @@ def test_backend_is_discovered_from_its_native_schema_type():
     assert backend_for_schema_type(tuple) is FAKE_BACKEND
 
 
+def test_backend_matches_subclasses_of_its_registered_types():
+    class SpecializedFrame(FakeDataFrame):
+        pass
+
+    class SpecializedSchema(tuple):
+        pass
+
+    assert backend_for_frame_type(SpecializedFrame) is FAKE_BACKEND
+    assert backend_for_schema_type(SpecializedSchema) is FAKE_BACKEND
+
+
 def test_registration_rejects_an_ambiguous_dataframe_type():
     class AmbiguousBackend(FakeBackend):
         name = "ambiguous-frame"
-        schema_types = (dict,)
+        schema_type = dict  # type: ignore[bad-assignment] - test a different type
 
     with pytest.raises(TypeError, match="ambiguous dataframe type"):
         register_backend(AmbiguousBackend())
@@ -87,7 +103,7 @@ def test_registration_rejects_an_ambiguous_schema_type():
 
     class AmbiguousBackend(FakeBackend):
         name = "ambiguous-schema"
-        dataframe_types = (OtherDataFrame,)
+        dataframe_type = OtherDataFrame  # type: ignore[bad-assignment] - test a different type
 
     with pytest.raises(TypeError, match="ambiguous schema type"):
         register_backend(AmbiguousBackend())

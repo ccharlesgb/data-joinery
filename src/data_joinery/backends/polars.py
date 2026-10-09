@@ -25,7 +25,7 @@ from data_joinery.schema_types import (
     SchemaDifference,
 )
 
-from .base import register_backend
+from .base import DataFrameBackend, register_backend
 
 NoneType = type(None)
 POLARS_MAX_DECIMAL_PRECISION = 38
@@ -319,10 +319,10 @@ def _validate_create_options(options: dict[str, object]) -> None:
         raise TypeError(f"Unexpected Polars dataframe options: {names}")
 
 
-class PolarsBackend:
+class PolarsBackend(DataFrameBackend[pl.DataFrame, pl.Schema]):
     name = "polars"
-    dataframe_types = (pl.DataFrame,)
-    schema_types = (pl.Schema,)
+    dataframe_type = pl.DataFrame
+    schema_type = pl.Schema
 
     def compile_schema(self, schema: ModelSchema[Any]) -> pl.Schema:
         fields: dict[str, PolarsDataType] = {}
@@ -352,7 +352,7 @@ class PolarsBackend:
 
     def coerce_dataframe(
         self,
-        dataframe: object,
+        dataframe: pl.DataFrame,
         schema: ModelSchema[Any],
         mode: CoercionMode,
     ) -> pl.DataFrame:

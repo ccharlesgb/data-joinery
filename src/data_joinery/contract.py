@@ -97,14 +97,18 @@ class DataFrameContract:
             if self.backend_name is not None
             else backend_for_value(value)
         )
-        expected_types = (
-            (self.dataframe_type,)
+        expected_type = (
+            self.dataframe_type
             if self.dataframe_type is not None
-            else backend.dataframe_types
+            else backend.dataframe_type
             if backend is not None
-            else ()
+            else None
         )
-        if backend is None or not isinstance(value, expected_types):
+        if (
+            backend is None
+            or expected_type is None
+            or not isinstance(value, expected_type)
+        ):
             expected = (
                 self.dataframe_type.__name__
                 if self.dataframe_type is not None
