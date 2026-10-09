@@ -40,6 +40,10 @@ schemas match the type annotations.
 
 This example reads orders, groups them by day and customer, and checks the schema at each step:
 
+![Order metrics pipeline: read_orders passes Orders to get_metrics, which passes OrderMetrics to print_metrics.](images/homepage-pipeline.svg)
+
+Open the [full-size pipeline figure](images/homepage-pipeline.svg) to inspect the step inputs and outputs.
+
 === "Polars"
 
     ``` python

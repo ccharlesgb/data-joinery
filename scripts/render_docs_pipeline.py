@@ -1,4 +1,4 @@
-"""Render the branch and join pipeline from the documentation as an SVG figure."""
+"""Render the documentation pipelines as SVG figures."""
 
 from __future__ import annotations
 
@@ -18,20 +18,34 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
 
-def main() -> None:
-    example = ROOT / "docs_src/learn/pipelines/index/pipeline_visualisation_polars.py"
+def render_pipeline(
+    example: Path, pipeline_name: str, output: Path, preview: Path | None = None
+) -> None:
     with redirect_stdout(StringIO()):
-        pipeline = runpy.run_path(str(example))["order_pipeline"]
+        pipeline = runpy.run_path(str(example))[pipeline_name]
     figure = pipeline.visualize(show=False)
-    output = ROOT / "docs/images/pipeline-data-flow.svg"
     figure.savefig(output, bbox_inches="tight", facecolor=figure.get_facecolor())
-    preview = ROOT / "scratch/pipeline-visualisation/docs-pipeline.png"
-    preview.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(
-        preview, dpi=150, bbox_inches="tight", facecolor=figure.get_facecolor()
-    )
+    if preview is not None:
+        preview.parent.mkdir(parents=True, exist_ok=True)
+        figure.savefig(
+            preview, dpi=150, bbox_inches="tight", facecolor=figure.get_facecolor()
+        )
     plt.close(figure)
     print(f"Saved {output}")
+
+
+def main() -> None:
+    render_pipeline(
+        ROOT / "docs_src/learn/pipelines/index/pipeline_visualisation_polars.py",
+        "order_pipeline",
+        ROOT / "docs/images/pipeline-data-flow.svg",
+        ROOT / "scratch/pipeline-visualisation/docs-pipeline.png",
+    )
+    render_pipeline(
+        ROOT / "docs_src/index/minimum_example_polars.py",
+        "order_metrics",
+        ROOT / "docs/images/homepage-pipeline.svg",
+    )
 
 
 if __name__ == "__main__":
