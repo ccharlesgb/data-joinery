@@ -86,8 +86,12 @@ def test_filter_active_customers(spark):
 ```
 
 Use a shared local Spark fixture when the project has one rather than creating a new session in
-every test. For Polars, use its DataFrame testing assertions. Assert values as well as schema so a
-contract-valid but logically incorrect result cannot pass.
+every test. For Polars, use `polars.testing.assert_frame_equal(actual, expected)`. Construct an
+expected DataFrame and compare the whole frame instead of separately checking rows, columns,
+and counts. For non-DataFrame results, build an expected object and use `assert actual == expected`
+when equality is meaningful. Prefer one meaningful assertion per test and split distinct behaviors
+into separate tests. Keep separate assertions for genuinely different behavior or when whole-object
+equality is unsuitable; do not combine unrelated checks into a tuple to reduce the count.
 
 Add focused failure tests when contract behavior is part of the requirement. For example, verify
 that a missing required field or incorrect output name raises `SchemaCoercionError`. Do not retest

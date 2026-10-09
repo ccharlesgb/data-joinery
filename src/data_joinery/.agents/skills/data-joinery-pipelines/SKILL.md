@@ -36,8 +36,20 @@ Connections are validated as the graph is built. Incompatible schema or instance
 fails with `PipelineExecutionError` when an input dependency is left dangling. Correct the model or
 connection instead of weakening a valid contract to suppress these errors.
 
-`Pipeline.run(...)` returns a mapping keyed by step name, so tests and application adapters can
-inspect terminal or intermediate outputs when needed.
+`Pipeline.run(...)` returns a `PipelineResult`. It also acts as a mapping from step names to
+non-`None` outputs, but use `result.get_output(step)` when you kept the `Step`, or
+`result.get_output("step_name", ValueType)` when you only have its name. These methods can also
+read a step whose output is `None`.
+
+Use `result.get_input(step, "parameter", ValueType)` to inspect a specific bound input. Use
+`result.get_one_input(step, ValueType)` only when exactly one input has that runtime type;
+context values and defaults count too. Writer inputs are recorded before their input contracts
+project or cast them. To test what the writer function actually receives after coercion, capture
+the value inside an override. `get_step_run(step)` exposes the transform, bound input sources,
+and output when the complete run record matters.
+
+For a graph overview, install the `vis` extra and call `pipeline.visualize(show=False)` after
+connecting steps. It returns a Matplotlib figure that can be saved or inspected.
 
 ## Inject Typed Context
 
@@ -70,6 +82,9 @@ paths, dates, thresholds, and similar values in meaningfully named types or conf
 instead of using ambiguous primitives. Use the built-in `SparkContext` when the Spark session is
 the only dependency. A step that asks for a type absent from the declared context fails when it is
 added.
+
+For a dbt Python model, put dbt's runtime object in the pipeline context and use it in reader
+transforms to fetch upstream models or sources.
 
 ## Pass Ordinary Instance Values
 
@@ -105,7 +120,12 @@ A practical end-to-end test usually:
 1. creates input frames from `Schema(Model).create_dataframe(...)` or another small local fixture;
 2. overrides unavailable readers and effectful writers with decorated transforms;
 3. runs the production graph with a complete context object;
-4. asserts captured terminal values and any important intermediate result from the returned map.
+4. compares the writer input or selected step output with the expected result from `PipelineResult`.
 
-Use explicit names for every overridable step. Assert the final values or captured effect rather
-than merely assuming the override mapping was applied.
+Use explicit names for every overridable step. Build an expected object and compare the complete
+value when equality is meaningful. For a DataFrame, construct an expected DataFrame and compare
+the whole frame with `polars.testing.assert_frame_equal(actual, expected)` or
+`pyspark.testing.assertDataFrameEqual(actual, expected)`, rather than checking rows, columns,
+and counts separately. Prefer one meaningful assertion per test; split distinct behaviors into
+separate tests. Keep separate assertions when they check genuinely different behavior, and do not
+combine unrelated checks into a tuple merely to reduce the assertion count.
