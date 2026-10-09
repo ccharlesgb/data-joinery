@@ -24,6 +24,7 @@ nav = [
     { "Pipelines" = [
       "learn/pipelines/index.md",
       "learn/pipelines/context.md",
+      "learn/pipelines/inspecting_pipeline_runs.md",
       "learn/pipelines/testing.md",
     ]
     },

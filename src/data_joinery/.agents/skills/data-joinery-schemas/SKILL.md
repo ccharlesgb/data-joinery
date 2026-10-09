@@ -88,6 +88,8 @@ customers = customer_schema.create_dataframe(rows, DataFrame, session=spark)
 
 For Polars, pass `pl.DataFrame`; no Spark session is required. Prefer this API for fixtures because
 the same model defines both the row values and expected backend schema.
+When testing a resulting DataFrame, construct the expected frame and compare the complete value
+with `polars.testing.assert_frame_equal` or `pyspark.testing.assertDataFrameEqual`.
 
 ## Coerce an Existing DataFrame
 

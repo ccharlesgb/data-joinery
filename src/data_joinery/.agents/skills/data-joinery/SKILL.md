@@ -22,8 +22,8 @@ and decorated transforms without a pipeline.
   `data-joinery-schemas`.
 - For declaring contracts, implementing a transform, or unit testing one transform, use
   `data-joinery-transformations`.
-- For connecting steps, injecting context, validating a graph, or testing a complete pipeline,
-  use `data-joinery-pipelines`.
+- For connecting steps, injecting context, visualizing a graph, inspecting run results, using
+  per-run overrides, or testing a complete pipeline, use `data-joinery-pipelines`.
 - For deciding where code belongs in a new or existing application repository, use
   `data-joinery-project-layout`.
 

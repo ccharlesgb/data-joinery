@@ -4,7 +4,15 @@ from typing import Annotated
 import polars as pl
 import pytest
 
-from data_joinery import Project, Schema, Strict, transform
+from data_joinery import (
+    BoundInput,
+    DefaultSource,
+    Project,
+    Schema,
+    StepRun,
+    Strict,
+    transform,
+)
 from data_joinery.pipeline import (
     Pipeline,
     PipelineConnectionError,
@@ -155,7 +163,17 @@ def test_pipeline_uses_default_for_unconnected_input():
     sink = pipeline.add_step(consume)
     pipeline.connect(source, sink)
 
-    assert pipeline.run()["consume"] == "hello worl"
+    result = pipeline.run()
+    expected = StepRun(
+        step=sink,
+        transform=consume,
+        inputs={
+            "value": BoundInput("hello world", source),
+            "limit": BoundInput(10, DefaultSource()),
+        },
+        output="hello worl",
+    )
+    assert result.get_step_run(sink) == expected
 
 
 def test_pipeline_runs_root_step_with_only_defaulted_inputs():
@@ -164,9 +182,16 @@ def test_pipeline_runs_root_step_with_only_defaulted_inputs():
         return path
 
     pipeline = Pipeline()
-    pipeline.add_step(read)
+    step = pipeline.add_step(read)
 
-    assert pipeline.run()["read"] == "data.csv"
+    result = pipeline.run()
+    expected = StepRun(
+        step=step,
+        transform=read,
+        inputs={"path": BoundInput("data.csv", DefaultSource())},
+        output="data.csv",
+    )
+    assert result.get_step_run(step) == expected
 
 
 def test_pipeline_runs_root_step_with_defaults_from_override():
@@ -179,11 +204,16 @@ def test_pipeline_runs_root_step_with_defaults_from_override():
         return path
 
     pipeline = Pipeline()
-    pipeline.add_step(read)
+    step = pipeline.add_step(read)
 
-    assert (
-        pipeline.run(transform_overrides={"read": replacement})["read"] == "fixture.csv"
+    result = pipeline.run(transform_overrides={"read": replacement})
+    expected = StepRun(
+        step=step,
+        transform=replacement,
+        inputs={"path": BoundInput("fixture.csv", DefaultSource())},
+        output="fixture.csv",
     )
+    assert result.get_step_run(step) == expected
 
 
 def test_pipeline_uses_effective_transform_default_for_unconnected_input():
@@ -204,9 +234,17 @@ def test_pipeline_uses_effective_transform_default_for_unconnected_input():
     sink = pipeline.add_step(consume)
     pipeline.connect(source, sink)
 
-    assert (
-        pipeline.run(transform_overrides={"consume": replacement})["consume"] == "val"
+    result = pipeline.run(transform_overrides={"consume": replacement})
+    expected = StepRun(
+        step=sink,
+        transform=replacement,
+        inputs={
+            "value": BoundInput("value", source),
+            "limit": BoundInput(3, DefaultSource()),
+        },
+        output="val",
     )
+    assert result.get_step_run(sink) == expected
 
 
 def test_override_error_names_expected_and_actual_output():

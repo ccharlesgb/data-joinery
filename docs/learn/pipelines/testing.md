@@ -8,15 +8,15 @@ Pipeline tests check that connected transformations produce the expected result.
 reader, writer, or model cannot run in a test environment, pass a replacement transformation
 to `Pipeline.run()` through `transform_overrides`.
 
-Overrides use step names. A step uses its transformation name by default, or the name given
-to `add_step(..., name="...")`. Give steps you plan to replace explicit names so tests can
-address them reliably.
+To inspect outputs and writer inputs from a completed run, see
+[Inspecting Pipeline Runs](inspecting_pipeline_runs.md).
 
 ## Replacing readers and writers
 
 Pass overrides to `Pipeline.run()` as a mapping from step name to another transformation. Overrides
-apply only to that run. This example replaces the reader and writer, providing test input and capturing the
-output in memory:
+apply only to that run. Give steps you plan to replace explicit names with `add_step(..., name="...")`.
+This example replaces the reader and writer, then checks the
+DataFrame passed to the writer:
 
 === "Polars"
 

@@ -43,19 +43,28 @@ Use a standard Python `src` layout:
 └── tests/
     ├── test_transform.py
     └── test_pipeline.py          # Add when end-to-end graph behavior needs coverage
+```
+
 The directory and distribution names may use hyphens, while the importable Python package uses underscores.
 Only create optional directories and test modules when the project needs them.
-Module Responsibilities
-context.py
+
+## Module Responsibilities
+
+### `context.py`
+
 Define runtime dependencies supplied to the pipeline rather than produced by another transform.
 Typical context values include:
+
 - Spark or other execution sessions
 - Input and output paths
 - Run dates
 - Environment-specific settings
 - External clients
+
 Represent the complete pipeline context with a frozen dataclass. Extend an appropriate data-joinery context class when the installed API provides one.
 Use distinct marker types for semantically different values that share the same primitive representation:
+
+```python
 class OrdersPath(str):
     """Path containing source orders."""
 
@@ -68,15 +77,21 @@ class OutputPath(str):
 class PipelineContext(SparkContext):
     orders_path: OrdersPath
     output_path: OutputPath
+```
+
 Marker types let data-joinery resolve dependencies by meaning rather than treating every string, date, or path as interchangeable.
-schemas.py
+
+### `schemas.py`
+
 Define the logical records exchanged by transforms.
 Prefer focused dataclasses whose fields describe the expected columns and Python value types. Create separate schemas for materially different stages, such as source records, enriched records, features, predictions, or metrics.
 Schema inheritance is appropriate when an output genuinely extends an input record. Do not force inheritance when the records represent different concepts.
 Keep transformation logic and runtime configuration out of this module.
-transform.py
+### `transform.py`
+
 Define the pipeline’s executable units with @transform.
 Each transform should:
+
 - Perform one coherent read, transformation, model, write, or reporting operation.
 - Declare context dependencies with Annotated[..., Context()].
 - Declare dataframe contracts using the data-joinery schema annotations appropriate to the installed version, such as Project, ProjectCast, or Strict.
@@ -85,12 +100,18 @@ Each transform should:
 - Be callable directly in focused tests.
 Keep related constants near the transforms that use them unless the project already has an established configuration module.
 Split transform.py into a transforms/ package only when its size or distinct domains make that separation useful. Do not introduce the package preemptively.
-pipeline.py
+### `pipeline.py`
+
 Own graph construction, not business logic.
 Expose a function such as:
+
+```python
 def build_pipeline() -> Pipeline[PipelineContext]:
     ...
+```
+
 Inside it:
+
 1. Construct the pipeline with its context type.
 2. Register transforms with add_step.
 3. Connect producer and consumer steps.
@@ -99,9 +120,11 @@ Inside it:
 Assign each registered step to a variable that describes its result. This makes graph wiring readable.
 Use explicit step names when they are needed for stable output lookup, transform overrides, or compatibility with existing callers. Otherwise follow the project’s current convention.
 Keep filesystem defaults close to pipeline construction only when they are example-project defaults. Production paths and run-specific values normally belong in the context supplied at runtime.
-__main__.py
+### `__main__.py`
+
 Provide the executable entry point for local or packaged execution.
 It may:
+
 - Create runtime services such as a Spark session.
 - Build concrete context values.
 - Call build_pipeline().
@@ -109,28 +132,42 @@ It may:
 - Display or otherwise handle selected outputs.
 - Shut down resources reliably.
 Keep transforms and graph construction out of this module. Use try/finally or a suitable context manager when a runtime resource must always be closed.
-__init__.py
+### `__init__.py`
+
 Keep package initialization lightweight. A package docstring or deliberately chosen public exports are sufficient.
 Do not start sessions, read data, or execute a pipeline during import.
-tests/
-Test transforms directly wherever possible. Construct small schema-valid inputs and assert observable output values, columns, or side effects.
+
+### `tests/`
+
+Test transforms directly wherever possible. Construct small schema-valid inputs and compare
+complete outputs with expected values. For DataFrames, build the expected frame and use
+`polars.testing.assert_frame_equal` or `pyspark.testing.assertDataFrameEqual` instead of checking
+rows, columns, and counts separately. For other values, compare complete objects when equality is
+meaningful. Prefer one meaningful assertion per test; separate distinct behaviors into separate
+tests, while keeping separate assertions when they check genuinely different behavior.
 Use temporary paths for read/write tests so test runs do not alter repository data or generated output.
 Add a pipeline-level test when it provides value beyond transform tests, including:
+
 - Verifying graph wiring
 - Exercising fan-in or branching
 - Checking named pipeline outputs
 - Testing transform overrides
 - Confirming interoperability between dataframe or model types
 Reuse existing fixtures and assertion libraries rather than introducing a parallel testing style.
-pyproject.toml
+### `pyproject.toml`
+
 Configure the project as a normal src-layout Python package and declare only the dependencies it owns.
 When the project is part of a workspace, first determine whether dependencies and development tools are managed by the workspace root. Do not duplicate or move that configuration without a concrete need.
 Ensure the build configuration points to src/<package_name> when the project is independently buildable.
-Data and Output Directories
+## Data and Output Directories
+
 Use data/ for small, intentional fixtures or runnable-example inputs. Do not assume production datasets belong in the repository.
 Use a clearly identified output directory such as __output/ only for local generated artifacts. Follow the repository’s existing ignore and cleanup policy, and never overwrite existing data merely to demonstrate the layout.
-Adding a Pipeline Feature
+
+## Adding a Pipeline Feature
+
 When extending a project:
+
 1. Inspect the existing modules and identify their actual responsibilities.
 2. Add or update schema types when the data contract changes.
 3. Add required runtime values and marker types to the existing context.
