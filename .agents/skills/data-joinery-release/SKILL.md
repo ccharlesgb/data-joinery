@@ -71,7 +71,7 @@ git add -- pyproject.toml uv.lock
 git commit -m "Release x.x.x"
 git push origin main
 git tag x.x.x
-git push --tags
+git push origin x.x.x
 ```
 
 Replace every `x.x.x` above with the selected version. If a commit, push, or
