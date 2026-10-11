@@ -49,9 +49,13 @@ except Exception:
 - If the snippet is an example of writing a test then the filename should 
 begin with `test_` and the documentation script will run it with pytest.
 
-## Tone of voice
+### Tone of voice
 
 - Documentation should be clear and only reference the framework's behaviour and not it's internal 
   implementation. UNLESS the page is in the `internals` section
 
 - Try to keep wording simple so that even somebody not an expert in Python can still understand it.
+
+## Skills
+
+If making changes to the public API or adding new features, please ensure that the relevant skills in `src/data_joinery/.agents` are updated to reflect the new functionality. This includes updating any documentation, examples, and tests that demonstrate the use of the new features.

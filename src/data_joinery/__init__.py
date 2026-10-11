@@ -16,7 +16,7 @@ from .pipeline_result import (
     ContextSource,
     DefaultSource,
     PipelineResult,
-    StepRun,
+    StepInvocation,
 )
 from .schemas import Schema
 from .transform import transform
@@ -35,7 +35,7 @@ __all__ = [
     "ProjectTopLevel",
     "Schema",
     "Step",
-    "StepRun",
+    "StepInvocation",
     "Strict",
     "transform",
 ]

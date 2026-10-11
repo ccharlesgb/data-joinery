@@ -1,4 +1,4 @@
-"""The values and input bindings observed during a pipeline run."""
+"""The values and input bindings observed during a pipeline invocation."""
 
 from __future__ import annotations
 
@@ -42,12 +42,12 @@ class BoundInput:
 
 
 @dataclass(frozen=True)
-class StepRun[OutputT]:
-    """Record one step's transform, inputs, and output.
+class StepInvocation[OutputT]:
+    """Record one step invocation's transform, inputs, and output.
 
     Attributes:
-        step: Step that ran.
-        transform: Transform used, including any replacement supplied at run time.
+        step: Step that was invoked.
+        transform: Transform used, including any replacement supplied to the run.
         inputs: Values bound to parameter names before input coercion.
         output: Validated output, including ``None`` for a writer step.
     """
@@ -59,25 +59,27 @@ class StepRun[OutputT]:
 
 
 class PipelineResult(Mapping[str, Any]):
-    """Record a pipeline run and provide access to its step outputs.
+    """Record a pipeline invocation and provide access to step outputs.
 
     Mapping access by step name includes only outputs other than ``None``.
-    ``step_runs`` includes every step in execution order.
+    ``step_invocations`` includes every invoked step in dependency order.
 
     Args:
-        step_runs: Run records in execution order.
+        step_invocations: Invocation records in dependency order.
 
     Attributes:
-        step_runs: Run records for every step, including steps with no output.
+        step_invocations: Records for every invoked step, including writers.
     """
 
-    def __init__(self, step_runs: tuple[StepRun[Any], ...]) -> None:
-        self.step_runs = step_runs
-        self._by_step_name = {step_run.step.name: step_run for step_run in step_runs}
+    def __init__(self, step_invocations: tuple[StepInvocation[Any], ...]) -> None:
+        self.step_invocations = step_invocations
+        self._by_step_name = {
+            invocation.step.name: invocation for invocation in step_invocations
+        }
         self._outputs = {
-            step_run.step.name: step_run.output
-            for step_run in step_runs
-            if step_run.output is not None
+            invocation.step.name: invocation.output
+            for invocation in step_invocations
+            if invocation.output is not None
         }
 
     def __getitem__(self, step_name: str) -> Any:
@@ -85,7 +87,7 @@ class PipelineResult(Mapping[str, Any]):
         return self._outputs[step_name]
 
     def __iter__(self) -> Iterator[str]:
-        """Iterate over step names with non-None outputs in execution order."""
+        """Iterate over step names with non-None outputs in invocation order."""
         return iter(self._outputs)
 
     def __len__(self) -> int:
@@ -93,30 +95,30 @@ class PipelineResult(Mapping[str, Any]):
         return len(self._outputs)
 
     @overload
-    def get_step_run[T](self, step: Step[T]) -> StepRun[T]: ...
+    def get_step_invocation[T](self, step: Step[T]) -> StepInvocation[T]: ...
 
     @overload
-    def get_step_run(self, step: str) -> StepRun[Any]: ...
+    def get_step_invocation(self, step: str) -> StepInvocation[Any]: ...
 
-    def get_step_run(self, step: Step[Any] | str) -> StepRun[Any]:
-        """Get a step's run record, including steps that return `None`.
+    def get_step_invocation(self, step: Step[Any] | str) -> StepInvocation[Any]:
+        """Get a step's invocation record, including steps that return `None`.
 
         Args:
             step: A step from this pipeline or its name. A step object must be
-                the same object that was run, not just have the same name.
+                the same object that was invoked, not just have the same name.
 
         Returns:
-            The step's recorded inputs and output.
+            The step invocation's recorded inputs and output.
 
         Raises:
-            KeyError: If the step name is absent or the step object was not run.
+            KeyError: If the step name is absent or the step was not invoked.
         """
         if isinstance(step, str):
             return self._by_step_name[step]
-        step_run = self._by_step_name.get(step.name)
-        if step_run is None or step_run.step is not step:
+        invocation = self._by_step_name.get(step.name)
+        if invocation is None or invocation.step is not step:
             raise KeyError(f"Step '{step.name}' is not in this pipeline result.")
-        return step_run
+        return invocation
 
     @overload
     def get_output[T](self, step: Step[T]) -> T: ...
@@ -147,7 +149,7 @@ class PipelineResult(Mapping[str, Any]):
         if not isinstance(step, str):
             if value_type is not None:
                 raise TypeError("Pass value_type only when looking up a step by name.")
-            return self.get_step_run(step).output
+            return self.get_step_invocation(step).output
         if value_type is None:
             raise TypeError("Looking up an output by step name requires value_type.")
         value = self._by_step_name[step].output
@@ -175,11 +177,11 @@ class PipelineResult(Mapping[str, Any]):
             KeyError: If the step or parameter is absent.
             TypeError: If the value is not an instance of `value_type`.
         """
-        step_run = self.get_step_run(step)
-        binding = step_run.inputs[parameter_name]
+        invocation = self.get_step_invocation(step)
+        binding = invocation.inputs[parameter_name]
         if not isinstance(binding.value, value_type):
             raise TypeError(
-                f"Input '{parameter_name}' of step '{step_run.step.name}' is "
+                f"Input '{parameter_name}' of step '{invocation.step.name}' is "
                 f"{type(binding.value).__name__}, expected {value_type.__name__}."
             )
         return cast(T, binding.value)
@@ -201,16 +203,16 @@ class PipelineResult(Mapping[str, Any]):
             KeyError: If the step is absent.
             LookupError: If zero or multiple inputs match `value_type`.
         """
-        step_run = self.get_step_run(step)
+        invocation = self.get_step_invocation(step)
         matches = [
             binding.value
-            for binding in step_run.inputs.values()
+            for binding in invocation.inputs.values()
             if isinstance(binding.value, value_type)
         ]
         if len(matches) != 1:
             raise LookupError(
                 f"Expected exactly one input of type {value_type.__name__} "
-                f"for step '{step_run.step.name}'; found {len(matches)}."
+                f"for step '{invocation.step.name}'; found {len(matches)}."
             )
         return cast(T, matches[0])
 

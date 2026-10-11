@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any, overload
 
 import rustworkx as rx
@@ -24,10 +25,11 @@ from data_joinery.contract import (
     describe_contract,
 )
 from data_joinery.dependencies import inspect_context_type
+from data_joinery.logger import logger
 from data_joinery.pipeline_result import (
     ContextSource,
     PipelineResult,
-    StepRun,
+    StepInvocation,
     bound_inputs,
 )
 from data_joinery.transform import Transform
@@ -58,7 +60,7 @@ class Step[OutputT]:
 
     Attributes:
         name: Name used to identify the step in its pipeline and result.
-        transform: Transform called when the step runs.
+        transform: Transform called for this step.
     """
 
     name: str
@@ -80,7 +82,7 @@ class Step[OutputT]:
 
 
 class Pipeline[ContextT]:
-    """Connect transforms and run them in dependency order.
+    """Connect transforms and invoke them in dependency order.
 
     Args:
         context_type: Optional context dataclass. Pass its class when
@@ -453,7 +455,7 @@ class Pipeline[ContextT]:
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
     ) -> PipelineResult:
-        """Run each step and return its recorded inputs and outputs.
+        """Invoke each step and return its recorded inputs and outputs.
 
         Args:
             context: Instance of the context dataclass, when the pipeline
@@ -463,7 +465,7 @@ class Pipeline[ContextT]:
                 same output contract.
 
         Returns:
-            A result containing a run record for every step.
+            A result containing an invocation record for every step.
 
         Raises:
             TypeError: If the context is missing or has the wrong type.
@@ -491,9 +493,22 @@ class Pipeline[ContextT]:
 
         overrides = self._resolve_transform_overrides(transform_overrides)
         self._validate_source_steps(overrides)
+        run_started_at = perf_counter()
+        logger.info(
+            "Pipeline.run() started (steps: %d, context: %s, overrides: %d)",
+            len(self._node_indices),
+            type(context).__name__ if context is not None else "none",
+            len(overrides),
+        )
+        for name, replacement in overrides.items():
+            logger.debug(
+                "Override for step '%s': transform '%s'",
+                name,
+                replacement.default_name,
+            )
 
         outputs: dict[str, Any] = {}
-        step_runs: list[StepRun[Any]] = []
+        step_invocations: list[StepInvocation[Any]] = []
 
         for step in self.get_steps_in_execution_order():
             effective_transform = overrides.get(step.name, step.transform)
@@ -529,6 +544,21 @@ class Pipeline[ContextT]:
                     "Connect an upstream step to each input."
                 )
 
+            logger.debug(
+                "Invoking step '%s' with transform '%s' "
+                "(inputs: %s; context fields: %s)",
+                step.name,
+                effective_transform.default_name,
+                tuple(sorted(arguments)),
+                tuple(
+                    sorted(
+                        source.field
+                        for source in sources.values()
+                        if isinstance(source, ContextSource)
+                    )
+                ),
+            )
+            step_started_at = perf_counter()
             try:
                 bound = signature.bind(**arguments)
                 bound.apply_defaults()
@@ -540,12 +570,18 @@ class Pipeline[ContextT]:
                     f"Pipeline step '{step.name}' failed: "
                     f"{type(error).__name__}: {error}"
                 ) from error
+            logger.debug(
+                "Step '%s' returned in %.3fs (return type: %s)",
+                step.name,
+                perf_counter() - step_started_at,
+                type(result).__name__,
+            )
 
             if result is not None:
                 outputs[step.name] = result
 
-            step_runs.append(
-                StepRun(
+            step_invocations.append(
+                StepInvocation(
                     step=step,
                     transform=effective_transform,
                     inputs=bound_inputs(bound.arguments, sources),
@@ -553,7 +589,21 @@ class Pipeline[ContextT]:
                 )
             )
 
-        return PipelineResult(tuple(step_runs))
+        pipeline_result = PipelineResult(tuple(step_invocations))
+        logger.info(
+            "Pipeline.run() returned in %.3fs (step invocations: %d, outputs: %d)",
+            perf_counter() - run_started_at,
+            len(step_invocations),
+            len(pipeline_result),
+        )
+        logger.debug(
+            "Pipeline result step invocations: %s",
+            ", ".join(
+                invocation.step.name for invocation in pipeline_result.step_invocations
+            )
+            or "<none>",
+        )
+        return pipeline_result
 
     def visualize(self, *, show: bool = True):
         """Draw the pipeline and return its Matplotlib figure.

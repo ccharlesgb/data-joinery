@@ -345,7 +345,10 @@ def test_executable_pipeline_runs_sources_and_downstream_steps(
 
     result = pipeline.run(SparkContext(spark))
 
-    assert [step_run.step for step_run in result.step_runs] == [users, filtered]
+    assert [invocation.step for invocation in result.step_invocations] == [
+        users,
+        filtered,
+    ]
     assert result.get_output(filtered).collect()[0].user_id == 1
 
 
@@ -409,7 +412,7 @@ def test_executable_pipeline_runs_fan_in_and_independent_components(
 
     result = pipeline.run(SparkContext(spark))
 
-    assert len(result.step_runs) == 3
+    assert len(result.step_invocations) == 3
     assert result.get_output(joined).collect()[0].user_id == 1
 
 

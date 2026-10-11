@@ -9,7 +9,7 @@ from data_joinery import (
     DefaultSource,
     Project,
     Schema,
-    StepRun,
+    StepInvocation,
     Strict,
     transform,
 )
@@ -181,7 +181,7 @@ def test_pipeline_uses_default_for_unconnected_input():
     pipeline.connect(source, sink)
 
     result = pipeline.run()
-    expected = StepRun(
+    expected = StepInvocation(
         step=sink,
         transform=consume,
         inputs={
@@ -190,7 +190,7 @@ def test_pipeline_uses_default_for_unconnected_input():
         },
         output="hello worl",
     )
-    assert result.get_step_run(sink) == expected
+    assert result.get_step_invocation(sink) == expected
 
 
 def test_pipeline_runs_root_step_with_only_defaulted_inputs():
@@ -202,13 +202,13 @@ def test_pipeline_runs_root_step_with_only_defaulted_inputs():
     step = pipeline.add_step(read)
 
     result = pipeline.run()
-    expected = StepRun(
+    expected = StepInvocation(
         step=step,
         transform=read,
         inputs={"path": BoundInput("data.csv", DefaultSource())},
         output="data.csv",
     )
-    assert result.get_step_run(step) == expected
+    assert result.get_step_invocation(step) == expected
 
 
 def test_pipeline_runs_root_step_with_defaults_from_override():
@@ -224,13 +224,13 @@ def test_pipeline_runs_root_step_with_defaults_from_override():
     step = pipeline.add_step(read)
 
     result = pipeline.run(transform_overrides={"read": replacement})
-    expected = StepRun(
+    expected = StepInvocation(
         step=step,
         transform=replacement,
         inputs={"path": BoundInput("fixture.csv", DefaultSource())},
         output="fixture.csv",
     )
-    assert result.get_step_run(step) == expected
+    assert result.get_step_invocation(step) == expected
 
 
 def test_pipeline_uses_effective_transform_default_for_unconnected_input():
@@ -252,7 +252,7 @@ def test_pipeline_uses_effective_transform_default_for_unconnected_input():
     pipeline.connect(source, sink)
 
     result = pipeline.run(transform_overrides={"consume": replacement})
-    expected = StepRun(
+    expected = StepInvocation(
         step=sink,
         transform=replacement,
         inputs={
@@ -261,7 +261,7 @@ def test_pipeline_uses_effective_transform_default_for_unconnected_input():
         },
         output="val",
     )
-    assert result.get_step_run(sink) == expected
+    assert result.get_step_invocation(sink) == expected
 
 
 def test_override_error_names_expected_and_actual_output():

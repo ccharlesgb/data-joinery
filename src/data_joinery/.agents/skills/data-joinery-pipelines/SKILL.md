@@ -49,8 +49,8 @@ Use `result.get_input(step, "parameter", ValueType)` to inspect a specific bound
 `result.get_one_input(step, ValueType)` only when exactly one input has that runtime type;
 context values and defaults count too. Writer inputs are recorded before their input contracts
 project or cast them. To test what the writer function actually receives after coercion, capture
-the value inside an override. `get_step_run(step)` exposes the transform, bound input sources,
-and output when the complete run record matters.
+the value inside an override. `get_step_invocation(step)` exposes the transform, bound input
+sources, and output when the complete invocation record matters.
 
 For a graph overview, install the `vis` extra and call `pipeline.visualize(show=False)` after
 connecting steps. It returns a Matplotlib figure that can be saved or inspected.

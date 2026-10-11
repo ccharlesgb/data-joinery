@@ -12,7 +12,7 @@ from data_joinery import (
     DefaultSource,
     Pipeline,
     Project,
-    StepRun,
+    StepInvocation,
     transform,
 )
 
@@ -43,13 +43,13 @@ def test_result_traces_bound_inputs_outputs_and_sources():
 
     result = pipeline.run(RunContext("abc"))
     expected = (
-        StepRun(
+        StepInvocation(
             step=read_step,
             transform=read,
             inputs={"label": BoundInput("abc", ContextSource("label"))},
             output="abc",
         ),
-        StepRun(
+        StepInvocation(
             step=write_step,
             transform=write,
             inputs={
@@ -60,7 +60,7 @@ def test_result_traces_bound_inputs_outputs_and_sources():
         ),
     )
 
-    assert result.step_runs == expected
+    assert result.step_invocations == expected
     assert dict(result) == {"read": "abc"}
 
 
@@ -174,7 +174,7 @@ def test_result_checks_input_type_and_step_identity():
     other_pipeline = Pipeline()
     other_step = other_pipeline.add_step(rows)
     with pytest.raises(KeyError, match="not in this pipeline result"):
-        result.get_step_run(other_step)
+        result.get_step_invocation(other_step)
 
 
 def test_result_records_dataframe_passed_before_input_coercion():
