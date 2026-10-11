@@ -18,6 +18,7 @@ from data_joinery.transform import (
     Transform,
     TransformSpec,
     _inspect_transform,
+    side_effect,
     transform,
 )
 
@@ -146,6 +147,63 @@ def test_transform_treats_missing_return_annotation_as_void():
     @transform
     def write_path():
         return "unexpected"
+
+    with pytest.raises(TypeError, match="Return value from 'write_path' must be None"):
+        write_path()
+
+
+def test_transform_marks_terminal_side_effect():
+    @transform(side_effect=True)
+    def write_path() -> None:
+        pass
+
+    assert write_path.side_effect is True
+
+
+def test_side_effect_decorator_marks_transform():
+    @side_effect
+    def write_path() -> None:
+        pass
+
+    assert write_path.side_effect is True
+
+
+def test_side_effect_decorator_requires_none_annotation():
+    with pytest.raises(TypeError, match="must explicitly annotate its return as None"):
+
+        @side_effect
+        def write_path():
+            pass
+
+
+def test_transform_defaults_to_no_side_effect():
+    @transform()
+    def check_path() -> None:
+        pass
+
+    assert check_path.side_effect is False
+
+
+def test_side_effect_transform_requires_explicit_none_annotation():
+    with pytest.raises(TypeError, match="must explicitly annotate its return as None"):
+
+        @transform(side_effect=True)
+        def write_path():
+            pass
+
+
+def test_side_effect_transform_rejects_value_return_annotation():
+    with pytest.raises(TypeError, match="must explicitly annotate its return as None"):
+
+        @transform(side_effect=True)
+        def write_path() -> str:
+            return "path"
+
+
+def test_side_effect_transform_rejects_returned_value():
+    @transform(side_effect=True)
+    def write_path() -> None:
+        return "unexpected"  # type: ignore[return-value]
 
     with pytest.raises(TypeError, match="Return value from 'write_path' must be None"):
         write_path()

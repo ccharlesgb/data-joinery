@@ -3,6 +3,8 @@
 Data Joinery provides a decorator for defining transformations on DataFrames. This allows you to
 annotate input and output schemas making it much clearer what the transformation does:
 
+For transforms that write or print data, see [Side effects](../pipelines/side_effects.md).
+
 === "Polars"
 
     ``` python

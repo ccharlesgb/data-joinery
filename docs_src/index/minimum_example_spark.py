@@ -52,7 +52,7 @@ def get_metrics(
     )
 
 
-@transform
+@transform(side_effect=True)
 def print_metrics(metrics_table: Annotated[DataFrame, Strict(OrderMetrics)]) -> None:
     metrics_table.orderBy("customer_id").show()
 

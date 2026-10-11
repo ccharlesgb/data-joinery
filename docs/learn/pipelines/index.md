@@ -7,7 +7,8 @@
 Pipelines allow you to chain together multiple transformations. The pipeline will validate
 that the output of each transformation is compatible with the input of the next one.
 After running a pipeline, see [Inspecting Pipeline Runs](inspecting_pipeline_runs.md)
-to read a step's result.
+to read a step's result. See [Side effects](side_effects.md) to mark steps that
+a pipeline can skip during a run.
 
 ## Defining a pipeline
 

@@ -26,8 +26,9 @@ and decorated transforms without a pipeline.
   `data-joinery-schemas`.
 - For declaring contracts, implementing a transform, or unit testing one transform, use
   `data-joinery-transformations`.
-- For connecting steps, injecting context, visualizing a graph, inspecting run results, using
-  per-run overrides, or testing a complete pipeline, use `data-joinery-pipelines`.
+- For connecting steps, injecting context, marking or skipping side effects, visualizing a graph,
+  inspecting run results, using per-run overrides, or testing a complete pipeline, use
+  `data-joinery-pipelines`.
 - For deciding where code belongs in a new or existing application repository, use
   `data-joinery-project-layout`.
 
@@ -43,7 +44,10 @@ skills.
 - A **schema** is `Schema(Model)`, which compiles the model for a selected backend.
 - A **contract** is metadata such as `Strict(Model)` or `Project(Model)` on an `Annotated`
   DataFrame type.
-- A **transform** is a function decorated with `@transform`; contracts are enforced when it runs.
+- A **transform** is a function decorated with `@transform` or `@side_effect`; contracts are
+  enforced when it runs.
+- A **side-effect transform** uses `@side_effect` to mark a terminal action that a pipeline can
+  skip. It still runs when called directly.
 - A **step** is one named use of a transform in a pipeline. The same transform can be added more
   than once as distinct steps.
 - **Context** is typed runtime configuration or a dependency injected into transforms marked with

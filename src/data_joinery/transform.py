@@ -189,9 +189,15 @@ def _wrap_transform[**P, R](
 
 
 class Transform[**P, R]:
-    def __init__(self, fn: Callable[P, R]):
+    def __init__(self, fn: Callable[P, R], *, side_effect: bool = False):
         self._fn = fn
         self.__transform_spec__ = _inspect_transform(fn)
+        if side_effect and get_type_hints(fn).get("return") is not type(None):
+            raise TypeError(
+                f"Transform '{fn.__name__}' with side_effect=True must explicitly "
+                "annotate its return as None."
+            )
+        self._side_effect = side_effect
 
     def __call__(self, *args: P.args, **kwds: P.kwargs) -> R:
         return _wrap_transform(self._fn, self.__transform_spec__)(*args, **kwds)
@@ -203,35 +209,58 @@ class Transform[**P, R]:
     def default_name(self) -> str | None:
         return get_callable_name(self._fn)
 
+    @property
+    def side_effect(self) -> bool:
+        """Whether this transform is a skippable terminal side effect."""
+        return self._side_effect
+
 
 @overload
 def transform[**P, R](
     f: Callable[P, R],
+    *,
+    side_effect: bool = False,
 ) -> Transform[P, R]: ...
 
 
 @overload
 def transform[**P, R](
     f: None = None,
+    *,
+    side_effect: bool = False,
 ) -> Callable[[Callable[P, R]], Transform[P, R]]: ...
 
 
 def transform[**P, R](
     f: Callable[P, R] | None = None,
+    *,
+    side_effect: bool = False,
 ) -> Transform[P, R] | Callable[[Callable[P, R]], Transform[P, R]]:
     """Decorate a function to validate its annotated inputs and output.
 
-    Use as ``@transform`` or ``@transform()``. DataFrame contracts in
+    Use as ``@transform``, ``@transform()``, or
+    ``@transform(side_effect=True)``. A side-effect transform must explicitly
+    return ``None`` and can be skipped by ``Pipeline.run``. DataFrame contracts in
     ``Annotated`` control schema validation and coercion. Other supported
     runtime classes are checked with ``isinstance``.
 
     Args:
         f: Function to decorate. Omit when using ``@transform()``.
+        side_effect: Mark a terminal transform that can be skipped by a pipeline run.
 
     Returns:
         A callable transform that can also be added to a pipeline.
     """
     if f is None:
-        return Transform
+        return lambda fn: Transform(fn, side_effect=side_effect)
 
-    return Transform(f)
+    return Transform(f, side_effect=side_effect)
+
+
+def side_effect[**P, R](f: Callable[P, R]) -> Transform[P, R]:
+    """Mark a terminal transform as a side effect.
+
+    This is shorthand for ``@transform(side_effect=True)``. The function must
+    explicitly declare ``-> None``. Calling it directly still runs it.
+    """
+    return Transform(f, side_effect=True)

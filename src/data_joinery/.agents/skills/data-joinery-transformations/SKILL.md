@@ -53,6 +53,11 @@ Transforms can also accept or return ordinary class instances. These contracts c
 compatibility rather than coercing a schema. Parameterized instance types such as `list[str]` are
 not supported; wrap structured values in a named class when their contents matter.
 
+For a transform that writes data, records a metric, or prints a result, use `@side_effect` (shorthand
+for `@transform(side_effect=True)`). Declare `-> None`: a side-effect transform cannot supply an
+output to a downstream step. The marker does not change direct calls; it lets a pipeline skip the
+transform when run with `include_side_effects=False`.
+
 ## Run a Transform
 
 Call the decorated function normally or use a backend's transform idiom, such as Spark's

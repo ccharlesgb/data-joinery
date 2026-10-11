@@ -19,7 +19,7 @@ from .pipeline_result import (
     StepInvocation,
 )
 from .schemas import Schema
-from .transform import transform
+from .transform import side_effect, transform
 
 __all__ = [
     "BoundInput",
@@ -37,5 +37,6 @@ __all__ = [
     "Step",
     "StepInvocation",
     "Strict",
+    "side_effect",
     "transform",
 ]

@@ -42,7 +42,7 @@ def get_metrics(
     ).agg(pl.col("order_value").sum().alias("total_order_value"))
 
 
-@transform
+@transform(side_effect=True)
 def print_metrics(metrics_table: Annotated[pl.DataFrame, Strict(OrderMetrics)]) -> None:
     print(metrics_table.sort("customer_id"))
 

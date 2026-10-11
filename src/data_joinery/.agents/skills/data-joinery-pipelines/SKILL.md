@@ -55,6 +55,19 @@ sources, and output when the complete invocation record matters.
 For a graph overview, install the `vis` extra and call `pipeline.visualize(show=False)` after
 connecting steps. It returns a Matplotlib figure that can be saved or inspected.
 
+## Skip Side Effects
+
+Mark final writers, metric loggers, and printers with `@side_effect` (or
+`@transform(side_effect=True)`). They must declare `-> None` and cannot feed another step.
+`pipeline.run(context, include_side_effects=False)` runs the rest of the graph without calling
+marked steps. Side effects run by default, and unmarked transforms that return `None` still run.
+Skipped steps have no `StepInvocation` in the result. Calling a marked transform directly still runs it.
+
+The original step's marker controls skipping when a run uses `transform_overrides`: an unmarked
+replacement of a marked writer is still skipped, while a marked replacement cannot be used for an
+unmarked step. If a test needs to inspect the input to a writer, override the writer instead of
+skipping it. Pipeline visualizations show marked steps with an amber accent and `SIDE EFFECT` label.
+
 ## Inject Typed Context
 
 Mark non-graph dependencies with `Annotated[DependencyType, Context()]`. Declare the available

@@ -14,7 +14,8 @@
 
 `Pipeline.run()` returns a `PipelineResult`. Use a `Step` or a step name to
 select the output you want. The result also acts as a mapping from step names
-to non-`None` outputs.
+to non-`None` outputs. When `include_side_effects=False`, marked side-effect
+steps are skipped and do not appear in the result's run records.
 
 | Method | Use |
 | --- | --- |

@@ -92,3 +92,21 @@ def test_empty_pipeline_visualization():
         text.get_text() for text in figure.axes[0].texts
     ]
     plt.close(figure)
+
+
+def test_visualize_labels_side_effect_steps():
+    pytest.importorskip("matplotlib")
+    from matplotlib import pyplot as plt
+
+    @transform(side_effect=True)
+    def publish() -> None:
+        pass
+
+    pipeline = Pipeline()
+    pipeline.add_step(publish)
+
+    figure = pipeline.visualize(show=False)
+    labels = [text.get_text() for text in figure.axes[0].texts]
+
+    assert "SIDE EFFECT" in labels
+    plt.close(figure)

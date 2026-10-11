@@ -129,6 +129,39 @@ def test_run_logs_all_result_step_invocations(caplog: pytest.LogCaptureFixture):
     )
 
 
+def test_run_logs_only_executed_steps_when_side_effects_are_skipped(
+    caplog: pytest.LogCaptureFixture,
+):
+    @transform
+    def read() -> int:
+        return 1
+
+    @transform(side_effect=True)
+    def write(value: int) -> None:
+        pass
+
+    pipeline = Pipeline()
+    source = pipeline.add_step(read)
+    sink = pipeline.add_step(write)
+    source >> sink
+
+    with caplog.at_level(logging.DEBUG, logger="data_joinery"):
+        pipeline.run(include_side_effects=False)
+
+    assert_logs_produced(
+        caplog,
+        [
+            "Pipeline.run() started (steps: 2, context: none, overrides: 0)",
+            "Invoking step 'read' with transform 'read' (inputs: (); context fields: ())",
+            re.compile(rf"Step 'read' returned in {_DURATION} \(return type: int\)"),
+            re.compile(
+                rf"Pipeline\.run\(\) returned in {_DURATION} \(step invocations: 1, outputs: 1\)"
+            ),
+            "Pipeline result step invocations: read",
+        ],
+    )
+
+
 def test_run_logs_context_field_without_value(caplog: pytest.LogCaptureFixture):
     @dataclass
     class Secret:

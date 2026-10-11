@@ -73,7 +73,7 @@ def score_orders(
     return orders.with_columns((pl.col("amount") / model.threshold).alias("score"))
 
 
-@transform
+@transform(side_effect=True)
 def write_scores(
     scores: Annotated[pl.DataFrame, Strict(ScoredOrders)],
 ) -> None:

@@ -341,8 +341,11 @@ class Pipeline[ContextT]:
         node_indices = rx.topological_sort(self._dag)
         return [self._dag[node_index] for node_index in node_indices]
 
-    def _validate_source_steps(self, overrides: Mapping[str, Transform]) -> None:
-        for step, step_index in self._node_indices.items():
+    def _validate_source_steps(
+        self, overrides: Mapping[str, Transform], steps: Sequence[Step[Any]]
+    ) -> None:
+        for step in steps:
+            step_index = self._node_indices[step]
             if self._dag.in_degree(step_index) != 0:
                 continue
             effective_transform = overrides.get(step.name, step.transform)
@@ -361,6 +364,11 @@ class Pipeline[ContextT]:
 
     def _validate_transform_override(self, step: Step, replacement: Transform) -> None:
         self._validate_transform_parameters(replacement)
+        if replacement.side_effect and not step.transform.side_effect:
+            raise PipelineOverrideError(
+                f"Transform override for step '{step.name}' cannot introduce a side "
+                "effect. Mark the original transform with side_effect=True."
+            )
         original = step.transform.__transform_spec__
         override = replacement.__transform_spec__
 
@@ -439,6 +447,7 @@ class Pipeline[ContextT]:
         context: None = None,
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
+        include_side_effects: bool = True,
     ) -> PipelineResult: ...
 
     @overload
@@ -447,6 +456,7 @@ class Pipeline[ContextT]:
         context: ContextT,
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
+        include_side_effects: bool = True,
     ) -> PipelineResult: ...
 
     def run(
@@ -454,6 +464,7 @@ class Pipeline[ContextT]:
         context: ContextT | None = None,
         *,
         transform_overrides: Mapping[str, Transform] | None = None,
+        include_side_effects: bool = True,
     ) -> PipelineResult:
         """Invoke each step and return its recorded inputs and outputs.
 
@@ -463,9 +474,11 @@ class Pipeline[ContextT]:
             transform_overrides: Replacement transforms keyed by step name.
                 Each replacement must have compatible input contracts and the
                 same output contract.
+            include_side_effects: Whether to run transforms marked with
+                ``side_effect=True``. Defaults to ``True``.
 
         Returns:
-            A result containing an invocation record for every step.
+            A result containing an invocation record for every executed step.
 
         Raises:
             TypeError: If the context is missing or has the wrong type.
@@ -492,7 +505,12 @@ class Pipeline[ContextT]:
             )
 
         overrides = self._resolve_transform_overrides(transform_overrides)
-        self._validate_source_steps(overrides)
+        steps_to_run = [
+            step
+            for step in self.get_steps_in_execution_order()
+            if include_side_effects or not step.transform.side_effect
+        ]
+        self._validate_source_steps(overrides, steps_to_run)
         run_started_at = perf_counter()
         logger.info(
             "Pipeline.run() started (steps: %d, context: %s, overrides: %d)",
@@ -510,7 +528,7 @@ class Pipeline[ContextT]:
         outputs: dict[str, Any] = {}
         step_invocations: list[StepInvocation[Any]] = []
 
-        for step in self.get_steps_in_execution_order():
+        for step in steps_to_run:
             effective_transform = overrides.get(step.name, step.transform)
             spec = effective_transform.__transform_spec__
             arguments: dict[str, Any] = {}

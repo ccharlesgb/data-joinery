@@ -140,6 +140,7 @@ def draw_pipeline(dag: rx.PyDAG) -> Figure:
     top = {i: center_y[i] + height[i] / 2 for i in nodes}
     bottom = {i: center_y[i] - height[i] / 2 for i in nodes}
     palette = {"frame": "#27887f", "value": "#7767a6", "void": "#8a98a7"}
+    side_effect_color = "#b76524"
 
     # Scale with the graph, so saved figures remain readable even for wide pipelines.
     ys = [value for i in nodes for value in (top[i], bottom[i])]
@@ -184,6 +185,7 @@ def draw_pipeline(dag: rx.PyDAG) -> Figure:
         step = dag[i]
         spec = step.transform.__transform_spec__
         output, kind = _contract_label(spec.output_contract)
+        accent = side_effect_color if step.transform.side_effect else palette[kind]
         x, y = left[i], top[i]
         ax.add_patch(
             FancyBboxPatch(
@@ -216,7 +218,7 @@ def draw_pipeline(dag: rx.PyDAG) -> Figure:
                 -height[i] + 0.20,
                 boxstyle="round,pad=0,rounding_size=0.03",
                 linewidth=0,
-                facecolor=palette[kind],
+                facecolor=accent,
                 zorder=4,
             )
         )
@@ -288,19 +290,19 @@ def draw_pipeline(dag: rx.PyDAG) -> Figure:
         ax.text(
             x + 0.27,
             bottom[i] + 0.26,
-            "OUT",
+            "SIDE EFFECT" if step.transform.side_effect else "OUT",
             fontsize=7.5,
             fontweight="bold",
-            color="#8292a2",
+            color=accent if step.transform.side_effect else "#8292a2",
             va="center",
             zorder=5,
         )
         ax.text(
-            x + 0.72,
+            x + (1.35 if step.transform.side_effect else 0.72),
             bottom[i] + 0.26,
             shorten(output, width=37, placeholder="…"),
             fontsize=9,
-            color=palette[kind],
+            color=accent,
             va="center",
             zorder=5,
         )

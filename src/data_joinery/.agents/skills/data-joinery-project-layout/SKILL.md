@@ -89,7 +89,8 @@ Schema inheritance is appropriate when an output genuinely extends an input reco
 Keep transformation logic and runtime configuration out of this module.
 ### `transform.py`
 
-Define the pipeline’s executable units with @transform.
+Define the pipeline’s executable units with `@transform`. Use `@side_effect` for terminal writers,
+metric loggers, or printers that a pipeline should be able to skip; these declare `-> None`.
 Each transform should:
 
 - Perform one coherent read, transformation, model, write, or reporting operation.
