@@ -86,10 +86,14 @@ rows = [Customer("1", "Alice", True), Customer("2", "Bob", False)]
 customers = customer_schema.create_dataframe(rows, DataFrame, session=spark)
 ```
 
-For Polars, pass `pl.DataFrame`; no Spark session is required. Prefer this API for fixtures because
-the same model defines both the row values and expected backend schema.
-When testing a resulting DataFrame, construct the expected frame and compare the complete value
-with `polars.testing.assert_frame_equal` or `pyspark.testing.assertDataFrameEqual`.
+For Polars, pass `pl.LazyFrame` by default, or `pl.DataFrame` when an eager frame is useful; no
+Spark session is required. Prefer this API for fixtures because the same model defines both the
+row values and expected backend schema. Coercion also accepts either Polars type and preserves
+the frame type. Collect a lazy result when its values are needed, such as for a test comparison.
+Construct the expected frame and compare the complete value with
+`polars.testing.assert_frame_equal(actual.collect(), expected)` for a lazy result, or compare
+eager Polars and PySpark results with their respective `assert_frame_equal` and
+`assertDataFrameEqual` helpers.
 
 ## Coerce an Existing DataFrame
 

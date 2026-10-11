@@ -13,6 +13,10 @@ PySpark and Polars and can be used in three independent layers:
 2. `@transform` gives DataFrame parameters and return values runtime schema contracts.
 3. `Pipeline` connects transforms into a validated directed graph and injects typed context.
 
+For Polars, both `pl.LazyFrame` and `pl.DataFrame` are supported. Prefer `pl.LazyFrame` so
+operations can remain lazy until the result is needed; use `pl.DataFrame` when eager data is
+appropriate.
+
 Use only the lowest layer the task needs. A caller can use schemas without decorated transforms,
 and decorated transforms without a pipeline.
 

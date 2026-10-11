@@ -8,7 +8,7 @@ from ..schema_types import CoercionMode
 
 
 class DataFrameBackend[FrameT, SchemaT](Protocol):
-    """Connect one dataframe class and one native schema class to Data Joinery.
+    """Connect dataframe classes and one native schema class to Data Joinery.
 
     Backend lookup recognizes subclasses of its registered classes too.
     Implement this protocol, then pass one instance to :func:`register_backend`.
@@ -17,8 +17,8 @@ class DataFrameBackend[FrameT, SchemaT](Protocol):
     name: str
     """Unique name used to identify this backend."""
 
-    dataframe_type: type[FrameT]
-    """Dataframe class accepted and returned by this backend."""
+    dataframe_types: tuple[type[FrameT], ...]
+    """Dataframe classes accepted and returned by this backend."""
 
     schema_type: type[SchemaT]
     """Native schema class returned by :meth:`compile_schema`."""
@@ -47,9 +47,10 @@ class DataFrameBackend[FrameT, SchemaT](Protocol):
         self,
         rows: Sequence[object],
         schema: ModelSchema[Any],
+        frame_type: type[FrameT],
         **kwargs: object,
     ) -> FrameT:
-        """Build a frame from model instances using the compiled schema.
+        """Build a frame of the requested type using the compiled schema.
 
         ``kwargs`` carries backend-specific options, such as a Spark session.
         Reject options that this backend does not support.
@@ -70,14 +71,19 @@ def register_backend[FrameT, SchemaT](
     if existing is not None:
         raise ValueError(f"Backend '{backend.name}' is already registered")
 
+    if not backend.dataframe_types:
+        raise ValueError(f"Backend '{backend.name}' must register a dataframe type")
+
     for registered in _BACKENDS.values():
-        _raise_for_type_overlap(
-            backend.dataframe_type,
-            registered.dataframe_type,
-            backend,
-            registered,
-            "dataframe",
-        )
+        for candidate_type in backend.dataframe_types:
+            for registered_type in registered.dataframe_types:
+                _raise_for_type_overlap(
+                    candidate_type,
+                    registered_type,
+                    backend,
+                    registered,
+                    "dataframe",
+                )
         _raise_for_type_overlap(
             backend.schema_type, registered.schema_type, backend, registered, "schema"
         )
@@ -150,9 +156,13 @@ def _find_backend_for_type(
     matches = [
         backend
         for backend in _BACKENDS.values()
-        if issubclass(
-            requested_type,
-            backend.schema_type if schema else backend.dataframe_type,
+        if (
+            issubclass(requested_type, backend.schema_type)
+            if schema
+            else any(
+                issubclass(requested_type, frame_type)
+                for frame_type in backend.dataframe_types
+            )
         )
     ]
     if len(matches) > 1:

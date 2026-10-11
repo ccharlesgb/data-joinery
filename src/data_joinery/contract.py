@@ -20,10 +20,15 @@ class ContractTypeMismatch(TypeError):
 def describe_contract(contract: Contract) -> str:
     """Describe the value a pipeline connection or override declares."""
     if isinstance(contract, DataFrameContract):
-        frame = (
-            f"{contract.backend_name} DataFrame"
-            if contract.backend_name is not None
+        frame_type_name = (
+            contract.dataframe_type.__name__
+            if contract.dataframe_type is not None
             else "DataFrame"
+        )
+        frame = (
+            f"{contract.backend_name} {frame_type_name}"
+            if contract.backend_name is not None
+            else frame_type_name
         )
         return f"{frame}[{contract.schema.model.__name__}] ({contract.coercion_mode})"
     if isinstance(contract, InstanceContract):
@@ -92,22 +97,19 @@ class DataFrameContract:
         return self.schema == produced.schema and same_backend and same_dataframe_type
 
     def validate(self, value: object) -> object:
+        value_backend = backend_for_value(value)
         backend = (
             get_backend(self.backend_name)
             if self.backend_name is not None
-            else backend_for_value(value)
-        )
-        expected_type = (
-            self.dataframe_type
-            if self.dataframe_type is not None
-            else backend.dataframe_type
-            if backend is not None
-            else None
+            else value_backend
         )
         if (
             backend is None
-            or expected_type is None
-            or not isinstance(value, expected_type)
+            or value_backend is not backend
+            or (
+                self.dataframe_type is not None
+                and not isinstance(value, self.dataframe_type)
+            )
         ):
             expected = (
                 self.dataframe_type.__name__

@@ -84,6 +84,23 @@ def test_pipeline_connection_error_describes_both_contracts():
     assert "backends, types, and schema models match" in message
 
 
+def test_pipeline_connection_error_distinguishes_eager_and_lazy_polars_frames():
+    @transform
+    def users() -> Annotated[pl.DataFrame, Project(User)]:
+        return pl.DataFrame()
+
+    @transform
+    def accept(users: Annotated[pl.LazyFrame, Project(User)]) -> None:
+        pass
+
+    pipeline = Pipeline()
+    source = pipeline.add_step(users)
+    sink = pipeline.add_step(accept)
+
+    with pytest.raises(PipelineConnectionError, match=r"polars LazyFrame\[User\]"):
+        pipeline.connect(source, sink)
+
+
 def test_ambiguous_connection_rejects_unmatched_explicit_parameter():
     @transform
     def users() -> Annotated[pl.DataFrame, Project(User)]:

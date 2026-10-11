@@ -45,6 +45,10 @@ composable. A transform can change backends by using different DataFrame classes
 return annotations. Perform the conversion explicitly in the body and define backend-specific
 model field types with `Annotated` metadata where needed.
 
+For Polars contracts, annotate inputs and outputs as either `pl.LazyFrame` or `pl.DataFrame`.
+Prefer `pl.LazyFrame` through a chain of transforms and collect only when an eager result is
+needed. Keep the annotation consistent with the type the transform actually receives or returns.
+
 Transforms can also accept or return ordinary class instances. These contracts check runtime class
 compatibility rather than coercing a schema. Parameterized instance types such as `list[str]` are
 not supported; wrap structured values in a named class when their contents matter.
@@ -86,7 +90,8 @@ def test_filter_active_customers(spark):
 ```
 
 Use a shared local Spark fixture when the project has one rather than creating a new session in
-every test. For Polars, use `polars.testing.assert_frame_equal(actual, expected)`. Construct an
+every test. For Polars, use `polars.testing.assert_frame_equal(actual, expected)` for eager frames
+or `polars.testing.assert_frame_equal(actual.collect(), expected)` for lazy results. Construct an
 expected DataFrame and compare the whole frame instead of separately checking rows, columns,
 and counts. For non-DataFrame results, build an expected object and use `assert actual == expected`
 when equality is meaningful. Prefer one meaningful assertion per test and split distinct behaviors

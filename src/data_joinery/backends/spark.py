@@ -563,7 +563,7 @@ def _session_from_create_options(options: dict[str, object]) -> SparkSession:
 
 class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
     name = "spark"
-    dataframe_type = DataFrame
+    dataframe_types = (DataFrame,)
     schema_type = types.StructType
 
     def compile_schema(self, schema: ModelSchema[Any]) -> types.StructType:
@@ -584,6 +584,7 @@ class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
         self,
         rows: Sequence[object],
         schema: ModelSchema[Any],
+        frame_type: type[DataFrame],
         **kwargs: object,
     ) -> DataFrame:
         session = _session_from_create_options(kwargs)

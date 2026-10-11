@@ -97,7 +97,7 @@ class Schema[T]:
         backend = _require_backend(
             backend_for_frame_type(frame_type), frame_type, kind="dataframe"
         )
-        frame = backend.create_dataframe(rows, self._model_schema, **kwargs)
+        frame = backend.create_dataframe(rows, self._model_schema, frame_type, **kwargs)
         if not isinstance(frame, frame_type):
             raise TypeError(
                 f"Backend '{backend.name}' returned DataFrame type "

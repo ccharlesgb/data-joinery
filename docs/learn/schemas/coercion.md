@@ -191,3 +191,21 @@ you want to easily align your DataFrame with the model's schema. It will also st
 Type casting in Data Joinery follows the backend's casting rules. If the cast is
 permitted then a conversion attempt will happen to try to change the data type. This could still
 raise a runtime error if the cast is not possible for a specific value in your dataframe.
+
+## Polars LazyFrames
+
+The same coercion modes accept `pl.LazyFrame`. They check its schema when called and
+return a `pl.LazyFrame`, so you can keep building the query before calling `collect()`:
+
+``` python
+--8<-- "docs_src/learn/coercion/lazyframe_polars.py"
+```
+
+:fontawesome-solid-code: Outputs:
+
+``` text
+--8<-- "docs_src/learn/coercion/lazyframe_polars_stdout.log"
+```
+
+Schema mismatches such as missing fields fail during coercion. In `project_cast` mode,
+a value that cannot be cast may fail later, when Polars runs the query.

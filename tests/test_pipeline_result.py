@@ -122,6 +122,34 @@ def test_result_gets_dataframe_output_by_step():
     assert_frame_equal(result.get_output(right), pl.DataFrame({"value": [1]}))
 
 
+def test_pipeline_passes_lazyframes_between_steps():
+    written: list[pl.DataFrame] = []
+
+    @transform
+    def read() -> Annotated[pl.LazyFrame, Project(Row)]:
+        return pl.LazyFrame({"value": [1], "extra": [2]})
+
+    @transform
+    def increment(
+        rows: Annotated[pl.LazyFrame, Project(Row)],
+    ) -> Annotated[pl.LazyFrame, Project(Row)]:
+        return rows.with_columns((pl.col("value") + 1).alias("value"))
+
+    @transform
+    def write(rows: Annotated[pl.LazyFrame, Project(Row)]) -> None:
+        written.append(rows.collect())
+
+    pipeline = Pipeline()
+    read_step = pipeline.add_step(read)
+    increment_step = pipeline.add_step(increment)
+    write_step = pipeline.add_step(write)
+    read_step >> increment_step >> write_step
+
+    pipeline.run()
+
+    assert_frame_equal(written[0], pl.DataFrame({"value": [2]}))
+
+
 def test_result_checks_input_type_and_step_identity():
     @transform
     def rows() -> Annotated[pl.DataFrame, Project(Row)]:

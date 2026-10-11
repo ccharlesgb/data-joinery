@@ -256,14 +256,15 @@ def _build_projected_expression(
 
 
 def _project_fields(
-    dataframe: pl.DataFrame,
-    schema: pl.Schema,
+    dataframe: pl.DataFrame | pl.LazyFrame,
+    given_schema: pl.Schema,
+    expected_schema: pl.Schema,
     *,
     mode: CoercionMode,
     cast: bool,
     recurse: bool,
-) -> pl.DataFrame:
-    diff = _schema_diff(dataframe.schema, schema)
+) -> pl.DataFrame | pl.LazyFrame:
+    diff = _schema_diff(given_schema, expected_schema)
     type_mismatches = (
         tuple(
             difference
@@ -287,13 +288,13 @@ def _project_fields(
         raise SchemaCoercionError(mode, violations)
 
     if not recurse:
-        return dataframe.select(schema.names())
+        return dataframe.select(expected_schema.names())
 
     expressions = [
         _build_projected_expression(
-            pl.col(name), dataframe.schema[name], target_type, cast=cast
+            pl.col(name), given_schema[name], target_type, cast=cast
         ).alias(name)
-        for name, target_type in schema.items()
+        for name, target_type in expected_schema.items()
     ]
     try:
         return dataframe.select(expressions)
@@ -319,9 +320,9 @@ def _validate_create_options(options: dict[str, object]) -> None:
         raise TypeError(f"Unexpected Polars dataframe options: {names}")
 
 
-class PolarsBackend(DataFrameBackend[pl.DataFrame, pl.Schema]):
+class PolarsBackend(DataFrameBackend[pl.DataFrame | pl.LazyFrame, pl.Schema]):
     name = "polars"
-    dataframe_type = pl.DataFrame
+    dataframe_types = (pl.DataFrame, pl.LazyFrame)
     schema_type = pl.Schema
 
     def compile_schema(self, schema: ModelSchema[Any]) -> pl.Schema:
@@ -341,45 +342,52 @@ class PolarsBackend(DataFrameBackend[pl.DataFrame, pl.Schema]):
         self,
         rows: Sequence[object],
         schema: ModelSchema[Any],
+        frame_type: type[pl.DataFrame | pl.LazyFrame],
         **kwargs: object,
-    ) -> pl.DataFrame:
+    ) -> pl.DataFrame | pl.LazyFrame:
         _validate_create_options(kwargs)
-        return pl.DataFrame(
+        dataframe = pl.DataFrame(
             _serialize_rows(schema, rows),
             schema=self.compile_schema(schema),
             strict=True,
         )
+        return dataframe.lazy() if issubclass(frame_type, pl.LazyFrame) else dataframe
 
     def coerce_dataframe(
         self,
-        dataframe: pl.DataFrame,
+        dataframe: pl.DataFrame | pl.LazyFrame,
         schema: ModelSchema[Any],
         mode: CoercionMode,
-    ) -> pl.DataFrame:
-        if not isinstance(dataframe, pl.DataFrame):
+    ) -> pl.DataFrame | pl.LazyFrame:
+        if not isinstance(dataframe, (pl.DataFrame, pl.LazyFrame)):
             raise TypeError(
-                "Polars coercion requires a polars.DataFrame; "
+                "Polars coercion requires a polars.DataFrame or polars.LazyFrame; "
                 f"got {type(dataframe).__name__}."
             )
 
+        given = (
+            dataframe.collect_schema()
+            if isinstance(dataframe, pl.LazyFrame)
+            else dataframe.schema
+        )
         expected = self.compile_schema(schema)
         if mode == "strict":
-            diff = _schema_diff(dataframe.schema, expected)
+            diff = _schema_diff(given, expected)
             violations = (*diff.missing, *diff.additional, *diff.type_mismatches)
             if violations:
                 raise SchemaCoercionError(mode, violations)
             return dataframe
         if mode == "project_top_level":
             return _project_fields(
-                dataframe, expected, mode=mode, cast=False, recurse=False
+                dataframe, given, expected, mode=mode, cast=False, recurse=False
             )
         if mode == "project":
             return _project_fields(
-                dataframe, expected, mode=mode, cast=False, recurse=True
+                dataframe, given, expected, mode=mode, cast=False, recurse=True
             )
         if mode == "project_cast":
             return _project_fields(
-                dataframe, expected, mode=mode, cast=True, recurse=True
+                dataframe, given, expected, mode=mode, cast=True, recurse=True
             )
         raise ValueError(
             f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "

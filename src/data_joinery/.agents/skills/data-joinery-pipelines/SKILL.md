@@ -36,6 +36,10 @@ Connections are validated as the graph is built. Incompatible schema or instance
 fails with `PipelineExecutionError` when an input dependency is left dangling. Correct the model or
 connection instead of weakening a valid contract to suppress these errors.
 
+Polars steps can use `pl.LazyFrame` or `pl.DataFrame` contracts. Prefer `pl.LazyFrame` across
+connected steps and collect at the boundary that needs an eager result. Use matching frame types
+in connected output and input annotations.
+
 `Pipeline.run(...)` returns a `PipelineResult`. It also acts as a mapping from step names to
 non-`None` outputs, but use `result.get_output(step)` when you kept the `Step`, or
 `result.get_output("step_name", ValueType)` when you only have its name. These methods can also
@@ -124,8 +128,9 @@ A practical end-to-end test usually:
 
 Use explicit names for every overridable step. Build an expected object and compare the complete
 value when equality is meaningful. For a DataFrame, construct an expected DataFrame and compare
-the whole frame with `polars.testing.assert_frame_equal(actual, expected)` or
-`pyspark.testing.assertDataFrameEqual(actual, expected)`, rather than checking rows, columns,
-and counts separately. Prefer one meaningful assertion per test; split distinct behaviors into
+the whole frame with `polars.testing.assert_frame_equal` or
+`pyspark.testing.assertDataFrameEqual`. Collect a lazy Polars result before comparing it with an
+expected frame. Avoid separate checks of rows, columns, and counts. Prefer one meaningful
+assertion per test; split distinct behaviors into
 separate tests. Keep separate assertions when they check genuinely different behavior, and do not
 combine unrelated checks into a tuple merely to reduce the assertion count.

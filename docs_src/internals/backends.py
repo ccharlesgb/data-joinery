@@ -19,7 +19,7 @@ class ExampleDataFrame:
 
 class ExampleBackend(DataFrameBackend[ExampleDataFrame, tuple[str, ...]]):
     name = "example"
-    dataframe_type = ExampleDataFrame
+    dataframe_types = (ExampleDataFrame,)
     schema_type = tuple
 
     def compile_schema(self, schema: ModelSchema[Any]) -> tuple[str, ...]:
@@ -53,12 +53,13 @@ class ExampleBackend(DataFrameBackend[ExampleDataFrame, tuple[str, ...]]):
         self,
         rows: Sequence[object],
         schema: ModelSchema[Any],
+        frame_type: type[ExampleDataFrame],
         **kwargs: object,
     ) -> ExampleDataFrame:
         if kwargs:
             raise TypeError(f"Unexpected options: {', '.join(kwargs)}")
         schema.serialize_rows(rows)
-        return ExampleDataFrame(self.compile_schema(schema))
+        return frame_type(self.compile_schema(schema))
 
 
 backend: DataFrameBackend[ExampleDataFrame, tuple[str, ...]] = ExampleBackend()

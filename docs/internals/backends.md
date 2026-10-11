@@ -1,6 +1,6 @@
 # Adding a dataframe backend
 
-A backend connects one dataframe class and one native schema class to Data Joinery. The
+A backend connects one or more dataframe classes and one native schema class to Data Joinery. The
 `DataFrameBackend[Frame, NativeSchema]` protocol makes those types part of the interface:
 `create_dataframe` and `coerce_dataframe` return `Frame`, while `compile_schema` returns
 `NativeSchema`. Register one backend instance with `register_backend`.
@@ -10,10 +10,10 @@ A backend connects one dataframe class and one native schema class to Data Joine
 | Member | What it does |
 | --- | --- |
 | `name` | Gives the backend a unique name. |
-| `dataframe_type` | Identifies the frame class accepted and returned by this backend. |
+| `dataframe_types` | Lists the frame classes accepted and returned by this backend. |
 | `schema_type` | Identifies the native schema class returned by `compile_schema`. |
 | `compile_schema(schema)` | Maps each `ModelSchema` field and annotation to a native schema. Handle nested and backend-specific field types here. |
-| `create_dataframe(rows, schema, **kwargs)` | Checks the model rows, builds a frame with the compiled schema, and handles backend-specific options. Reject unknown options. |
+| `create_dataframe(rows, schema, frame_type, **kwargs)` | Checks the model rows, builds the requested frame class with the compiled schema, and handles backend-specific options. Reject unknown options. |
 | `coerce_dataframe(frame, schema, mode)` | Checks or reshapes a frame according to the requested mode. Return the same frame class or raise `SchemaCoercionError` for schema mismatches. |
 
 The four coercion modes have distinct promises:
@@ -45,7 +45,7 @@ field types, and nested fields.
 --8<-- "docs_src/internals/backends_stdout.log"
 ```
 
-`dataframe_type` and `schema_type` each take a single class. Subclasses are recognized
+`dataframe_types` is a tuple of classes, while `schema_type` takes one class. Subclasses are recognized
 when finding a backend; when creating a frame or native schema, the returned object
 must also match the class requested by the caller. Registration rejects duplicate
 names and overlapping frame or schema classes across backends, so each type has one
@@ -55,7 +55,10 @@ clear owner.
 
 Register the backend before using its frame or schema class. `Schema.native_schema()`
 finds it by `schema_type`; `Schema.create_dataframe()` and frame coercion find it by
-`dataframe_type`. Transform annotations use the same lookup.
+the classes in `dataframe_types`. Transform annotations use the same lookup.
+
+Backends written against the earlier protocol need to replace `dataframe_type` with
+`dataframe_types = (FrameClass,)` and accept `frame_type` in `create_dataframe()`.
 
 Put the backend's native type mapping, row conversion, schema comparison, projection,
 and casting rules in its implementation. The built-in Polars and PySpark backends are
