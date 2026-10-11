@@ -8,7 +8,11 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "rustworkx>=0.18.1",
+    "typer>=0.20.0",
 ]
+
+[project.scripts]
+data-joinery = "data_joinery.cli:app"
 
 [tool.pyrefly]
 project-includes = [

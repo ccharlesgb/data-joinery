@@ -27,6 +27,7 @@ nav = [
       "learn/pipelines/side_effects.md",
       "learn/pipelines/inspecting_pipeline_runs.md",
       "learn/pipelines/testing.md",
+      "learn/pipelines/cli.md",
     ]
     },
     "learn/dbt.md",

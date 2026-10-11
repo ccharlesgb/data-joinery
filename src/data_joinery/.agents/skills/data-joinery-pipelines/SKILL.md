@@ -1,6 +1,6 @@
 ---
 name: data-joinery-pipelines
-description: Build and end-to-end test Data Joinery pipelines, including typed context, step connections, instance outputs, run results, and per-run transform overrides. Use when multiple transforms form a validated graph.
+description: Build, run from the CLI, visualize, and end-to-end test Data Joinery pipelines, including typed context, step connections, run results, and per-run transform overrides. Use when multiple transforms form a validated graph.
 ---
 
 # Data Joinery Pipelines
@@ -102,6 +102,85 @@ added.
 
 For a dbt Python model, put dbt's runtime object in the pipeline context and use it in reader
 transforms to fetch upstream models or sources.
+
+## Make a Pipeline Available to the CLI
+
+Put a `Pipeline` object named `pipeline` or a no-argument `build_pipeline()` function in a Python
+file. The CLI loads that object or calls the function to get the graph. Keep graph construction
+separate from execution: importing the file and building the graph should not run steps, read
+data, or create external sessions. `visualize` builds the graph without creating a context or
+running the pipeline.
+
+For example, `main.py` can define a context factory that converts a command line date into a
+typed dependency:
+
+```python
+from dataclasses import dataclass
+from datetime import date
+from typing import Annotated
+
+from data_joinery import Context, Pipeline, side_effect, transform
+
+
+class RunDate(date):
+    pass
+
+
+@dataclass(frozen=True)
+class ReportContext:
+    run_date: RunDate
+
+    @classmethod
+    def from_kwargs(cls, *, run_date: str) -> "ReportContext":
+        return cls(run_date=RunDate.fromisoformat(run_date))
+
+
+@transform
+def make_report(run_date: Annotated[RunDate, Context()]) -> str:
+    return f"Report for {run_date.isoformat()}"
+
+
+@side_effect
+def print_report(report: str) -> None:
+    print(report)
+
+
+def build_pipeline() -> Pipeline[ReportContext]:
+    pipeline = Pipeline(ReportContext)
+    pipeline.add_step(make_report) >> pipeline.add_step(print_report)
+    return pipeline
+```
+
+From the directory containing `main.py`, run:
+
+```shell
+data-joinery run --context run_date=2026-10-11
+data-joinery run --context run_date=2026-10-11 --skip-side-effects
+data-joinery visualize --output report.svg
+```
+
+For another file, pass its path, such as `data-joinery run pipelines/report.py`. An importable
+module also works, such as `data-joinery run my_project.report`. Add `:attribute` when the
+pipeline object or builder has a different name, for example
+`data-joinery run my_project.report:build_report_pipeline`. Without a target, the CLI uses
+`main.py` and looks for `pipeline` first, then `build_pipeline`.
+
+Each repeated `--context NAME=VALUE` supplies one string keyword argument to the context
+class's `from_kwargs` method. The method must convert those strings into dependencies and
+return an instance of that context class. Define it whenever the CLI must accept context
+values; the CLI does not derive options or conversions from dataclass fields. If the pipeline
+has a context but no `--context` options, the CLI calls `from_kwargs()` when it exists or
+constructs the context with no arguments. A context-free pipeline accepts no `--context`
+options. Keep required runtime services in the context factory or steps so drawing the graph
+does not start them. Manage the lifetime of services created by the factory yourself; the CLI
+does not close them after a run.
+
+`run` executes marked side effects unless `--skip-side-effects` is passed. In the example,
+skipping prevents `print_report` from running while `make_report` still runs. Mark only terminal
+steps that should be skipped with `@side_effect`; an unmarked `-> None` step still runs. Install
+the `vis` extra to use `visualize`. It opens a Matplotlib window by default, or saves an SVG or
+PNG when passed `--output report.svg` or `--output report.png`. See the Pipeline CLI guide
+in the project documentation for a runnable version of this example.
 
 ## Pass Ordinary Instance Values
 
