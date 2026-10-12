@@ -1,6 +1,6 @@
 ---
 name: data-joinery
-description: Orient work that uses Data Joinery, choose the right framework layer, and route detailed schema, transformation, pipeline, or project-layout tasks to the focused Data Joinery skills.
+description: Orient work that uses Data Joinery and route schema, transformation, pipeline, query-plan inspection, or project-layout tasks to the focused skills.
 ---
 
 # Data Joinery
@@ -29,6 +29,8 @@ and decorated transforms without a pipeline.
 - For connecting steps, injecting context, marking or skipping side effects, visualizing a graph,
   inspecting run results, using per-run overrides, or testing a complete pipeline, use
   `data-joinery-pipelines`.
+- For inspecting or comparing PySpark or Polars query execution plans from pipeline outputs, use
+  `data-joinery-plan-inspection`.
 - For deciding where code belongs in a new or existing application repository, use
   `data-joinery-project-layout`.
 
