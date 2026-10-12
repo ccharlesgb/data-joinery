@@ -130,10 +130,13 @@ def run(
 ) -> None:
     """Run a pipeline and its steps in dependency order."""
     pipeline = _load_pipeline(target)
+    run_context = _build_context(pipeline, context or [])
+    typer.echo(f"Running pipeline from {target}...")
     pipeline.run(
-        _build_context(pipeline, context or []),
+        run_context,
         include_side_effects=not skip_side_effects,
     )
+    typer.echo("Pipeline finished.")
 
 
 @app.command()
@@ -153,6 +156,7 @@ def visualize(
     if output is not None and output.suffix.lower() not in {".svg", ".png"}:
         _error("--output must end in .svg or .png.")
     pipeline = _load_pipeline(target)
+    typer.echo(f"Visualizing pipeline from {target}...")
     try:
         figure = pipeline.visualize(show=output is None)
     except ImportError as error:
@@ -166,6 +170,9 @@ def visualize(
             from matplotlib import pyplot as plt
 
             plt.close(figure)
+        typer.echo(f"Pipeline visualization saved to {output}.")
+    else:
+        typer.echo("Pipeline visualization displayed.")
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from data_joinery import Pipeline
 from data_joinery.cli import app
 
 
@@ -52,6 +53,34 @@ def test_run_executes_side_effects(pipeline_file: Path, tmp_path: Path):
     assert (result.exit_code, destination.read_text()) == (0, "produce,publish")
 
 
+def test_run_reports_start_and_completion(pipeline_file: Path, tmp_path: Path):
+    destination = tmp_path / "run.txt"
+
+    result = CliRunner().invoke(
+        app, ["run", str(pipeline_file), "--context", f"destination={destination}"]
+    )
+
+    assert result.output == (
+        f"Running pipeline from {pipeline_file}...\nPipeline finished.\n"
+    )
+
+
+def test_run_does_not_report_completion_after_failure(
+    pipeline_file: Path, tmp_path: Path, monkeypatch
+):
+    def fail(*args, **kwargs):
+        raise RuntimeError("step failed")
+
+    monkeypatch.setattr(Pipeline, "run", fail)
+    destination = tmp_path / "run.txt"
+
+    result = CliRunner().invoke(
+        app, ["run", str(pipeline_file), "--context", f"destination={destination}"]
+    )
+
+    assert result.output == f"Running pipeline from {pipeline_file}...\n"
+
+
 def test_run_skips_side_effects(pipeline_file: Path, tmp_path: Path):
     destination = tmp_path / "run.txt"
     result = CliRunner().invoke(
@@ -78,6 +107,32 @@ def test_visualize_saves_figure(pipeline_file: Path, tmp_path: Path, extension: 
     )
 
     assert result.exit_code == 0 and output.stat().st_size > 1000
+
+
+def test_visualize_reports_saved_file(pipeline_file: Path, tmp_path: Path):
+    pytest.importorskip("matplotlib")
+    output = tmp_path / "pipeline.svg"
+
+    result = CliRunner().invoke(
+        app, ["visualize", str(pipeline_file), "--output", str(output)]
+    )
+
+    assert result.output == (
+        f"Visualizing pipeline from {pipeline_file}...\n"
+        f"Pipeline visualization saved to {output}.\n"
+    )
+
+
+def test_visualize_reports_displayed_figure(pipeline_file: Path, monkeypatch):
+    pyplot = pytest.importorskip("matplotlib.pyplot")
+    monkeypatch.setattr(pyplot, "show", lambda: None)
+
+    result = CliRunner().invoke(app, ["visualize", str(pipeline_file)])
+
+    assert result.output == (
+        f"Visualizing pipeline from {pipeline_file}...\n"
+        "Pipeline visualization displayed.\n"
+    )
 
 
 def test_visualize_rejects_unsupported_format(pipeline_file: Path, tmp_path: Path):
