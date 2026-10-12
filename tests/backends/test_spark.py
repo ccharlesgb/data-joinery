@@ -364,7 +364,8 @@ def test_schema_diff_reports_all_nested_differences():
 _NUMERIC = types.NumericType()
 _STRING = types.StringType()
 _DATE = types.DateType()
-_TIME = types.TimeType()
+_TIME_TYPE = getattr(types, "TimeType", None)
+_TIME = _TIME_TYPE() if _TIME_TYPE is not None else None
 _TIMESTAMP = types.TimestampType()
 _TIMESTAMP_NTZ = types.TimestampNTZType()
 _INTERVAL = types.DayTimeIntervalType()
@@ -527,6 +528,7 @@ _TEST_CAST_MATRIX = {
     [
         (source, target, allowed)
         for (source, target), allowed in _TEST_CAST_MATRIX.items()
+        if source is not None and target is not None
     ],
 )
 def test_is_cast_compatible_matches_ansi_matrix(source, target, allowed):

@@ -1,0 +1,25 @@
+name: Backend compatibility
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - dbr17-polars1
+          - dbr17-polars2
+          - dbr18-polars1
+          - dbr18-polars2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run compatibility tests
+        run: docker compose run --build --rm ${{ matrix.service }}

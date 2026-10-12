@@ -55,28 +55,3 @@ def get_metrics(
 Using a schema first approach makes it much clearer what this transformation does, for
 both you and a coding agent. Data Joinery will also enforce at runtime that the input and output
 schemas match the type annotations.
-
-## Migrating from Spark Joinery
-
-The project was renamed for the initial Data Joinery release, version 0.1.0. Replace
-`spark-joinery` with `data-joinery` in dependency declarations and replace
-`spark_joinery` with `data_joinery` in Python imports.
-
-## Development
-
-This project uses `uv` for Python/dependency management and `just` as the command runner.
-
-### Quick start
-
-```bash
-just install
-```
-
-### Common commands
-
-```bash
-just test
-just lint
-just format
-just check
-```

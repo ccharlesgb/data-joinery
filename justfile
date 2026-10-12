@@ -7,7 +7,17 @@ install:
     uv sync --all-extras --all-groups
 
 test:
-    uv run pytest --ignore=docs_src/
+    uv run --extra all pytest --ignore=docs_src/
+
+test-compat service:
+    docker compose run --build --rm {{service}}
+
+test-matrix:
+    docker compose build
+    docker compose run --rm dbr17-polars1
+    docker compose run --rm dbr17-polars2
+    docker compose run --rm dbr18-polars1
+    docker compose run --rm dbr18-polars2
 
 lint-code:
     uv run ruff check . --fix
@@ -16,7 +26,7 @@ lint-deps:
     uv run deptry src
 
 lint-types:
-    uv run pyrefly check
+    uv run --extra all pyrefly check
 
 lint-format:
     uv run ruff format .
@@ -32,7 +42,7 @@ agent-lint-code:
     uv run ruff check . --fix --output-format concise
 
 agent-test: agent-clear-test-report
-    uv run pytest --ignore=docs_src/ --tb=short --junitxml=test-report.xml
+    uv run --extra all pytest --ignore=docs_src/ --tb=short --junitxml=test-report.xml
 
 agent-lint: lint-deps agent-lint-code lint-types lint-format
 

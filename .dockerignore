@@ -1,0 +1,12 @@
+.git
+.venv
+.pytest_cache
+.ruff_cache
+.pyrefly_cache
+.uv_cache
+dist
+site
+site_build
+htmlcov
+test-report.xml
+uv.lock
