@@ -38,11 +38,8 @@ schemas match the type annotations.
 
 ## A complete pipeline
 
-This example reads orders, groups them by day and customer, and checks the schema at each step:
-
-![Order metrics pipeline: read_orders passes Orders to get_metrics, which passes OrderMetrics to print_metrics.](images/homepage-pipeline.svg)
-
-Open the [full-size pipeline figure](images/homepage-pipeline.svg) to inspect the step inputs and outputs.
+Pipelines can be built by chaining multiple transformations together. This example creates a dataset, calculates some
+metrics and prints the output:
 
 === "Polars"
 
@@ -67,6 +64,13 @@ Open the [full-size pipeline figure](images/homepage-pipeline.svg) to inspect th
     ``` text
     --8<-- "docs_src/index/minimum_example_spark_stdout.log"
     ```
+
+Data Joinery will validate that the outputs of one step match the inputs of the next one. Pipelines can be visualised to 
+show how the transformations link together:
+
+![Order metrics pipeline: read_orders passes Orders to get_metrics, which passes OrderMetrics to print_metrics.](images/homepage-pipeline.svg)
+
+Open the [full-size pipeline figure](images/homepage-pipeline.svg) to inspect the step inputs and outputs.
 
 ## Installation
 
