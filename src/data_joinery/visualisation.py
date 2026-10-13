@@ -99,6 +99,7 @@ def draw_pipeline(dag: rx.PyDAG) -> Figure:
     """Return a figure with labeled steps, data types, and input connections."""
     from matplotlib import pyplot as plt
     from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
+    from matplotlib.path import Path
 
     nodes = list(dag.node_indices())
     if not nodes:
@@ -168,10 +169,13 @@ def draw_pipeline(dag: rx.PyDAG) -> Figure:
         sx = left[source] + width
         tx = left[target]
         color = palette[kind]
+        bend = min((tx - sx) * 0.5, gap_x * 0.8)
+        path = Path(
+            [(sx, sy), (sx + bend, sy), (tx - bend, ty), (tx, ty)],
+            [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4],
+        )
         arrow = FancyArrowPatch(
-            (sx, sy),
-            (tx, ty),
-            connectionstyle=f"arc3,rad={0.12 if sy <= ty else -0.12}",
+            path=path,
             arrowstyle="-|>",
             mutation_scale=12,
             linewidth=1.7,
