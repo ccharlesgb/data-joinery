@@ -28,8 +28,12 @@ def build_pipeline() -> Pipeline[OrderPipelineContext]:
 
 The same transform can be added more than once because a step represents one named instance in the
 graph. Give explicit, stable names to steps that tests or callers address. `connect(upstream,
-downstream)` is equivalent to `upstream >> downstream`; use `connect_many([...], downstream)` when
-one step consumes several upstream results.
+downstream)` is equivalent to `upstream >> downstream` or `downstream << upstream`. Use
+`upstream >> [first, second]` to connect one output to several steps, or
+`[first, second] >> downstream` when one step consumes several upstream results. The equivalent
+reversed forms are `[first, second] << upstream` and `downstream << [first, second]`.
+Lists can also appear between shifts, as in `source >> [first, second] >> joined`.
+Use `connect_many([...], downstream)` for the explicit many-to-one form.
 
 Connections are validated as the graph is built. Incompatible schema or instance contracts raise
 `PipelineConnectionError`, and a connection that creates a cycle raises `PipelineCycleError`. A run

@@ -39,6 +39,12 @@ transformations are compatible and can be connected together:
     --8<-- "docs_src/learn/pipelines/index/pipeline_connect_happy_spark_stdout.log"
     ```
 
+??? Info "Connecting steps"
+
+    You can also connect steps with `upstream >> downstream` or `downstream << upstream`.
+    For multiple steps, use `upstream >> [first, second]` to send one result to both steps,
+    or `[first, second] >> downstream` to provide two inputs to one step. Use `connect(..., param="input_name")` when a match is ambiguous.
+
 ## Validating the pipeline
 
 The pipeline will validate itself as you connect transformations. If there is a schema or type

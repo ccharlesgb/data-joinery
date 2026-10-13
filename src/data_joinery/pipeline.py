@@ -67,18 +67,55 @@ class Step[OutputT]:
     transform: Transform[..., OutputT]
     _pipeline: Pipeline[Any]
 
-    def __rshift__[OtherT](self, other: Step[OtherT]) -> Step[OtherT]:
-        """Connect this step to another and return the downstream step.
+    @overload
+    def __rshift__[OtherT](self, other: Step[OtherT]) -> Step[OtherT]: ...
 
-        This is shorthand for ``pipeline.connect(self, other)``. Use
-        ``Pipeline.connect`` to choose an input parameter when needed.
-        """
-        if not isinstance(other, Step):
-            raise TypeError(
-                f"Can only connect Step instances using >>; got {type(other).__name__}."
-            )
-        self._pipeline.connect(self, other)
+    @overload
+    def __rshift__[OtherT](self, other: list[Step[OtherT]]) -> list[Step[OtherT]]: ...
+
+    def __rshift__(self, other: Step | list[Step]) -> Step | list[Step]:
+        """Connect this step to downstream steps and return the right operand."""
+        downstream_steps = other if isinstance(other, list) else [other]
+        if not downstream_steps:
+            raise ValueError(">> requires at least one downstream Step.")
+        for downstream in downstream_steps:
+            if not isinstance(downstream, Step):
+                raise TypeError(
+                    "Can only connect Step instances using >>; "
+                    f"got {type(downstream).__name__}."
+                )
+            self._pipeline.connect(self, downstream)
         return other
+
+    @overload
+    def __lshift__[OtherT](self, other: Step[OtherT]) -> Step[OtherT]: ...
+
+    @overload
+    def __lshift__[OtherT](self, other: list[Step[OtherT]]) -> list[Step[OtherT]]: ...
+
+    def __lshift__(self, other: Step | list[Step]) -> Step | list[Step]:
+        """Connect upstream steps to this step and return the right operand."""
+        upstream_steps = other if isinstance(other, list) else [other]
+        if not upstream_steps:
+            raise ValueError("<< requires at least one upstream Step.")
+        for upstream in upstream_steps:
+            if not isinstance(upstream, Step):
+                raise TypeError(
+                    "Can only connect Step instances using <<; "
+                    f"got {type(upstream).__name__}."
+                )
+            self._pipeline.connect(upstream, self)
+        return other
+
+    def __rrshift__(self, other: list[Step]) -> Step[OutputT]:
+        """Connect a list of upstream steps to this step."""
+        self.__lshift__(other)
+        return self
+
+    def __rlshift__(self, other: list[Step]) -> Step[OutputT]:
+        """Connect this step to a list of downstream steps."""
+        self.__rshift__(other)
+        return self
 
 
 class Pipeline[ContextT]:

@@ -125,6 +125,119 @@ def test_step_right_shift_rejects_non_step_operand():
         users >> "filtered"  # type: ignore[operator]
 
 
+@pytest.fixture
+def wiring_steps():
+    @transform
+    def source() -> int:
+        return 1
+
+    @transform
+    def left(value: int) -> int:
+        return value
+
+    @transform
+    def right(value: int) -> str:
+        return str(value)
+
+    @transform
+    def sink(value: int, label: str) -> None:
+        pass
+
+    pipeline = Pipeline()
+    return (
+        pipeline,
+        pipeline.add_step(source),
+        pipeline.add_step(left),
+        pipeline.add_step(right),
+        pipeline.add_step(sink),
+    )
+
+
+def test_step_left_shift_connects_upstream(wiring_steps):
+    pipeline, source, left, _, _ = wiring_steps
+
+    assert left << source is source
+    assert pipeline.get_upstream_steps(left) == {source}
+
+
+def test_step_right_shift_connects_downstream_list(wiring_steps):
+    pipeline, source, left, right, _ = wiring_steps
+    downstream = [left, right]
+
+    assert source >> downstream is downstream
+    assert {step: pipeline.get_upstream_steps(step) for step in downstream} == {
+        left: {source},
+        right: {source},
+    }
+
+
+def test_step_left_shift_connects_upstream_list(wiring_steps):
+    pipeline, _, left, right, sink = wiring_steps
+    upstream = [left, right]
+
+    assert sink << upstream is upstream
+    assert pipeline.get_upstream_steps(sink) == {left, right}
+
+
+def test_list_right_shift_connects_upstream_steps(wiring_steps):
+    pipeline, _, left, right, sink = wiring_steps
+
+    assert [left, right] >> sink is sink
+    assert pipeline.get_upstream_steps(sink) == {left, right}
+
+
+def test_list_left_shift_connects_downstream_steps(wiring_steps):
+    pipeline, source, left, right, _ = wiring_steps
+
+    assert [left, right] << source is source
+    assert {step: pipeline.get_upstream_steps(step) for step in (left, right)} == {
+        left: {source},
+        right: {source},
+    }
+
+
+def test_step_shift_chains_through_lists(wiring_steps):
+    pipeline, source, left, right, sink = wiring_steps
+
+    assert source >> [left, right] >> sink is sink
+    assert pipeline.get_upstream_steps(sink) == {left, right}
+
+
+def test_step_left_shift_chains_through_lists(wiring_steps):
+    pipeline, source, left, right, sink = wiring_steps
+
+    assert sink << [left, right] << source is source
+    assert pipeline.get_upstream_steps(sink) == {left, right}
+
+
+def test_step_shift_rejects_empty_list(wiring_steps):
+    _, source, _, _, _ = wiring_steps
+
+    with pytest.raises(ValueError, match="at least one"):
+        source >> []
+
+
+def test_list_shift_rejects_empty_list(wiring_steps):
+    _, _, _, _, sink = wiring_steps
+
+    with pytest.raises(ValueError, match="at least one"):
+        [] >> sink
+
+
+def test_step_shift_rejects_non_step_in_list(wiring_steps):
+    _, source, _, _, _ = wiring_steps
+
+    with pytest.raises(TypeError, match="only connect Step instances"):
+        source >> ["bad"]  # type: ignore[operator]
+
+
+def test_step_shift_uses_contract_validation(wiring_steps):
+    _, _, left, right, _ = wiring_steps
+
+    with pytest.raises(PipelineConnectionError, match="No compatible contract"):
+        right >> left
+
+
 def test_connect_many_rejects_empty_sources():
     @transform
     def read_users(
