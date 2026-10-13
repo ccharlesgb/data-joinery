@@ -1,9 +1,5 @@
 # Inspecting Pipeline Runs
 
-!!! example
-
-    Pipeline syntax is experimental
-
 `Pipeline.run()` returns a `PipelineResult`. Most tests already have the `Step`
 returned by `add_step`, so they can read its output with `result.get_output(step)`.
 If you only have the step name, pass the expected runtime type:

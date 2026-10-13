@@ -2,7 +2,7 @@
 
 !!! example
 
-    Pipeline syntax is experimental
+    CLI is experimental
 
 The `data-joinery` command runs a pipeline defined in a Python file. It can also
 draw the pipeline, so you can check its steps without running them.

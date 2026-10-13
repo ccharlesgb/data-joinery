@@ -1,9 +1,5 @@
 # Testing
 
-!!! example
-
-    Pipeline syntax is experimental
-
 Pipeline tests check that connected transformations produce the expected result. If a
 reader, writer, or model cannot run in a test environment, pass a replacement transformation
 to `Pipeline.run()` through `transform_overrides`.
