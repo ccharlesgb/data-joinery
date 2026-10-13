@@ -31,24 +31,24 @@ class PipelineDependencies:
 @transform
 def read_data(
     path_config: Annotated[PathConfig, Context()],
-) -> Annotated[pl.DataFrame, Strict(A)]:
-    return pl.read_csv(path_config.input_path, schema_overrides={"a": pl.String})
+) -> Annotated[pl.LazyFrame, Strict(A)]:
+    return pl.scan_csv(path_config.input_path, schema_overrides={"a": pl.String})
 
 
 @transform
 def transform_data(
-    a: Annotated[pl.DataFrame, Strict(A)],
-) -> Annotated[pl.DataFrame, Strict(B)]:
+    a: Annotated[pl.LazyFrame, Strict(A)],
+) -> Annotated[pl.LazyFrame, Strict(B)]:
     return a.rename({"a": "b"})
 
 
 @transform
 def write_data(
-    b: Annotated[pl.DataFrame, Strict(B)],
+    b: Annotated[pl.LazyFrame, Strict(B)],
     path_config: Annotated[PathConfig, Context()],
 ) -> None:
     print("Write to ", path_config.output_path.name)
-    print(b)
+    print(b.collect())
 
 
 order_metrics = Pipeline(PipelineDependencies)

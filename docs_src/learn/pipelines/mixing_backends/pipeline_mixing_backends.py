@@ -61,17 +61,18 @@ def aggregate_features(
 @transform
 def collect_features(
     features: Annotated[DataFrame, Strict(CustomerFeatures)],
-) -> Annotated[pl.DataFrame, Strict(CustomerFeatures)]:
-    return cast(pl.DataFrame, pl.from_arrow(features.toArrow()))
+) -> Annotated[pl.LazyFrame, Strict(CustomerFeatures)]:
+    return cast(pl.DataFrame, pl.from_arrow(features.toArrow())).lazy()
 
 
 @transform
 def train_model(
-    features: Annotated[pl.DataFrame, Strict(CustomerFeatures)],
+    features: Annotated[pl.LazyFrame, Strict(CustomerFeatures)],
 ) -> LinearRegression:
+    collected = features.collect()
     return LinearRegression().fit(
-        features[["visits", "total_minutes"]],
-        features["annual_spend"],
+        collected[["visits", "total_minutes"]],
+        collected["annual_spend"],
     )
 
 

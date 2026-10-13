@@ -23,24 +23,24 @@ class DummyModel(Model):
 
 
 @transform
-def read_observations() -> Annotated[pl.DataFrame, Project(Observation)]:
-    return pl.DataFrame({"value": [1, 2]})
+def read_observations() -> Annotated[pl.LazyFrame, Project(Observation)]:
+    return pl.LazyFrame({"value": [1, 2]})
 
 
 @transform
 def train_model(
-    observations: Annotated[pl.DataFrame, Project(Observation)],
+    observations: Annotated[pl.LazyFrame, Project(Observation)],
 ) -> Model:
     raise RuntimeError("expensive production training")
 
 
 @transform
 def predict(
-    observations: Annotated[pl.DataFrame, Project(Observation)],
+    observations: Annotated[pl.LazyFrame, Project(Observation)],
     model: Model,
-) -> Annotated[pl.DataFrame, Project(Observation)]:
-    return pl.DataFrame(
-        {"value": [model.predict(value) for value in observations["value"]]}
+) -> Annotated[pl.LazyFrame, Project(Observation)]:
+    return observations.select(
+        pl.col("value").map_elements(model.predict, return_dtype=pl.Int64)
     )
 
 
@@ -57,7 +57,7 @@ def build_pipeline() -> Pipeline:
 def test_model_pipeline_with_dummy_training():
     @transform
     def train_dummy(
-        observations: Annotated[pl.DataFrame, Project(Observation)],
+        observations: Annotated[pl.LazyFrame, Project(Observation)],
     ) -> Model:
         return DummyModel()
 
@@ -65,6 +65,6 @@ def test_model_pipeline_with_dummy_training():
         transform_overrides={"train": train_dummy},
     )
 
-    predicted = result.get_output("predict", pl.DataFrame)
-    expected = pl.DataFrame({"value": [2, 4]})
-    assert_frame_equal(predicted, expected)
+    predicted = result.get_output("predict", pl.LazyFrame)
+    expected = pl.LazyFrame({"value": [2, 4]})
+    assert_frame_equal(predicted.collect(), expected.collect())

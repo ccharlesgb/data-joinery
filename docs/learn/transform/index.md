@@ -106,3 +106,12 @@ A schema mismatch in a transformation chain raises an error:
 
     A PySpark transformation that performs an action such as `collect()` may process data
     before a later schema check raises `SchemaCoercionError`.
+
+## Lazy vs Eager
+
+Polars supports two modes of execution,
+[lazy and eager](https://docs.pola.rs/user-guide/concepts/lazy-api/). You can use either
+mode with Data Joinery but lazy mode is strongly preferred as you will benefit from the performance
+optimisations Polars can make. Because both Polars and PySpark use lazy evaluation, the idea that
+you are 'running' transformations is a bit misleading. In reality you are just chaining up transformations
+and the intermediate results are not materialised.

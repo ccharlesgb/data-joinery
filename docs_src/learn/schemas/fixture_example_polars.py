@@ -19,5 +19,5 @@ rows = [
 ]
 
 schema = Schema(Customer)
-df = schema.create_dataframe(rows, pl.DataFrame)
-print(df)
+df = schema.create_dataframe(rows, pl.LazyFrame)
+print(df.collect())

@@ -22,15 +22,15 @@ class CustomerCount:
 
 @transform
 def filter_active_customers(
-    customers: Annotated[pl.DataFrame, Strict(Customer)],
-) -> Annotated[pl.DataFrame, Strict(Customer)]:
+    customers: Annotated[pl.LazyFrame, Strict(Customer)],
+) -> Annotated[pl.LazyFrame, Strict(Customer)]:
     return customers.filter(pl.col("is_active"))
 
 
 @transform
 def get_customer_count(
-    customers: Annotated[pl.DataFrame, Strict(Customer)],
-) -> Annotated[pl.DataFrame, Strict(CustomerCount)]:
+    customers: Annotated[pl.LazyFrame, Strict(Customer)],
+) -> Annotated[pl.LazyFrame, Strict(CustomerCount)]:
     return customers.select(pl.len().alias("count"))
 
 
@@ -42,7 +42,7 @@ customers = customer_schema.create_dataframe(
         Customer("2", "Bob", False),
         Customer("3", "Charlie", True),
     ],
-    pl.DataFrame,
+    pl.LazyFrame,
 )
 try:
     get_customer_count(filter_active_customers(customers))

@@ -27,29 +27,29 @@ class ScoreModel:
 
 
 @transform
-def read_orders() -> Annotated[pl.DataFrame, Strict(Orders)]:
-    return pl.DataFrame({"order_id": [1, 2], "amount": [50.0, 150.0]})
+def read_orders() -> Annotated[pl.LazyFrame, Strict(Orders)]:
+    return pl.LazyFrame({"order_id": [1, 2], "amount": [50.0, 150.0]})
 
 
 @transform
 def clean_orders(
-    orders: Annotated[pl.DataFrame, Strict(Orders)],
-) -> Annotated[pl.DataFrame, Strict(Orders)]:
+    orders: Annotated[pl.LazyFrame, Strict(Orders)],
+) -> Annotated[pl.LazyFrame, Strict(Orders)]:
     return orders.filter(pl.col("amount") >= 0)
 
 
 @transform
 def priority_orders(
-    orders: Annotated[pl.DataFrame, Strict(Orders)],
-) -> Annotated[pl.DataFrame, Strict(Orders)]:
+    orders: Annotated[pl.LazyFrame, Strict(Orders)],
+) -> Annotated[pl.LazyFrame, Strict(Orders)]:
     return orders.filter(pl.col("amount") > 100)
 
 
 @transform
 def combine_orders(
-    cleaned: Annotated[pl.DataFrame, Strict(Orders)],
-    priority: Annotated[pl.DataFrame, Strict(Orders)],
-) -> Annotated[pl.DataFrame, Strict(Orders)]:
+    cleaned: Annotated[pl.LazyFrame, Strict(Orders)],
+    priority: Annotated[pl.LazyFrame, Strict(Orders)],
+) -> Annotated[pl.LazyFrame, Strict(Orders)]:
     return pl.concat([cleaned, priority]).unique(
         subset=["order_id"], maintain_order=True
     )
@@ -57,9 +57,9 @@ def combine_orders(
 
 @transform
 def fit_threshold(
-    orders: Annotated[pl.DataFrame, Strict(Orders)],
+    orders: Annotated[pl.LazyFrame, Strict(Orders)],
 ) -> ScoreModel:
-    mean = cast(float | None, orders["amount"].mean())
+    mean = cast(float | None, orders.select(pl.col("amount").mean()).collect().item())
     if mean is None:
         raise ValueError("cannot fit a threshold from empty orders")
     return ScoreModel(threshold=mean)
@@ -67,17 +67,17 @@ def fit_threshold(
 
 @transform
 def score_orders(
-    orders: Annotated[pl.DataFrame, Strict(Orders)],
+    orders: Annotated[pl.LazyFrame, Strict(Orders)],
     model: ScoreModel,
-) -> Annotated[pl.DataFrame, Strict(ScoredOrders)]:
+) -> Annotated[pl.LazyFrame, Strict(ScoredOrders)]:
     return orders.with_columns((pl.col("amount") / model.threshold).alias("score"))
 
 
 @transform(side_effect=True)
 def write_scores(
-    scores: Annotated[pl.DataFrame, Strict(ScoredOrders)],
+    scores: Annotated[pl.LazyFrame, Strict(ScoredOrders)],
 ) -> None:
-    print(scores)
+    print(scores.collect())
 
 
 order_pipeline = Pipeline()

@@ -27,5 +27,5 @@ class CustomerMetrics:
 
 @transform
 def get_metrics(
-    fact_table: Annotated[pl.DataFrame, Strict(Customer)],
-) -> Annotated[pl.DataFrame, Strict(CustomerMetrics)]: ...
+    fact_table: Annotated[pl.LazyFrame, Strict(Customer)],
+) -> Annotated[pl.LazyFrame, Strict(CustomerMetrics)]: ...

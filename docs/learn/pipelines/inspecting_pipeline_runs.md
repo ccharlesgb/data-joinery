@@ -12,7 +12,7 @@ If you only have the step name, pass the expected runtime type:
 ## Inspect what a writer received
 
 For an end-to-end test, check the DataFrame passed to the final writer. Use
-`get_one_input("write_orders", pl.DataFrame)` when the writer has one DataFrame
+`get_one_input("write_orders", pl.LazyFrame)` when the writer has one DataFrame
 input. The example also reads the upstream step's output:
 
 ``` python
@@ -35,7 +35,7 @@ input. The example also reads the upstream step's output:
 `get_one_input` raises `LookupError` if no input or more than one input matches
 the requested runtime type. It considers all bound inputs, including context
 values and defaults. When several match, use
-`get_input(writer_step, "orders", pl.DataFrame)` to name the parameter.
+`get_input(writer_step, "orders", pl.LazyFrame)` to name the parameter.
 
 In a test, compare the recorded input with an expected DataFrame using the
 backend's frame equality helper.
@@ -70,7 +70,7 @@ DataFrame class:
 --8<-- "docs_src/learn/pipelines/inspecting_pipeline_runs/inspect_dataframe_polars_stdout.log"
 ```
 
-For PySpark, pass `pyspark.sql.DataFrame` in place of `pl.DataFrame`. A named
+For PySpark, pass `pyspark.sql.DataFrame` in place of `pl.LazyFrame`. A named
 lookup raises `TypeError` if the output has a different runtime type.
 
 The [Pipeline result reference](../../reference/Pipeline.md#pipeline-results)

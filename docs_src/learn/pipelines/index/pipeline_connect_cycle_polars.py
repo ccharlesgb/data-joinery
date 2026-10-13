@@ -18,14 +18,14 @@ class B: ...
 
 @transform
 def transform_data(
-    _: Annotated[pl.DataFrame, Strict(A)],
-) -> Annotated[pl.DataFrame, Strict(B)]: ...
+    _: Annotated[pl.LazyFrame, Strict(A)],
+) -> Annotated[pl.LazyFrame, Strict(B)]: ...
 
 
 @transform
 def transform_data_back(
-    _: Annotated[pl.DataFrame, Strict(B)],
-) -> Annotated[pl.DataFrame, Strict(A)]: ...
+    _: Annotated[pl.LazyFrame, Strict(B)],
+) -> Annotated[pl.LazyFrame, Strict(A)]: ...
 
 
 order_metrics = Pipeline()

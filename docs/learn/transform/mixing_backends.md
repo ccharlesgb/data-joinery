@@ -1,7 +1,7 @@
 # Mixing Backends
 
 It is possible to write a transformation that takes a dataframe in one backend and outputs it in another. A common
-use case of this is to collect a spark frame to a Polars dataframe onto the driver node after an
+use case is to move an aggregated Spark frame to Polars on the driver node after an
 aggregation.
 
 This example moves the records from Polars to Spark and then to Polars; it does not change

@@ -19,14 +19,14 @@ class B:
 
 @transform
 def transform_data(
-    a: Annotated[pl.DataFrame, Strict(A)],
-) -> Annotated[pl.DataFrame, Strict(B)]:
+    a: Annotated[pl.LazyFrame, Strict(A)],
+) -> Annotated[pl.LazyFrame, Strict(B)]:
     return a.rename({"a": "b"})
 
 
 @transform
 def write_data(
-    b: Annotated[pl.DataFrame, Strict(B)],
+    b: Annotated[pl.LazyFrame, Strict(B)],
 ) -> None:
     print(b)
 

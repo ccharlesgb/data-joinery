@@ -17,14 +17,14 @@ class OrderTotal:
 
 
 @transform
-def read_orders() -> Annotated[pl.DataFrame, Project(Order)]:
-    return pl.DataFrame({"amount": [10, 20]})
+def read_orders() -> Annotated[pl.LazyFrame, Project(Order)]:
+    return pl.LazyFrame({"amount": [10, 20]})
 
 
 @transform
 def total_orders(
-    orders: Annotated[pl.DataFrame, Project(Order)],
-) -> Annotated[pl.DataFrame, Project(OrderTotal)]:
+    orders: Annotated[pl.LazyFrame, Project(Order)],
+) -> Annotated[pl.LazyFrame, Project(OrderTotal)]:
     return orders.select(pl.col("amount").sum().alias("total"))
 
 
@@ -34,5 +34,5 @@ total_step = pipeline.add_step(total_orders)
 read_step >> total_step
 
 result = pipeline.run()
-print("Orders:", result.get_output(read_step).to_dicts())
-print("Total:", result.get_output("total_orders", pl.DataFrame).to_dicts())
+print("Orders:", result.get_output(read_step).collect().to_dicts())
+print("Total:", result.get_output("total_orders", pl.LazyFrame).collect().to_dicts())

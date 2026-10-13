@@ -13,12 +13,12 @@ class Order:
 
 
 @transform
-def read_orders() -> Annotated[pl.DataFrame, Project(Order)]:
-    return pl.DataFrame({"order_id": [1, 2]})
+def read_orders() -> Annotated[pl.LazyFrame, Project(Order)]:
+    return pl.LazyFrame({"order_id": [1, 2]})
 
 
 @transform
-def write_orders(orders: Annotated[pl.DataFrame, Project(Order)]) -> None:
+def write_orders(orders: Annotated[pl.LazyFrame, Project(Order)]) -> None:
     pass
 
 
@@ -29,6 +29,6 @@ def test_writer_input():
     read >> write
 
     result = pipeline.run()
-    actual = result.get_one_input(write, pl.DataFrame)
-    expected = pl.DataFrame({"order_id": [1, 2]})
-    assert_frame_equal(actual, expected)
+    actual = result.get_one_input(write, pl.LazyFrame)
+    expected = pl.LazyFrame({"order_id": [1, 2]})
+    assert_frame_equal(actual.collect(), expected.collect())

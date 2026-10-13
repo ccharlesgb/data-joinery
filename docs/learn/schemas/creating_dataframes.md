@@ -27,18 +27,3 @@ its backend. Spark also requires its session through the `session` keyword:
     ``` text
     --8<-- "docs_src/learn/schemas/fixture_example_spark_stdout.log"
     ```
-
-## Lazy Polars frames
-
-Pass `pl.LazyFrame` to create a lazy frame from model instances. Use `collect()` when
-you want to run a query and get a `pl.DataFrame`:
-
-``` python
---8<-- "docs_src/learn/schemas/lazy_creation_polars.py"
-```
-
-:fontawesome-solid-code: Outputs:
-
-``` text
---8<-- "docs_src/learn/schemas/lazy_creation_polars_stdout.log"
-```

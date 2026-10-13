@@ -20,25 +20,25 @@ record_schema = Schema(Record)
 
 @transform
 def polars_to_spark(
-    records: Annotated[pl.DataFrame, Strict(Record)],
+    records: Annotated[pl.LazyFrame, Strict(Record)],
     spark: SparkSession,
 ) -> Annotated[DataFrame, Strict(Record)]:
     return spark.createDataFrame(
-        records.to_dicts(), schema=record_schema.native_schema(StructType)
+        records.collect().to_dicts(), schema=record_schema.native_schema(StructType)
     )
 
 
 @transform
 def spark_to_polars(
     records: Annotated[DataFrame, Strict(Record)],
-) -> Annotated[pl.DataFrame, ProjectCast(Record)]:
-    return cast(pl.DataFrame, pl.from_arrow(records.toArrow()))
+) -> Annotated[pl.LazyFrame, ProjectCast(Record)]:
+    return cast(pl.DataFrame, pl.from_arrow(records.toArrow())).lazy()
 
 
 spark = SparkSession.builder.getOrCreate()
 
 polars_records = record_schema.create_dataframe(
-    [Record(1, "first"), Record(2, "second")], pl.DataFrame
+    [Record(1, "first"), Record(2, "second")], pl.LazyFrame
 )
 spark_records = polars_to_spark(polars_records, spark)
 polars_records_back = spark_to_polars(spark_records)

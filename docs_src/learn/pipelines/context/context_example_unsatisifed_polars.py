@@ -26,14 +26,14 @@ class PipelineDependencies:
 @transform
 def read_data(
     run_date: Annotated[RunDate, Context()],
-) -> Annotated[pl.DataFrame, Strict(A)]:
+) -> Annotated[pl.LazyFrame, Strict(A)]:
     expected_path = Path(__file__).parent / f"example_{run_date.strftime('%Y%m%d')}.csv"
-    return pl.read_csv(expected_path)
+    return pl.scan_csv(expected_path)
 
 
 @transform
-def write_data(b: Annotated[pl.DataFrame, Strict(A)]) -> None:
-    print(b)
+def write_data(b: Annotated[pl.LazyFrame, Strict(A)]) -> None:
+    print(b.collect())
 
 
 try:

@@ -39,7 +39,7 @@ input_df = input_schema.create_dataframe(
             sub_schema=SubModel(subfield1="subvalue1", subfield2="subvalue2"),
         )
     ],
-    pl.DataFrame,
+    pl.LazyFrame,
 )
 
 try:

@@ -24,22 +24,22 @@ class C:
 
 
 @transform
-def read_data() -> Annotated[pl.DataFrame, Strict(A)]:
-    return pl.DataFrame({"a": ["value"]})
+def read_data() -> Annotated[pl.LazyFrame, Strict(A)]:
+    return pl.LazyFrame({"a": ["value"]})
 
 
 @transform
 def transform_data(
-    a: Annotated[pl.DataFrame, Strict(A)],
-) -> Annotated[pl.DataFrame, Strict(B)]:
+    a: Annotated[pl.LazyFrame, Strict(A)],
+) -> Annotated[pl.LazyFrame, Strict(B)]:
     return a.rename({"a": "b"})
 
 
 @transform
 def write_data(
-    b: Annotated[pl.DataFrame, Strict(C)],  # Our upstream does not produce schema C
+    b: Annotated[pl.LazyFrame, Strict(C)],  # Our upstream does not produce schema C
 ) -> None:
-    print(b)
+    print(b.collect())
 
 
 order_metrics = Pipeline()

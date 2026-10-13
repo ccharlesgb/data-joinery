@@ -19,8 +19,8 @@ class CollectedStats:
 
 
 @transform
-def read_data() -> Annotated[pl.DataFrame, Strict(InputDataset)]:
-    return pl.DataFrame(
+def read_data() -> Annotated[pl.LazyFrame, Strict(InputDataset)]:
+    return pl.LazyFrame(
         [
             InputDataset("a1", "b1"),
             InputDataset("a2", "b2"),
@@ -32,10 +32,10 @@ def read_data() -> Annotated[pl.DataFrame, Strict(InputDataset)]:
 
 @transform
 def collect_stats(
-    input: Annotated[pl.DataFrame, Strict(InputDataset)],
+    input: Annotated[pl.LazyFrame, Strict(InputDataset)],
 ) -> CollectedStats:
-    distinct_a = input.select("a").unique().height
-    distinct_b = input.select("b").unique().height
+    distinct_a = input.select("a").unique().collect().height
+    distinct_b = input.select("b").unique().collect().height
     return CollectedStats(distinct_a=distinct_a, distinct_b=distinct_b)
 
 

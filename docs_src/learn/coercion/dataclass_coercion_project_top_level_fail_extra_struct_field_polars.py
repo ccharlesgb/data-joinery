@@ -50,7 +50,7 @@ input_df = input_schema.create_dataframe(
             ),
         )
     ],
-    pl.DataFrame,
+    pl.LazyFrame,
 )
 
 try:

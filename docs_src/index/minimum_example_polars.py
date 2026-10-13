@@ -22,29 +22,29 @@ class OrderMetrics:
 
 
 @transform
-def read_orders() -> Annotated[pl.DataFrame, Strict(Orders)]:
+def read_orders() -> Annotated[pl.LazyFrame, Strict(Orders)]:
     return Schema(Orders).create_dataframe(
         [
             Orders(datetime(2026, 1, 1, tzinfo=UTC), "customer_1", 10.0),
             Orders(datetime(2026, 1, 2, tzinfo=UTC), "customer_2", 20.0),
             Orders(datetime(2026, 1, 2, tzinfo=UTC), "customer_2", 30.0),
         ],
-        pl.DataFrame,
+        pl.LazyFrame,
     )
 
 
 @transform
 def get_metrics(
-    order_table: Annotated[pl.DataFrame, Strict(Orders)],
-) -> Annotated[pl.DataFrame, Strict(OrderMetrics)]:
+    order_table: Annotated[pl.LazyFrame, Strict(Orders)],
+) -> Annotated[pl.LazyFrame, Strict(OrderMetrics)]:
     return order_table.group_by(
         pl.col("order_timestamp").dt.date().alias("order_date"), "customer_id"
     ).agg(pl.col("order_value").sum().alias("total_order_value"))
 
 
 @transform(side_effect=True)
-def print_metrics(metrics_table: Annotated[pl.DataFrame, Strict(OrderMetrics)]) -> None:
-    print(metrics_table.sort("customer_id"))
+def print_metrics(metrics_table: Annotated[pl.LazyFrame, Strict(OrderMetrics)]) -> None:
+    print(metrics_table.sort("customer_id").collect())
 
 
 order_metrics = Pipeline()

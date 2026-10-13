@@ -43,7 +43,7 @@ input_df = input_schema.create_dataframe(
             extra_field="extra_value",
         )
     ],
-    pl.DataFrame,
+    pl.LazyFrame,
 )
 
 try:

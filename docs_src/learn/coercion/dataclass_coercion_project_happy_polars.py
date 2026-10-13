@@ -48,8 +48,8 @@ input_df = input_schema.create_dataframe(
             ),
         )
     ],
-    pl.DataFrame,
+    pl.LazyFrame,
 )
 
 coerced_df = schema.coerce_dataframe(input_df, mode="project")
-print(coerced_df)
+print(coerced_df.collect())

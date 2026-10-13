@@ -16,8 +16,8 @@ class Customer:
 
 @transform
 def filter_active_customers(
-    customers: Annotated[pl.DataFrame, Project(Customer)],
-) -> Annotated[pl.DataFrame, Strict(Customer)]:
+    customers: Annotated[pl.LazyFrame, Project(Customer)],
+) -> Annotated[pl.LazyFrame, Strict(Customer)]:
     return customers.filter(pl.col("is_active"))
 
 
@@ -27,8 +27,8 @@ customers = Schema(Customer).create_dataframe(
         Customer(customer_id="2", name="Bob", is_active=False),
         Customer(customer_id="3", name="Charlie", is_active=True),
     ],
-    pl.DataFrame,
+    pl.LazyFrame,
 )
 
 active_customers = filter_active_customers(customers)
-print(active_customers)
+print(active_customers.collect())

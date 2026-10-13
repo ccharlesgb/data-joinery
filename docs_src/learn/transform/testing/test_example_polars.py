@@ -16,8 +16,8 @@ class Customer:
 
 @transform
 def filter_active_customers(
-    customers: Annotated[pl.DataFrame, Strict(Customer)],
-) -> Annotated[pl.DataFrame, Strict(Customer)]:
+    customers: Annotated[pl.LazyFrame, Strict(Customer)],
+) -> Annotated[pl.LazyFrame, Strict(Customer)]:
     return customers.filter(pl.col("is_active"))
 
 
@@ -30,15 +30,15 @@ def test_filter_active_customers():
             Customer("2", "Bob", False),
             Customer("3", "Charlie", True),
         ],
-        pl.DataFrame,
+        pl.LazyFrame,
     )
     expected_active_customers = customer_schema.create_dataframe(
         [
             Customer("1", "Alice", True),
             Customer("3", "Charlie", True),
         ],
-        pl.DataFrame,
+        pl.LazyFrame,
     )
 
     active_customers = filter_active_customers(customers)
-    assert_frame_equal(active_customers, expected_active_customers)
+    assert_frame_equal(active_customers.collect(), expected_active_customers.collect())

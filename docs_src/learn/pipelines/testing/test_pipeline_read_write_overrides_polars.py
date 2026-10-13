@@ -33,23 +33,23 @@ class OrderTotal:
 @transform
 def read_orders(
     storage: Annotated[Storage, Context()],
-) -> Annotated[pl.DataFrame, Project(Order)]:
-    return pl.read_parquet(storage.input_table)
+) -> Annotated[pl.LazyFrame, Project(Order)]:
+    return pl.scan_parquet(storage.input_table)
 
 
 @transform
 def calculate_totals(
-    orders: Annotated[pl.DataFrame, Project(Order)],
-) -> Annotated[pl.DataFrame, Project(OrderTotal)]:
+    orders: Annotated[pl.LazyFrame, Project(Order)],
+) -> Annotated[pl.LazyFrame, Project(OrderTotal)]:
     return orders.select("order_id", (pl.col("amount") * 2).alias("total"))
 
 
 @transform
 def write_totals(
-    totals: Annotated[pl.DataFrame, Project(OrderTotal)],
+    totals: Annotated[pl.LazyFrame, Project(OrderTotal)],
     storage: Annotated[Storage, Context()],
 ) -> None:
-    totals.write_parquet(storage.output_table)
+    totals.sink_parquet(storage.output_table)
 
 
 def build_pipeline() -> Pipeline[OrderPipelineContext]:
@@ -62,15 +62,15 @@ def build_pipeline() -> Pipeline[OrderPipelineContext]:
 
 
 def test_order_pipeline_end_to_end():
-    fixture_orders = pl.DataFrame({"order_id": [1, 2], "amount": [10, 25]})
+    fixture_orders = pl.LazyFrame({"order_id": [1, 2], "amount": [10, 25]})
 
     @transform
-    def read_fixture() -> Annotated[pl.DataFrame, Project(Order)]:
+    def read_fixture() -> Annotated[pl.LazyFrame, Project(Order)]:
         return fixture_orders
 
     @transform
     def capture_totals(
-        totals: Annotated[pl.DataFrame, Project(OrderTotal)],
+        totals: Annotated[pl.LazyFrame, Project(OrderTotal)],
     ) -> None:
         pass
 
@@ -82,6 +82,6 @@ def test_order_pipeline_end_to_end():
         },
     )
 
-    written = result.get_one_input("write", pl.DataFrame)
-    expected = pl.DataFrame({"order_id": [1, 2], "total": [20, 50]})
-    assert_frame_equal(written, expected)
+    written = result.get_one_input("write", pl.LazyFrame)
+    expected = pl.LazyFrame({"order_id": [1, 2], "total": [20, 50]})
+    assert_frame_equal(written.collect(), expected.collect())

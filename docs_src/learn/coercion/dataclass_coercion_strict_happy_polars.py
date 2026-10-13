@@ -39,8 +39,8 @@ input_df = input_schema.create_dataframe(
             sub_schema=SubModel(subfield1="subvalue1", subfield2="subvalue2"),
         )
     ],
-    pl.DataFrame,
+    pl.LazyFrame,
 )
 
 coerced_df = schema.coerce_dataframe(input_df, mode="strict")
-print(coerced_df)
+print(coerced_df.collect())
