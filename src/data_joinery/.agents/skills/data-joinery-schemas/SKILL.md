@@ -100,10 +100,10 @@ eager Polars and PySpark results with their respective `assert_frame_equal` and
 Call `Schema(Model).coerce_dataframe(frame, mode=...)`. Choose the least permissive mode that fits
 the boundary:
 
-- `"strict"` requires exactly the model's named fields and types. Extra fields, missing fields,
+- `"strict"` is the default and requires exactly the model's named fields and types. Extra fields, missing fields,
   and type mismatches fail. Field order and nullability are ignored, and input order is preserved.
 - `"project_top_level"` removes extra top-level columns, but nested structs must already match.
-- `"project"` is the default and recursively removes extra top-level and nested fields. Missing
+- `"project"` recursively removes extra top-level and nested fields. Missing
   fields and type mismatches still fail.
 - `"project_cast"` recursively projects fields and asks the backend to cast values to model types.
   Missing fields still fail, and a permitted cast can still fail for a particular runtime value.

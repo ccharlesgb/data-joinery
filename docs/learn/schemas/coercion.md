@@ -1,6 +1,6 @@
 # Coercing Schemas
 
-Coercion in Data Joinery is the process of automatically converting an input DataFrame to a specified schema. There
+Coercion in Data Joinery checks or converts an input DataFrame against a specified schema. There
 are several modes available to control how strict/relaxed the coercion process should be for your transformations.
 
 Use `Schema(Model).coerce_dataframe()` to take an input DataFrame and return either a new DataFrame that
@@ -16,7 +16,7 @@ Let's take the following schema and walk through how each mode works:
 
 Depending on your workflow and needs, you can choose from several coercion modes.
 
-### Strict
+### Strict (Default)
 
 In strict mode, the input DataFrame must have exactly the same named fields and types as the
 specified model. Any extra columns, missing columns or type mismatches will result in an error.
@@ -103,7 +103,7 @@ Strict does not care about ordering of the fields.
     --8<-- "docs_src/learn/coercion/dataclass_coercion_project_top_level_fail_extra_struct_field_spark_stdout.log"
     ```
 
-### Project (Default)
+### Project
 
 The mode `project` projects nested struct fields, removing all fields that are not in
 the model:

@@ -12,7 +12,7 @@ Pydantic model.
 
 ::: data_joinery.contract.ProjectCast
 
-`Project` is also the default mode for `Schema.coerce_dataframe()`.
+`Strict` is also the default mode for `Schema.coerce_dataframe()`.
 
 ## No output
 

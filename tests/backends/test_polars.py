@@ -309,10 +309,17 @@ def test_create_lazyframe_serializes_model_rows():
     assert_frame_equal(result.collect(), expected)
 
 
-def test_lazy_strict_preserves_original_frame():
+def test_lazy_default_coercion_preserves_original_frame():
     dataframe = pl.LazyFrame({"value": [1]})
 
-    assert Schema(LazyRow).coerce_dataframe(dataframe, "strict") is dataframe
+    assert Schema(LazyRow).coerce_dataframe(dataframe) is dataframe
+
+
+def test_default_coercion_rejects_extra_column():
+    dataframe = pl.DataFrame({"value": [1], "extra": [2]})
+
+    with pytest.raises(SchemaCoercionError, match="Additional field 'extra'"):
+        Schema(LazyRow).coerce_dataframe(dataframe)
 
 
 def test_lazy_strict_reports_schema_mismatch_before_execution():
@@ -341,7 +348,7 @@ def test_lazy_project_accepts_a_file_scan(tmp_path: Path):
     path.write_text("value,extra\n1,2\n")
     expected = pl.DataFrame({"value": [1]})
 
-    result = Schema(LazyRow).coerce_dataframe(pl.scan_csv(path))
+    result = Schema(LazyRow).coerce_dataframe(pl.scan_csv(path), "project")
 
     assert_frame_equal(result.collect(), expected)
 

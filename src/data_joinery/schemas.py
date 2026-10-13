@@ -107,18 +107,18 @@ class Schema[T]:
         return frame
 
     def coerce_dataframe(
-        self, dataframe: FrameT, mode: CoercionMode = "project"
+        self, dataframe: FrameT, mode: CoercionMode = "strict"
     ) -> FrameT:
         """Validate and adapt a DataFrame to this schema.
 
-        ``project`` removes extra fields, including nested fields. Use
-        ``strict`` to reject extras, ``project_top_level`` to require nested
-        fields to match, or ``project_cast`` to also cast field types.
+        ``strict`` rejects extra fields and type mismatches. Use
+        ``project_top_level`` to remove extra top-level fields, ``project``
+        to remove extra nested fields, or ``project_cast`` to also cast field types.
         Missing fields cause an error in every mode.
 
         Args:
             dataframe: DataFrame to validate and adapt.
-            mode: Schema coercion mode. Defaults to ``project``.
+            mode: Schema coercion mode. Defaults to ``strict``.
 
         Returns:
             A DataFrame of the same backend type.
