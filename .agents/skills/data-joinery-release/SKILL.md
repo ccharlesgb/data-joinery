@@ -6,7 +6,8 @@ description: Release data-joinery by validating the repository, selecting the ne
 # Data Joinery release
 
 Use this skill only to make a release of this repository. Do not skip a failed
-check or release from a dirty or outdated checkout.
+check or release from a dirty or outdated checkout. Use the
+`data-joinery-changelog` skill to prepare release notes.
 
 ## Validate the release candidate
 
@@ -52,6 +53,15 @@ If there is no matching tag, stop and ask the user for the initial release
 version; do not invent one. Before making changes, report the selected version
 and verify that no tag with that exact name already exists.
 
+## Approve the changelog
+
+Compare the latest release tag with `main`, then follow the
+`data-joinery-changelog` skill to draft the proposed `CHANGELOG.md` section for
+the selected version. Show the complete proposed section to the developer and
+obtain explicit approval before changing release files, committing, tagging, or
+publishing. Apply requested edits and seek approval of the revised text. Use
+the release date on which the tag will be published.
+
 ## Create and publish the release
 
 Update the `version` field in `pyproject.toml` to the selected version, then
@@ -61,13 +71,15 @@ run:
 uv lock
 ```
 
-Inspect the resulting diff. It must contain only the intended changes to
-`pyproject.toml` and `uv.lock`; otherwise stop for user direction. A tag must
-refer to the versioned package state, so create a release commit containing
-those two files before tagging:
+Update `CHANGELOG.md` with the approved section, move relevant entries out of
+`Unreleased`, and update its comparison links. Inspect the resulting diff. It
+must contain only the intended changes to `pyproject.toml`, `uv.lock`, and
+`CHANGELOG.md`; otherwise stop for user direction. A tag must refer to the
+versioned package state, so create a release commit containing these three
+files before tagging:
 
 ```sh
-git add -- pyproject.toml uv.lock
+git add -- pyproject.toml uv.lock CHANGELOG.md
 git commit -m "Release x.x.x"
 git push origin main
 git tag x.x.x
