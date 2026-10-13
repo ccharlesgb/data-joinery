@@ -6,14 +6,17 @@ Notable changes to Data Joinery are documented here. This changelog follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-13
+
 ### Added
 
 - Connect pipeline steps with `>>` or `<<`, including lists of steps for branches and joins.
-- Show progress and completion messages for CLI `run` and `visualize` commands.
 
 ### Changed
 
-- Allow installation and use with PySpark 4.0.
+- `Schema.coerce_dataframe()` now defaults to `strict` instead of `project`. Pass `mode="project"` to keep the previous behavior of removing extra fields.
+- Support installation and use with PySpark 4.0.
+- Show progress and completion messages for CLI `run` and `visualize` commands.
 
 ## [0.3.1] - 2026-10-11
 
@@ -75,7 +78,8 @@ Notable changes to Data Joinery are documented here. This changelog follows
 - First release as `data-joinery`, renamed from `spark-joinery`. Update package dependencies and Python imports to the new name.
 - Define schema-validated transformations and connect them into pipelines. Supports PySpark DataFrames, optional Polars DataFrames, dataclass and Pydantic schemas, context dependencies, and schema coercion modes.
 
-[Unreleased]: https://github.com/ccharlesgb/data-joinery/compare/0.3.1...HEAD
+[Unreleased]: https://github.com/ccharlesgb/data-joinery/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/ccharlesgb/data-joinery/compare/0.3.1...0.4.0
 [0.3.1]: https://github.com/ccharlesgb/data-joinery/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/ccharlesgb/data-joinery/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/ccharlesgb/data-joinery/compare/0.1.2...0.2.0
