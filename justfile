@@ -58,6 +58,9 @@ docs-build: docs-examples
 docs-examples:
     uv run --extra all python scripts/run_docs_examples.py
 
+docs-images:
+    uv run --extra all python scripts/render_docs_pipeline.py
+
 pipeline-gallery:
     uv run --extra all python scripts/render_pipeline_gallery.py
 
