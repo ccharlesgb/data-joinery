@@ -6,11 +6,7 @@ from typing import cast as type_cast
 from pyspark.sql import Column, DataFrame, SparkSession, types
 from pyspark.sql import functions as F
 
-from data_joinery.model_schema import (
-    ModelSchema,
-    get_model_fields,
-    is_schema_model,
-)
+from data_joinery.model_schema import ModelSchema
 from data_joinery.schema_types import (
     CoercionMode,
     DifferenceKind,
@@ -19,8 +15,8 @@ from data_joinery.schema_types import (
     SchemaDifference,
 )
 
-from .. import type_inspection
 from .base import DataFrameBackend, register_backend
+from .spark_types import _get_spark_field_type
 
 
 @dataclass(frozen=True)
@@ -332,38 +328,6 @@ def _is_cast_compatible(
     if given_category is None or expected_category is None:
         return False
     return CAST_MATRIX.get((given_category, expected_category), False)
-
-
-def _get_spark_schema_from_model(klass: type[Any]) -> types.StructType:
-    if not is_schema_model(klass):
-        raise ValueError(
-            f"{klass.__name__} is neither a dataclass nor a pydantic model"
-        )
-
-    struct_fields = [
-        types.StructField(name, _get_spark_field_type(field_type), True)
-        for name, field_type in get_model_fields(klass)
-    ]
-
-    return types.StructType(struct_fields)
-
-
-def _get_spark_field_type(field_type: Any) -> types.DataType:
-    annotated_spark_type = type_inspection.spark_type_from_annotated(field_type)
-    if annotated_spark_type is not None:
-        return annotated_spark_type
-
-    normalized_type = type_inspection.normalize_python_type(field_type)
-
-    if is_schema_model(normalized_type):
-        return _get_spark_schema_from_model(normalized_type)
-
-    if type_inspection.is_list(normalized_type):
-        element_type = type_inspection.get_list_element_type(normalized_type)
-        element_spark_type = _get_spark_field_type(element_type)
-        return types.ArrayType(element_spark_type, True)
-
-    return type_inspection.get_spark_type_from_python_type(normalized_type)
 
 
 def _coerce_strict(
