@@ -5,6 +5,7 @@ from .contract import (
     Strict,
 )
 from .dependencies import Context
+from .model_schema import BaseModel, Column, column
 from .pipeline import (
     Pipeline,
     PipelineExecutionError,
@@ -22,7 +23,9 @@ from .schemas import Schema
 from .transform import side_effect, transform
 
 __all__ = [
+    "BaseModel",
     "BoundInput",
+    "Column",
     "Context",
     "ContextSource",
     "DefaultSource",
@@ -37,6 +40,7 @@ __all__ = [
     "Step",
     "StepInvocation",
     "Strict",
+    "column",
     "side_effect",
     "transform",
 ]

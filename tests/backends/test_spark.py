@@ -10,6 +10,8 @@ from pyspark.testing import assertDataFrameEqual
 from data_joinery import Schema, schemas
 from data_joinery.backends import spark as spark_backend
 from data_joinery.backends.spark import Project, ProjectCast, ProjectTopLevel, Strict
+from data_joinery.model_schema import BaseModel as JoineryBaseModel
+from data_joinery.model_schema import Column, column
 
 
 @pytest.fixture(scope="session")
@@ -17,6 +19,30 @@ def spark() -> Generator[SparkSession, None, None]:
     spark = SparkSession.builder.master("local[*]").getOrCreate()
     yield spark
     spark.stop()
+
+
+def test_schema_create_dataframe_with_joinery_model_aliases(spark: SparkSession):
+    class Address(JoineryBaseModel):
+        city: Column[str] = column(name="City Name")
+
+    class Household(JoineryBaseModel):
+        address: Column[Address] = column(name="Home Address")
+        previous: Column[list[Address]]
+
+    row = Household(address=Address(city="London"), previous=[Address(city="Paris")])
+    actual = Schema(Household).create_dataframe([row], DataFrame, session=spark)
+    nested = types.StructType(
+        [types.StructField("City Name", types.StringType(), True)]
+    )
+    expected_schema = types.StructType(
+        [
+            types.StructField("Home Address", nested, True),
+            types.StructField("previous", types.ArrayType(nested, True), True),
+        ]
+    )
+    expected = spark.createDataFrame([(("London",), [("Paris",)])], expected_schema)
+
+    assertDataFrameEqual(actual, expected)
 
 
 def test_schema_create_dataframe_makes_spark_dataframe(spark: SparkSession):
