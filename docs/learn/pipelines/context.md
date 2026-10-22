@@ -95,3 +95,6 @@ fails immediately:
     ``` text
     --8<-- "docs_src/learn/pipelines/context/context_example_unsatisifed_spark_stdout.log"
     ```
+
+Import `Context` from `data_joinery`. It is also available from `data_joinery.context`;
+the former `data_joinery.dependencies` import path remains supported for compatibility.

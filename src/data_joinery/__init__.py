@@ -1,10 +1,10 @@
+from .context import Context
 from .contract import (
     Project,
     ProjectCast,
     ProjectTopLevel,
     Strict,
 )
-from .dependencies import Context
 from .pipeline import (
     Pipeline,
     PipelineExecutionError,

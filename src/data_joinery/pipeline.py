@@ -18,13 +18,13 @@ except ModuleNotFoundError as error:
 else:
     _MATPLOTLIB_AVAILABLE = True
 
+from data_joinery.context import inspect_context_type
 from data_joinery.contract import (
     Contract,
     DataFrameContract,
     VoidContract,
     describe_contract,
 )
-from data_joinery.dependencies import inspect_context_type
 from data_joinery.logger import logger
 from data_joinery.pipeline_result import (
     ContextSource,

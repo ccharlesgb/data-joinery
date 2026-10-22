@@ -14,7 +14,7 @@ from data_joinery import (
     transform,
 )
 from data_joinery.backends.spark import SparkContext
-from data_joinery.dependencies import Context
+from data_joinery.context import Context
 from data_joinery.pipeline import (
     Pipeline,
     PipelineConnectionError,
