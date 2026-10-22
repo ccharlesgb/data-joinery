@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 import polars as pl
 import pytest
 
-from data_joinery.backends.polars_types import _get_polars_field_type
+from data_joinery.backends.polars.types import _get_polars_field_type
 
 
 @dataclass

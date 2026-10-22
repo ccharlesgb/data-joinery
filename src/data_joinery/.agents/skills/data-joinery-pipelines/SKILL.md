@@ -74,9 +74,6 @@ skipping it. Pipeline visualizations show marked steps with an amber accent and 
 
 ## Inject Typed Context
 
-Import `Context` from `data_joinery` (or `data_joinery.context`). The former
-`data_joinery.dependencies` path remains available for compatibility.
-
 Mark non-graph dependencies with `Annotated[DependencyType, Context()]`. Declare the available
 dependencies in the pipeline's context dataclass:
 

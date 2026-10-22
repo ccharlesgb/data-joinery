@@ -7,9 +7,11 @@ from pydantic import BaseModel
 from pyspark.sql import DataFrame, SparkSession, types
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Schema, schemas
-from data_joinery.backends import spark as spark_backend
+from data_joinery import Pipeline, Schema, schemas, transform
+from data_joinery import Project as ProjectContract
 from data_joinery.backends.spark import Project, ProjectCast, ProjectTopLevel, Strict
+from data_joinery.backends.spark import backend as spark_backend
+from data_joinery.pipeline import PipelineConnectionError
 
 
 @pytest.fixture(scope="session")
@@ -1074,3 +1076,46 @@ def test_coerce_dataframe_project_cast_reports_every_unsupported_cast(
         ("type_mismatch", "binary_value"),
         ("type_mismatch", "date_value"),
     ]
+
+
+def test_pipeline_does_not_connect_different_dataframe_backends():
+    from polars import LazyFrame
+
+    @dataclass
+    class Order:
+        order_id: int
+
+    @transform
+    def polars_source() -> Annotated[LazyFrame, ProjectContract(Order)]:
+        return LazyFrame({"order_id": [1]})
+
+    @transform
+    def spark_sink(frame: Annotated[DataFrame, ProjectContract(Order)]) -> None:
+        pass
+
+    pipeline = Pipeline()
+    source = pipeline.add_step(polars_source)
+    sink = pipeline.add_step(spark_sink)
+
+    with pytest.raises(PipelineConnectionError, match="No compatible contract"):
+        pipeline.connect(source, sink)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "SparkBackend",
+        "SparkContext",
+        "Strict",
+        "Project",
+        "ProjectCast",
+        "ProjectTopLevel",
+        "SchemaCoercionMode",
+        "CAST_MATRIX",
+    ],
+)
+def test_package_exports_backend_symbols(name):
+    from data_joinery.backends import spark
+    from data_joinery.backends.spark import backend
+
+    assert getattr(spark, name) is getattr(backend, name)

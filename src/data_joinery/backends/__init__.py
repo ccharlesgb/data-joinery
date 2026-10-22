@@ -1,5 +1,5 @@
-from .base import (
-    DataFrameBackend,
+from .protocol import DataFrameBackend
+from .registry import (
     backend_for_frame_type,
     backend_for_schema_type,
     backend_for_value,

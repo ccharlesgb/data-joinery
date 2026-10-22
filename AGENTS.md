@@ -21,6 +21,7 @@
 
 ## Documentation
 
+- Public module-level functions, class methods, and classes must have Google-style docstrings.
 - Documentation is generated using `zensical`
 - The just command to build docs is `just docs-build`
 - The documentation relies on `docs_src` for runnable code snippets which `just docs-examples` updates for you

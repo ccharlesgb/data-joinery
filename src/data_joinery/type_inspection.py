@@ -47,5 +47,5 @@ def __getattr__(name: str) -> Any:
         "spark_type_from_literal",
         "get_spark_type_from_python_type",
     }:
-        return getattr(import_module(".backends.spark_types", __package__), name)
+        return getattr(import_module(".backends.spark.types", __package__), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

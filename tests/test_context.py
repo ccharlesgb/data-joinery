@@ -4,8 +4,9 @@ from typing import Any
 import pytest
 from pyspark.sql import SparkSession
 
+from data_joinery import Context as ExportedContext
 from data_joinery.backends.spark import SparkContext
-from data_joinery.context import inspect_context_type
+from data_joinery.context import Context, inspect_context_type
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,10 @@ class PathConfig:
 class ValidContext:
     path: PathConfig
     retries: int
+
+
+def test_root_context_is_canonical_context():
+    assert ExportedContext is Context
 
 
 def test_inspect_context_type_maps_dependency_types_to_fields():

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from typing import cast as type_cast
 
 from pyspark.sql import Column, DataFrame, SparkSession, types
@@ -13,10 +15,13 @@ from data_joinery.schemas.coercion import (
     SchemaDiff,
     SchemaDifference,
 )
-from data_joinery.schemas.model_schema import ModelSchema
 
-from .base import DataFrameBackend, register_backend
-from .spark_types import _get_spark_field_type
+from ..protocol import DataFrameBackend
+from ..registry import register_backend
+from .types import _get_spark_field_type
+
+if TYPE_CHECKING:
+    from data_joinery.schemas.model_schema import ModelSchema
 
 
 @dataclass(frozen=True)

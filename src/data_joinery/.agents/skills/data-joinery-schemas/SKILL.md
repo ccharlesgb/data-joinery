@@ -8,13 +8,6 @@ description: Define and use Data Joinery schemas with dataclasses or Pydantic mo
 Model the logical record shape first, then use `Schema(Model)` for backend-specific operations.
 Schemas can be used independently of transforms and pipelines.
 
-Import `Schema` and `SchemaCoercionError` from `data_joinery` or
-`data_joinery.schemas`. Import coercion modes and difference records from
-`data_joinery.schemas`. For custom backends, import `ModelSchema` and `ModelField`
-from `data_joinery.schemas.model_schema`, and coercion definitions from
-`data_joinery.schemas.coercion`. The old `data_joinery.model_schema` and
-`data_joinery.schema_types` paths remain available for compatibility.
-
 ## Define a Model
 
 Use either a Python dataclass or a Pydantic `BaseModel`:

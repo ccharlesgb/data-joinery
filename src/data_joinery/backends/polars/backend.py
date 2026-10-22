@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
-from dataclasses import asdict, is_dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -11,13 +12,15 @@ from data_joinery.schemas.coercion import (
     SchemaDiff,
     SchemaDifference,
 )
-from data_joinery.schemas.model_schema import ModelSchema
 
-from .base import DataFrameBackend, register_backend
-from .polars_types import _get_polars_field_type
+from ..protocol import DataFrameBackend
+from ..registry import register_backend
+from .types import _get_polars_field_type
 
 if TYPE_CHECKING:
     from polars._typing import PolarsDataType
+
+    from data_joinery.schemas.model_schema import ModelSchema
 else:
     PolarsDataType = Any
 
@@ -195,16 +198,6 @@ def _project_fields(
         raise
 
 
-def _serialize_rows(schema: ModelSchema[Any], rows: Sequence[object]) -> list[object]:
-    serialized = schema.serialize_rows(rows)  # type: ignore[arg-type]
-    return [
-        asdict(cast(Any, row))
-        if is_dataclass(row) and not isinstance(row, type)
-        else row
-        for row in serialized
-    ]
-
-
 def _validate_create_options(options: dict[str, object]) -> None:
     if options:
         names = ", ".join(sorted(options))
@@ -238,7 +231,7 @@ class PolarsBackend(DataFrameBackend[pl.DataFrame | pl.LazyFrame, pl.Schema]):
     ) -> pl.DataFrame | pl.LazyFrame:
         _validate_create_options(kwargs)
         dataframe = pl.DataFrame(
-            _serialize_rows(schema, rows),
+            schema.serialize_rows(rows),
             schema=self.compile_schema(schema),
             strict=True,
         )

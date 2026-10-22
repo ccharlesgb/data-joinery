@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args, get_origin
 
 import polars as pl
 
-from ..schemas.model_schema import get_model_fields, is_schema_model
-from ..type_inspection import normalize_python_type
+from ...schemas.model_schema import get_model_fields, is_schema_model
+from ...type_inspection import normalize_python_type
 
 POLARS_MAX_DECIMAL_PRECISION = 38
 DEFAULT_FRACTIONAL_DIGITS = 18

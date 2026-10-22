@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Optional
 import pytest
 from pyspark.sql import types
 
-from data_joinery.backends import spark_types
+from data_joinery.backends.spark import types as spark_types
 
 
 @pytest.mark.parametrize(

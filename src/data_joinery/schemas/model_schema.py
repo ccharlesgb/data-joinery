@@ -1,6 +1,6 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, fields, is_dataclass
-from typing import Any
+from dataclasses import asdict, dataclass, fields, is_dataclass
+from typing import Any, cast
 
 try:
     from pydantic import BaseModel as _PydanticBaseModel
@@ -39,18 +39,34 @@ class ModelSchema[T]:
             ),
         )
 
-    def serialize_rows(self, rows: Sequence[T]) -> list[object]:
-        serialized: list[object] = []
+    def serialize_rows(self, rows: Sequence[T]) -> list[dict[str, Any]]:
+        """Validate model rows and convert them to Python dictionaries.
+
+        Give DataFrame backends a common row format so they can create frames
+        from dataclasses and Pydantic models using the same interface. Check
+        that each row matches the schema's model before converting it.
+
+        Args:
+            rows: Instances of this schema's model to include in a DataFrame.
+
+        Returns:
+            One dictionary per row, in input order. Nested models are converted
+            to dictionaries.
+
+        Raises:
+            ValueError: If a row is not an instance of this schema's model.
+        """
+        serialized: list[dict[str, Any]] = []
         for index, row in enumerate(rows):
             if not isinstance(row, self.model):
                 raise ValueError(  # noqa: TRY004
                     f"Row {index}: expected {self.model.__name__}, got "
                     f"{type(row).__name__}. Pass {self.model.__name__} instances."
                 )
-            model_dump = getattr(row, "model_dump", None)
-            serialized.append(
-                model_dump(mode="python") if callable(model_dump) else row
-            )
+            if is_dataclass(row) and not isinstance(row, type):
+                serialized.append(asdict(row))
+            else:
+                serialized.append(cast(Any, row).model_dump(mode="python"))
         return serialized
 
 
