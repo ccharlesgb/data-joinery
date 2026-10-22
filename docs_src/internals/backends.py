@@ -4,12 +4,12 @@ from typing import Any
 
 from data_joinery import Schema
 from data_joinery.backends import DataFrameBackend, register_backend
-from data_joinery.model_schema import ModelSchema
-from data_joinery.schema_types import (
+from data_joinery.schemas.coercion import (
     CoercionMode,
     SchemaCoercionError,
     SchemaDifference,
 )
+from data_joinery.schemas.model_schema import ModelSchema
 
 
 @dataclass(frozen=True)

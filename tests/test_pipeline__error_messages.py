@@ -9,6 +9,7 @@ from data_joinery import (
     DefaultSource,
     Project,
     Schema,
+    SchemaCoercionError,
     StepInvocation,
     Strict,
     transform,
@@ -19,7 +20,6 @@ from data_joinery.pipeline import (
     PipelineExecutionError,
     PipelineOverrideError,
 )
-from data_joinery.schema_types import SchemaCoercionError
 
 
 @dataclass

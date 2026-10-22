@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 
-from data_joinery.model_schema import ModelSchema
-from data_joinery.schema_types import (
+from data_joinery.schemas.coercion import (
     CoercionMode,
     DifferenceKind,
     SchemaCoercionError,
     SchemaDiff,
     SchemaDifference,
 )
+from data_joinery.schemas.model_schema import ModelSchema
 
 from .base import DataFrameBackend, register_backend
 from .polars_types import _get_polars_field_type

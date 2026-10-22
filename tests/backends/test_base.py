@@ -12,9 +12,9 @@ from data_joinery.backends import (
     backend_for_schema_type,
     register_backend,
 )
-from data_joinery.model_schema import ModelSchema
 from data_joinery.pipeline import PipelineConnectionError
-from data_joinery.schema_types import CoercionMode
+from data_joinery.schemas.coercion import CoercionMode
+from data_joinery.schemas.model_schema import ModelSchema
 
 
 @dataclass(frozen=True)

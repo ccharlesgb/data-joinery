@@ -9,9 +9,8 @@ import pytest
 from polars.testing import assert_frame_equal
 from pydantic import BaseModel
 
-from data_joinery import Project, Schema, transform
+from data_joinery import Project, Schema, SchemaCoercionError, transform
 from data_joinery.backends import backend_for_frame_type, get_backend
-from data_joinery.schema_types import SchemaCoercionError
 
 
 def test_polars_backend_is_registered_for_dataframes():

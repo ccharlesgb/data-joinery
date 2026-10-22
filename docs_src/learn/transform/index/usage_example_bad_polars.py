@@ -4,8 +4,7 @@ from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Schema, Strict, transform
-from data_joinery.schema_types import SchemaCoercionError
+from data_joinery import Schema, SchemaCoercionError, Strict, transform
 
 
 @dataclass

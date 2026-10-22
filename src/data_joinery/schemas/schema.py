@@ -1,20 +1,17 @@
 from collections.abc import Sequence
 from typing import Any, TypeVar, cast
 
-from .backends import (
+from ..backends import (
     DataFrameBackend,
     backend_for_frame_type,
     backend_for_schema_type,
     backend_for_value,
 )
-from .model_schema import ModelSchema, is_pydantic_model, is_schema_model
-from .schema_types import (
+from .coercion import (
     CoercionMode,
-    DifferenceKind,
     SchemaCoercionError,
-    SchemaDiff,
-    SchemaDifference,
 )
+from .model_schema import ModelSchema
 
 FrameT = TypeVar("FrameT")
 
@@ -151,15 +148,3 @@ class Schema[T]:
         if not isinstance(other, Schema):
             return False
         return self.model == other.model
-
-
-__all__ = [
-    "CoercionMode",
-    "DifferenceKind",
-    "Schema",
-    "SchemaCoercionError",
-    "SchemaDiff",
-    "SchemaDifference",
-    "is_pydantic_model",
-    "is_schema_model",
-]

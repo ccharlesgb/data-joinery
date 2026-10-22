@@ -3,8 +3,7 @@ from dataclasses import dataclass
 
 import polars as pl
 
-from data_joinery import Schema
-from data_joinery.schema_types import SchemaCoercionError
+from data_joinery import Schema, SchemaCoercionError
 
 
 @dataclass

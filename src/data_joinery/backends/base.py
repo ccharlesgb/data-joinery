@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from importlib import import_module
 from importlib.util import find_spec
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from ..model_schema import ModelSchema
-from ..schema_types import CoercionMode
+if TYPE_CHECKING:
+    from ..schemas.coercion import CoercionMode
+    from ..schemas.model_schema import ModelSchema
 
 
 class DataFrameBackend[FrameT, SchemaT](Protocol):

@@ -22,7 +22,7 @@ from .contract import (
     VoidContract,
     _UncheckedContract,
 )
-from .schema_types import SchemaCoercionError
+from .schemas.coercion import SchemaCoercionError
 from .utils import get_callable_name
 
 

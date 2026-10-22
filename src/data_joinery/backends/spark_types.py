@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, get_args, get_origin
 
 from pyspark.sql import types
 
-from ..model_schema import get_model_fields, is_schema_model
+from ..schemas.model_schema import get_model_fields, is_schema_model
 from ..type_inspection import (
     get_list_element_type,
     is_list,
