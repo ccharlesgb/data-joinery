@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, TypeVar
+from typing import Any
 
 try:
     from pydantic import BaseModel as _PydanticBaseModel
@@ -11,9 +11,6 @@ except ModuleNotFoundError as error:
     _PYDANTIC_AVAILABLE = False
 else:
     _PYDANTIC_AVAILABLE = True
-
-
-T = TypeVar("T")
 
 
 @dataclass(frozen=True)

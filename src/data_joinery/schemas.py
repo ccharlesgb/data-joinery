@@ -16,7 +16,6 @@ from .schema_types import (
     SchemaDifference,
 )
 
-T = TypeVar("T")
 FrameT = TypeVar("FrameT")
 
 
