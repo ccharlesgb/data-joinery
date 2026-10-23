@@ -51,22 +51,6 @@ def test_get_spark_type_from_python_type_raises_value_error_for_mixed_literal_ty
         spark_types.get_spark_type_from_python_type(Literal[1, "a"])
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        "SPARK_MAX_DECIMAL_PRECISION",
-        "DEFAULT_FRACTIONAL_DIGITS",
-        "spark_type_from_annotated",
-        "spark_type_from_literal",
-        "get_spark_type_from_python_type",
-    ],
-)
-def test_legacy_type_inspection_imports_resolve_to_spark_types(name):
-    from data_joinery import type_inspection
-
-    assert getattr(type_inspection, name) is getattr(spark_types, name)
-
-
 def test_get_spark_field_type_maps_nested_optional_models():
     from dataclasses import dataclass
 

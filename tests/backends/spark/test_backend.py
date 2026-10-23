@@ -9,8 +9,13 @@ from pyspark.testing import assertDataFrameEqual
 
 from data_joinery import Pipeline, Schema, schemas, transform
 from data_joinery import Project as ProjectContract
-from data_joinery.backends.spark import Project, ProjectCast, ProjectTopLevel, Strict
 from data_joinery.backends.spark import backend as spark_backend
+from data_joinery.backends.spark.backend import (
+    Project,
+    ProjectCast,
+    ProjectTopLevel,
+    Strict,
+)
 from data_joinery.pipeline import PipelineConnectionError
 
 
@@ -1104,14 +1109,9 @@ def test_pipeline_does_not_connect_different_dataframe_backends():
 @pytest.mark.parametrize(
     "name",
     [
+        "SPARK_BACKEND",
         "SparkBackend",
         "SparkContext",
-        "Strict",
-        "Project",
-        "ProjectCast",
-        "ProjectTopLevel",
-        "SchemaCoercionMode",
-        "CAST_MATRIX",
     ],
 )
 def test_package_exports_backend_symbols(name):

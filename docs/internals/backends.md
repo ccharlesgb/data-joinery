@@ -9,20 +9,18 @@ Import the protocol and registration/lookup functions from `data_joinery.backend
 The protocol is defined in `backends/protocol.py`; registry state, registration
 validation, lookup, and lazy built-in discovery live in `backends/registry.py`.
 Importing these modules does not load Polars or PySpark. Lookup discovers installed
-built-in backends when no registered backend matches. The previous
-`data_joinery.backends.base` imports remain available for compatibility and forward
-to the same protocol and registry functions.
+built-in backends when no registered backend matches
 
 ## What to implement
 
-| Member | What it does |
-| --- | --- |
-| `name` | Gives the backend a unique name. |
-| `dataframe_types` | Lists the frame classes accepted and returned by this backend. |
-| `schema_type` | Identifies the native schema class returned by `compile_schema`. |
-| `compile_schema(schema)` | Maps each `ModelSchema` field and annotation to a native schema. Handle nested and backend-specific field types here. |
+| Member                                                 | What it does                                                                                                                                    |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                                 | Gives the backend a unique name.                                                                                                                |
+| `dataframe_types`                                      | Lists the frame classes accepted and returned by this backend.                                                                                  |
+| `schema_type`                                          | Identifies the native schema class returned by `compile_schema`.                                                                                |
+| `compile_schema(schema)`                               | Maps each `ModelSchema` field and annotation to a native schema. Handle nested and backend-specific field types here.                           |
 | `create_dataframe(rows, schema, frame_type, **kwargs)` | Checks the model rows, builds the requested frame class with the compiled schema, and handles backend-specific options. Reject unknown options. |
-| `coerce_dataframe(frame, schema, mode)` | Checks or reshapes a frame according to the requested mode. Return the same frame class or raise `SchemaCoercionError` for schema mismatches. |
+| `coerce_dataframe(frame, schema, mode)`                | Checks or reshapes a frame according to the requested mode. Return the same frame class or raise `SchemaCoercionError` for schema mismatches.   |
 
 Use `ModelSchema[T].serialize_rows(rows)` to validate model instances before creating
 a frame. It returns `list[dict[str, Any]]`: dataclass rows become dictionaries through
@@ -31,12 +29,12 @@ Nested models are converted to dictionaries as well.
 
 The four coercion modes have distinct promises:
 
-| Mode | Required behavior |
-| --- | --- |
-| `strict` | Check field names and types without removing or casting fields. Extra and missing fields fail. |
-| `project_top_level` | Remove extra top-level fields. Check nested fields and types without changing them. |
-| `project` | Remove extra fields, including nested fields. Check types without casting. |
-| `project_cast` | Project fields and cast types where the native library allows it. Report casts that cannot be made. |
+| Mode                | Required behavior                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `strict`            | Check field names and types without removing or casting fields. Extra and missing fields fail.      |
+| `project_top_level` | Remove extra top-level fields. Check nested fields and types without changing them.                 |
+| `project`           | Remove extra fields, including nested fields. Check types without casting.                          |
+| `project_cast`      | Project fields and cast types where the native library allows it. Report casts that cannot be made. |
 
 Every mode rejects missing fields. See [Coercing Schemas](../learn/schemas/coercion.md)
 for the user-facing behavior. Use `SchemaCoercionError` and `SchemaDifference` to describe
@@ -76,9 +74,4 @@ Backends written against the earlier protocol need to replace `dataframe_type` w
 Put the backend's native type mapping, row conversion, schema comparison, projection,
 and casting rules in its implementation. The built-in Polars and PySpark backends are
 complete examples in `src/data_joinery/backends/polars/` and
-`src/data_joinery/backends/spark/`. Each package keeps operations in `backend.py`
-and native type conversion in `types.py`. The package exports its backend class
-and instance; `data_joinery.backends.spark` also exports `SparkContext` and the
-existing Spark coercion classes. Add tests under `tests/backends/`
-for registration, all four modes, nested fields, bad rows, bad options, and unsupported
-casts. Run `just check` and `just docs-build` before shipping it.
+`src/data_joinery/backends/spark/`.

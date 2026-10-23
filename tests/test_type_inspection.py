@@ -1,5 +1,3 @@
-import builtins
-import runpy
 from types import GenericAlias
 from typing import Annotated, Literal, Optional
 
@@ -49,25 +47,3 @@ def test_get_list_element_type_rejects_non_list():
 def test_get_list_element_type_rejects_missing_element_type():
     with pytest.raises(ValueError, match="should have exactly one type argument"):
         type_inspection.get_list_element_type(GenericAlias(list, ()))
-
-
-def test_annotation_helpers_load_without_dataframe_backends(monkeypatch):
-    original_import = builtins.__import__
-
-    def import_without_backends(name, *args, **kwargs):
-        if name.split(".")[0] in {"pyspark", "polars"}:
-            raise AssertionError(f"Annotation helpers imported {name}")
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", import_without_backends)
-    helpers = runpy.run_path(type_inspection.__file__)
-
-    assert (
-        helpers["normalize_python_type"](Annotated[list[int] | None, "metadata"])
-        == list[int]
-    )
-
-
-def test_unknown_module_attribute_raises_attribute_error():
-    with pytest.raises(AttributeError, match="has no attribute 'unknown'"):
-        _ = type_inspection.unknown

@@ -1,6 +1,5 @@
 """Inspect Python annotations without loading a dataframe backend."""
 
-from importlib import import_module
 from types import UnionType
 from typing import Annotated, Any, Union, get_args, get_origin
 
@@ -36,16 +35,3 @@ def normalize_python_type(python_type: Any) -> Any:
             return normalize_python_type(non_none_args[0])
 
     return python_type
-
-
-# Keep existing Spark helper imports working without loading PySpark until used.
-def __getattr__(name: str) -> Any:
-    if name in {
-        "SPARK_MAX_DECIMAL_PRECISION",
-        "DEFAULT_FRACTIONAL_DIGITS",
-        "spark_type_from_annotated",
-        "spark_type_from_literal",
-        "get_spark_type_from_python_type",
-    }:
-        return getattr(import_module(".backends.spark.types", __package__), name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
