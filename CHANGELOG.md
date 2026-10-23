@@ -6,6 +6,12 @@ Notable changes to Data Joinery are documented here. This changelog follows
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-23
+
+### Fixed
+
+- Include the README as the project description on PyPI.
+
 ## [0.5.0] - 2026-10-23
 
 ### Added
@@ -89,7 +95,8 @@ Notable changes to Data Joinery are documented here. This changelog follows
 - First release as `data-joinery`, renamed from `spark-joinery`. Update package dependencies and Python imports to the new name.
 - Define schema-validated transformations and connect them into pipelines. Supports PySpark DataFrames, optional Polars DataFrames, dataclass and Pydantic schemas, context dependencies, and schema coercion modes.
 
-[Unreleased]: https://github.com/ccharlesgb/data-joinery/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/ccharlesgb/data-joinery/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/ccharlesgb/data-joinery/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/ccharlesgb/data-joinery/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/ccharlesgb/data-joinery/compare/0.3.1...0.4.0
 [0.3.1]: https://github.com/ccharlesgb/data-joinery/compare/0.3.0...0.3.1
