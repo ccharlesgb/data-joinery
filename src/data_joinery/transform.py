@@ -13,6 +13,7 @@ from typing import (
 )
 
 from .backends import backend_for_frame_type
+from .context import Context
 from .contract import (
     Contract,
     ContractTypeMismatch,
@@ -21,12 +22,11 @@ from .contract import (
     VoidContract,
     _UncheckedContract,
 )
-from .dependencies import Context
-from .schema_types import SchemaCoercionError
+from .schemas.coercion import SchemaCoercionError
 from .utils import get_callable_name
 
 
-def _get_annotated_dataframe_schema(annotation: Any) -> DataFrameContract | None:
+def _get_annotated_dataframe_contract(annotation: Any) -> DataFrameContract | None:
     if get_origin(annotation) is not Annotated:
         return None
 
@@ -77,7 +77,7 @@ class TransformSpec:
 def _inspect_transform(f: Any) -> TransformSpec:
     signature = inspect.signature(f)
     type_hints = get_type_hints(f, include_extras=True)
-    input_schemas: dict[str, Contract] = {}
+    input_contracts: dict[str, Contract] = {}
     context_parameters: dict[str, tuple[type, Context]] = {}
 
     for parameter_name in signature.parameters:
@@ -85,9 +85,9 @@ def _inspect_transform(f: Any) -> TransformSpec:
         if parameter_type is None:
             continue
 
-        dataframe_schema = _get_annotated_dataframe_schema(parameter_type)
-        if dataframe_schema is not None:
-            input_schemas[parameter_name] = dataframe_schema
+        dataframe_contract = _get_annotated_dataframe_contract(parameter_type)
+        if dataframe_contract is not None:
+            input_contracts[parameter_name] = dataframe_contract
             continue
 
         context_marker = _get_context_marker(parameter_type)
@@ -97,7 +97,7 @@ def _inspect_transform(f: Any) -> TransformSpec:
 
         if not _is_annotated_dataframe(parameter_type):
             try:
-                input_schemas[parameter_name] = InstanceContract(parameter_type)
+                input_contracts[parameter_name] = InstanceContract(parameter_type)
             except TypeError as error:
                 raise TypeError(
                     f"Transform '{f.__name__}' parameter '{parameter_name}': {error}"
@@ -106,9 +106,9 @@ def _inspect_transform(f: Any) -> TransformSpec:
     output_contract: Contract = VoidContract()
     return_type = type_hints.get("return")
     if return_type is not None and return_type is not type(None):
-        dataframe_schema = _get_annotated_dataframe_schema(return_type)
-        if dataframe_schema is not None:
-            output_contract = dataframe_schema
+        dataframe_contract = _get_annotated_dataframe_contract(return_type)
+        if dataframe_contract is not None:
+            output_contract = dataframe_contract
         elif _is_annotated_dataframe(return_type):
             output_contract = _UncheckedContract()
         else:
@@ -120,7 +120,7 @@ def _inspect_transform(f: Any) -> TransformSpec:
                 ) from None
 
     return TransformSpec(
-        input_contracts=input_schemas,
+        input_contracts=input_contracts,
         output_contract=output_contract,
         context_parameters=context_parameters,
     )

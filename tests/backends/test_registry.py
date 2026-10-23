@@ -3,18 +3,16 @@ from dataclasses import dataclass
 from typing import Annotated, Any
 
 import pytest
-from pyspark.sql import DataFrame
 
-from data_joinery import Pipeline, Project, Schema, Strict, transform
+from data_joinery import Project, Schema, Strict, transform
 from data_joinery.backends import (
     DataFrameBackend,
     backend_for_frame_type,
     backend_for_schema_type,
     register_backend,
 )
-from data_joinery.model_schema import ModelSchema
-from data_joinery.pipeline import PipelineConnectionError
-from data_joinery.schema_types import CoercionMode
+from data_joinery.schemas.coercion import CoercionMode
+from data_joinery.schemas.model_schema import ModelSchema
 
 
 @dataclass(frozen=True)
@@ -72,10 +70,15 @@ class Order:
     order_id: int
 
 
-def test_schema_delegates_to_a_registered_backend():
+def test_schema_compiles_with_a_registered_backend():
     schema = Schema(Order)
 
     assert schema.native_schema(tuple) == ("order_id",)
+
+
+def test_schema_creates_a_registered_dataframe_type():
+    schema = Schema(Order)
+
     assert schema.create_dataframe([Order(1)], FakeDataFrame) == FakeDataFrame(
         ("order_id",)
     )
@@ -103,34 +106,56 @@ def test_unbound_contract_accepts_the_second_dataframe_type():
     )
 
 
+def test_contract_rejects_a_backend_returning_a_different_dataframe_type(monkeypatch):
+    def coerce_dataframe(dataframe, schema, mode):
+        return OtherFakeDataFrame(("order_id",))
+
+    monkeypatch.setattr(FAKE_BACKEND, "coerce_dataframe", coerce_dataframe)
+
+    with pytest.raises(
+        TypeError,
+        match="returned DataFrame type OtherFakeDataFrame; expected FakeDataFrame",
+    ):
+        Project(Order).validate(FakeDataFrame(("order_id",)))
+
+
 def test_backend_matches_subclasses_of_its_registered_types():
     class SpecializedFrame(FakeDataFrame):
         pass
 
+    assert backend_for_frame_type(SpecializedFrame) is FAKE_BACKEND
+
+
+def test_backend_matches_subclasses_of_its_registered_schema_type():
     class SpecializedSchema(tuple):
         pass
 
-    assert backend_for_frame_type(SpecializedFrame) is FAKE_BACKEND
     assert backend_for_schema_type(SpecializedSchema) is FAKE_BACKEND
 
 
 def test_registration_rejects_an_ambiguous_dataframe_type():
+    class OtherSchema:
+        pass
+
     class AmbiguousBackend(FakeBackend):
         name = "ambiguous-frame"
-        schema_type = dict  # type: ignore[bad-assignment] - test a different type
+        schema_type = OtherSchema  # type: ignore[bad-assignment] - test a different type
 
     with pytest.raises(TypeError, match="ambiguous dataframe type"):
         register_backend(AmbiguousBackend())
 
 
 def test_registration_rejects_an_ambiguous_second_dataframe_type():
+    class OtherSchema:
+        pass
+
     class NewDataFrame:
         pass
 
     class AmbiguousBackend(FakeBackend):
         name = "ambiguous-second-frame"
         dataframe_types = (NewDataFrame, OtherFakeDataFrame)  # type: ignore[bad-assignment]
-        schema_type = dict  # type: ignore[bad-assignment]
+        schema_type = OtherSchema  # type: ignore[bad-assignment]
 
     with pytest.raises(TypeError, match="ambiguous dataframe type"):
         register_backend(AmbiguousBackend())
@@ -158,23 +183,15 @@ def test_transform_binds_dataframe_contract_to_annotation_backend():
     contract = select_order.__transform_spec__.input_contracts["frame"]
 
     assert contract.backend_name == "fake"  # type: ignore[attr-defined]
+
+
+def test_transform_coerces_with_a_registered_backend():
+    @transform
+    def select_order(
+        frame: Annotated[FakeDataFrame, Project(Order)],
+    ) -> Annotated[FakeDataFrame, Strict(Order)]:
+        return frame
+
     assert select_order(FakeDataFrame(("extra", "order_id"))) == FakeDataFrame(
         ("order_id",)
     )
-
-
-def test_pipeline_does_not_connect_different_dataframe_backends():
-    @transform
-    def fake_source() -> Annotated[FakeDataFrame, Project(Order)]:
-        return FakeDataFrame(("order_id",))
-
-    @transform
-    def spark_sink(frame: Annotated[DataFrame, Project(Order)]) -> None:
-        pass
-
-    pipeline = Pipeline()
-    source = pipeline.add_step(fake_source)
-    sink = pipeline.add_step(spark_sink)
-
-    with pytest.raises(PipelineConnectionError, match="No compatible contract"):
-        pipeline.connect(source, sink)

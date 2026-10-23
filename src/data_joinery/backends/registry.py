@@ -1,62 +1,12 @@
-from collections.abc import Sequence
+"""Backend registration, lazy built-in discovery, and lookup."""
+
+from __future__ import annotations
+
 from importlib import import_module
 from importlib.util import find_spec
-from typing import Any, Protocol
+from typing import Any
 
-from ..model_schema import ModelSchema
-from ..schema_types import CoercionMode
-
-
-class DataFrameBackend[FrameT, SchemaT](Protocol):
-    """Connect dataframe classes and one native schema class to Data Joinery.
-
-    Backend lookup recognizes subclasses of its registered classes too.
-    Implement this protocol, then pass one instance to :func:`register_backend`.
-    """
-
-    name: str
-    """Unique name used to identify this backend."""
-
-    dataframe_types: tuple[type[FrameT], ...]
-    """Dataframe classes accepted and returned by this backend."""
-
-    schema_type: type[SchemaT]
-    """Native schema class returned by :meth:`compile_schema`."""
-
-    def compile_schema(self, schema: ModelSchema[Any]) -> SchemaT:
-        """Build a native schema from the model's fields and annotations."""
-        ...
-
-    def coerce_dataframe(
-        self,
-        dataframe: FrameT,
-        schema: ModelSchema[Any],
-        mode: CoercionMode,
-    ) -> FrameT:
-        """Return a frame that satisfies the model, or raise on a mismatch.
-
-        ``strict`` checks fields and types without changing them. ``project``
-        removes extra fields, including nested fields; ``project_top_level``
-        removes only extra top-level fields. ``project_cast`` also casts types
-        when the native dataframe library permits it. All modes reject missing
-        fields. Raise ``SchemaCoercionError`` for schema mismatches.
-        """
-        ...
-
-    def create_dataframe(
-        self,
-        rows: Sequence[object],
-        schema: ModelSchema[Any],
-        frame_type: type[FrameT],
-        **kwargs: object,
-    ) -> FrameT:
-        """Build a frame of the requested type using the compiled schema.
-
-        ``kwargs`` carries backend-specific options, such as a Spark session.
-        Reject options that this backend does not support.
-        """
-        ...
-
+from .protocol import DataFrameBackend
 
 _BACKENDS: dict[str, DataFrameBackend[Any, Any]] = {}
 _BUILTINS_LOADED = False
@@ -65,6 +15,15 @@ _BUILTINS_LOADED = False
 def register_backend[FrameT, SchemaT](
     backend: DataFrameBackend[FrameT, SchemaT],
 ) -> None:
+    """Register a backend with a unique name and non-overlapping types.
+
+    Args:
+        backend: Implementation of the dataframe backend protocol.
+
+    Raises:
+        ValueError: The name is already used or no dataframe types are supplied.
+        TypeError: Frame or schema types overlap another backend's types.
+    """
     existing = _BACKENDS.get(backend.name)
     if existing is backend:
         return
@@ -118,6 +77,14 @@ def _load_builtin_backends() -> None:
 
 
 def get_backend(name: str) -> DataFrameBackend[Any, Any]:
+    """Find a backend by name, discovering installed built-ins if needed.
+
+    Args:
+        name: Registered backend name.
+
+    Raises:
+        LookupError: No registered or installed backend has this name.
+    """
     if name not in _BACKENDS:
         _load_builtin_backends()
     try:
@@ -129,6 +96,7 @@ def get_backend(name: str) -> DataFrameBackend[Any, Any]:
 
 
 def backend_for_frame_type(frame_type: type) -> DataFrameBackend[Any, Any] | None:
+    """Find the backend owning a frame class or subclass, or return None."""
     if not isinstance(frame_type, type):
         return None
     backend = _find_backend_for_type(frame_type)
@@ -139,6 +107,7 @@ def backend_for_frame_type(frame_type: type) -> DataFrameBackend[Any, Any] | Non
 
 
 def backend_for_schema_type(schema_type: type) -> DataFrameBackend[Any, Any] | None:
+    """Find the backend owning a native schema class or subclass, or return None."""
     if not isinstance(schema_type, type):
         return None
     backend = _find_backend_for_type(schema_type, schema=True)
@@ -174,4 +143,5 @@ def _find_backend_for_type(
 
 
 def backend_for_value(value: object) -> DataFrameBackend[Any, Any] | None:
+    """Find the backend owning a dataframe instance, or return None."""
     return backend_for_frame_type(type(value))

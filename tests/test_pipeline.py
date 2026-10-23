@@ -6,15 +6,12 @@ import pytest
 from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import (
-    Context as ExportedContext,
-)
-from data_joinery import (
+    Context,
     Project,
     Strict,
     transform,
 )
 from data_joinery.backends.spark import SparkContext
-from data_joinery.dependencies import Context
 from data_joinery.pipeline import (
     Pipeline,
     PipelineConnectionError,
@@ -622,10 +619,6 @@ def test_pipeline_rejects_transform_dependency_missing_from_context():
     pipeline = Pipeline(SparkContext)
     with pytest.raises(TypeError, match="does not provide it"):
         pipeline.add_step(read_users, "users")
-
-
-def test_dependency_types_are_exported_from_package():
-    assert ExportedContext is Context
 
 
 def test_run_uses_named_transform_overrides_without_mutating_pipeline(

@@ -104,6 +104,10 @@ instead of using ambiguous primitives. Use the built-in `SparkContext` when the 
 the only dependency. A step that asks for a type absent from the declared context fails when it is
 added.
 
+Import `SparkContext` from `data_joinery.backends.spark`. That package exposes only
+`SPARK_BACKEND`, `SparkBackend`, and `SparkContext` as its public API. Import contract markers
+such as `Project`, `ProjectCast`, `ProjectTopLevel`, and `Strict` from `data_joinery`.
+
 For a dbt Python model, put dbt's runtime object in the pipeline context and use it in reader
 transforms to fetch upstream models or sources.
 

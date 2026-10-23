@@ -1,23 +1,11 @@
-import datetime
-import decimal
+from __future__ import annotations
+
 from collections.abc import Sequence
-from dataclasses import asdict, is_dataclass
-from types import UnionType
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    Union,
-    cast,
-    get_args,
-    get_origin,
-)
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from data_joinery.model_schema import ModelSchema, get_model_fields, is_schema_model
-from data_joinery.schema_types import (
+from data_joinery.schemas.coercion import (
     CoercionMode,
     DifferenceKind,
     SchemaCoercionError,
@@ -25,110 +13,16 @@ from data_joinery.schema_types import (
     SchemaDifference,
 )
 
-from .base import DataFrameBackend, register_backend
-
-NoneType = type(None)
-POLARS_MAX_DECIMAL_PRECISION = 38
-DEFAULT_FRACTIONAL_DIGITS = 18
+from ..protocol import DataFrameBackend
+from ..registry import register_backend
+from .types import _get_polars_field_type
 
 if TYPE_CHECKING:
     from polars._typing import PolarsDataType
+
+    from data_joinery.schemas.model_schema import ModelSchema
 else:
     PolarsDataType = Any
-
-
-def _normalize_python_type(python_type: Any) -> Any:
-    origin = get_origin(python_type)
-    args = get_args(python_type)
-
-    if origin is Annotated and args:
-        return _normalize_python_type(args[0])
-
-    if origin in (Union, UnionType) and args:
-        non_none_args = [arg for arg in args if arg is not NoneType]
-        if len(non_none_args) == 1 and len(non_none_args) != len(args):
-            return _normalize_python_type(non_none_args[0])
-
-    return python_type
-
-
-def _polars_type_from_annotated(python_type: Any) -> PolarsDataType | None:
-    if get_origin(python_type) is not Annotated:
-        return None
-
-    for metadata in get_args(python_type)[1:]:
-        if isinstance(metadata, pl.DataType):
-            return metadata
-        if isinstance(metadata, type) and issubclass(metadata, pl.DataType):
-            return metadata
-    return None
-
-
-def _polars_type_from_literal(
-    python_type: Any,
-) -> PolarsDataType | None:
-    if get_origin(python_type) is not Literal:
-        return None
-
-    values = get_args(python_type)
-    if not values:
-        raise ValueError("Literal type must include at least one value")
-    polars_types = {_get_polars_field_type(type(value)) for value in values}
-    if len(polars_types) != 1:
-        raise ValueError(
-            f"Literal values must resolve to a single Polars type: {python_type}"
-        )
-    return next(iter(polars_types))
-
-
-def _get_polars_field_type(field_type: Any) -> PolarsDataType:
-    annotated_type = _polars_type_from_annotated(field_type)
-    if annotated_type is not None:
-        return annotated_type
-
-    literal_type = _polars_type_from_literal(field_type)
-    if literal_type is not None:
-        return literal_type
-
-    normalized_type = _normalize_python_type(field_type)
-    if is_schema_model(normalized_type):
-        return pl.Struct(
-            [
-                pl.Field(name, _get_polars_field_type(nested_type))
-                for name, nested_type in get_model_fields(normalized_type)
-            ]
-        )
-
-    if get_origin(normalized_type) is list:
-        args = get_args(normalized_type)
-        if len(args) != 1:
-            raise ValueError(
-                f"List type {normalized_type} should have exactly one type argument"
-            )
-        return pl.List(_get_polars_field_type(args[0]))
-
-    if normalized_type is int:
-        return pl.Int64
-    if normalized_type is str:
-        return pl.String
-    if normalized_type is float:
-        return pl.Float64
-    if normalized_type is bool:
-        return pl.Boolean
-    if normalized_type is datetime.datetime:
-        return pl.Datetime("us")
-    if normalized_type is datetime.date:
-        return pl.Date
-    if normalized_type is datetime.timedelta:
-        return pl.Duration("us")
-    if normalized_type is decimal.Decimal:
-        return pl.Decimal(
-            precision=POLARS_MAX_DECIMAL_PRECISION,
-            scale=DEFAULT_FRACTIONAL_DIGITS,
-        )
-    if normalized_type is bytes:
-        return pl.Binary
-    raise ValueError(f"Unsupported Python type: {normalized_type}")
 
 
 def _schema_diff(given: pl.Schema, expected: pl.Schema) -> SchemaDiff:
@@ -304,16 +198,6 @@ def _project_fields(
         raise
 
 
-def _serialize_rows(schema: ModelSchema[Any], rows: Sequence[object]) -> list[object]:
-    serialized = schema.serialize_rows(rows)  # type: ignore[arg-type]
-    return [
-        asdict(cast(Any, row))
-        if is_dataclass(row) and not isinstance(row, type)
-        else row
-        for row in serialized
-    ]
-
-
 def _validate_create_options(options: dict[str, object]) -> None:
     if options:
         names = ", ".join(sorted(options))
@@ -347,7 +231,7 @@ class PolarsBackend(DataFrameBackend[pl.DataFrame | pl.LazyFrame, pl.Schema]):
     ) -> pl.DataFrame | pl.LazyFrame:
         _validate_create_options(kwargs)
         dataframe = pl.DataFrame(
-            _serialize_rows(schema, rows),
+            schema.serialize_rows(rows),
             schema=self.compile_schema(schema),
             strict=True,
         )

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from .backends import backend_for_frame_type, backend_for_value, get_backend
-from .schemas import CoercionMode, Schema, SchemaCoercionError
+from .schemas import CoercionMode, Schema
 
 
 class Contract(Protocol):
@@ -117,16 +117,7 @@ class DataFrameContract:
                 else "registered dataframe"
             )
             raise ContractTypeMismatch(f"a {expected}")
-        try:
-            return backend.coerce_dataframe(
-                value, self.schema.model_schema, self.coercion_mode
-            )
-        except SchemaCoercionError as error:
-            raise SchemaCoercionError(
-                error.mode,
-                error.violations,
-                location=f"Schema '{self.schema.model.__name__}'",
-            ) from None
+        return self.schema.coerce_dataframe(value, self.coercion_mode)
 
 
 @dataclass(frozen=True)

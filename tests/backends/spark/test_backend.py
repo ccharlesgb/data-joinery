@@ -7,9 +7,10 @@ from pydantic import BaseModel
 from pyspark.sql import DataFrame, SparkSession, types
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Schema, schemas
-from data_joinery.backends import spark as spark_backend
-from data_joinery.backends.spark import Project, ProjectCast, ProjectTopLevel, Strict
+from data_joinery import Pipeline, Schema, schemas, transform
+from data_joinery import Project as ProjectContract
+from data_joinery.backends.spark import backend as spark_backend
+from data_joinery.pipeline import PipelineConnectionError
 
 
 @pytest.fixture(scope="session")
@@ -663,7 +664,7 @@ def test_coerce_dataframe_strict_raises_for_extra_column(spark: SparkSession):
     schema = types.StructType([types.StructField("a", types.IntegerType(), True)])
 
     with pytest.raises(schemas.SchemaCoercionError):
-        Strict()(dataframe, schema)
+        spark_backend._coerce_strict(dataframe, schema)
 
 
 def test_coerce_dataframe_strict_raises_for_type_mismatch(spark: SparkSession):
@@ -673,7 +674,7 @@ def test_coerce_dataframe_strict_raises_for_type_mismatch(spark: SparkSession):
     schema = types.StructType([types.StructField("a", types.StringType(), True)])
 
     with pytest.raises(schemas.SchemaCoercionError):
-        Strict()(dataframe, schema)
+        spark_backend._coerce_strict(dataframe, schema)
 
 
 # --- _coerce_dataframe: project_top_level ---
@@ -699,7 +700,9 @@ def test_coerce_dataframe_project_top_level_selects_subset_of_columns(
         ]
     )
 
-    result = ProjectTopLevel()(dataframe, schema)
+    result = spark_backend._project_fields(
+        dataframe, schema, mode="project_top_level", cast=False, recurse=False
+    )
 
     assert result.columns == ["a", "b"]
     assert result.collect() == [types.Row(a=1, b="a")]
@@ -719,7 +722,9 @@ def test_coerce_dataframe_project_top_level_raises_for_missing_column(
     )
 
     with pytest.raises(schemas.SchemaCoercionError):
-        ProjectTopLevel()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project_top_level", cast=False, recurse=False
+        )
 
 
 def test_coerce_dataframe_project_top_level_rejects_nested_additional_field(
@@ -755,7 +760,9 @@ def test_coerce_dataframe_project_top_level_rejects_nested_additional_field(
     )
 
     with pytest.raises(schemas.SchemaCoercionError) as error:
-        ProjectTopLevel()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project_top_level", cast=False, recurse=False
+        )
 
     assert [(item.kind, item.path) for item in error.value.violations] == [
         ("additional", "nested.nested_extra")
@@ -769,7 +776,9 @@ def test_coerce_dataframe_project_raises_for_type_mismatch(spark: SparkSession):
     schema = types.StructType([types.StructField("a", types.StringType(), True)])
 
     with pytest.raises(schemas.SchemaCoercionError):
-        Project()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project", cast=False, recurse=True
+        )
 
 
 def test_coerce_dataframe_project_reports_every_missing_and_type_mismatch(
@@ -787,7 +796,9 @@ def test_coerce_dataframe_project_reports_every_missing_and_type_mismatch(
     )
 
     with pytest.raises(schemas.SchemaCoercionError) as error:
-        Project()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project", cast=False, recurse=True
+        )
 
     assert [
         (violation.kind, violation.path) for violation in error.value.violations
@@ -828,7 +839,9 @@ def test_coerce_dataframe_project_prunes_nested_struct_fields(spark: SparkSessio
         ]
     )
 
-    result = Project()(dataframe, schema)
+    result = spark_backend._project_fields(
+        dataframe, schema, mode="project", cast=False, recurse=True
+    )
 
     assert result.collect() == [types.Row(a=types.Row(a1=1))]
 
@@ -869,7 +882,9 @@ def test_coerce_dataframe_project_prunes_array_of_struct_fields(
         ]
     )
 
-    result = Project()(dataframe, schema)
+    result = spark_backend._project_fields(
+        dataframe, schema, mode="project", cast=False, recurse=True
+    )
 
     assert result.collect() == [types.Row(items=[types.Row(a1=1), types.Row(a1=3)])]
 
@@ -907,7 +922,9 @@ def test_coerce_dataframe_project_raises_for_missing_nested_field(
     )
 
     with pytest.raises(schemas.SchemaCoercionError):
-        Project()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project", cast=False, recurse=True
+        )
 
 
 def test_coerce_dataframe_project_raises_for_nested_type_mismatch(
@@ -938,7 +955,9 @@ def test_coerce_dataframe_project_raises_for_nested_type_mismatch(
     )
 
     with pytest.raises(schemas.SchemaCoercionError):
-        Project()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project", cast=False, recurse=True
+        )
 
 
 # --- _coerce_dataframe: project_cast ---
@@ -952,7 +971,9 @@ def test_coerce_dataframe_project_cast_casts_mismatched_leaf_types(
     )
     schema = types.StructType([types.StructField("a", types.IntegerType(), True)])
 
-    result = ProjectCast()(dataframe, schema)
+    result = spark_backend._project_fields(
+        dataframe, schema, mode="project_cast", cast=True, recurse=True
+    )
 
     assert result.collect() == [types.Row(a=1)]
 
@@ -984,7 +1005,9 @@ def test_coerce_dataframe_project_cast_casts_nested_struct_fields(
         ]
     )
 
-    result = ProjectCast()(dataframe, schema)
+    result = spark_backend._project_fields(
+        dataframe, schema, mode="project_cast", cast=True, recurse=True
+    )
 
     assert result.collect() == [types.Row(a=types.Row(a1=1))]
 
@@ -1022,7 +1045,9 @@ def test_coerce_dataframe_project_cast_casts_array_of_struct_fields(
         ]
     )
 
-    result = ProjectCast()(dataframe, schema)
+    result = spark_backend._project_fields(
+        dataframe, schema, mode="project_cast", cast=True, recurse=True
+    )
 
     assert result.collect() == [types.Row(items=[types.Row(a1=1), types.Row(a1=2)])]
 
@@ -1041,7 +1066,9 @@ def test_coerce_dataframe_project_cast_raises_for_missing_field(
     )
 
     with pytest.raises(schemas.SchemaCoercionError):
-        ProjectCast()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project_cast", cast=True, recurse=True
+        )
 
 
 def test_coerce_dataframe_project_cast_reports_every_unsupported_cast(
@@ -1065,7 +1092,9 @@ def test_coerce_dataframe_project_cast_reports_every_unsupported_cast(
     )
 
     with pytest.raises(schemas.SchemaCoercionError) as error:
-        ProjectCast()(dataframe, schema)
+        spark_backend._project_fields(
+            dataframe, schema, mode="project_cast", cast=True, recurse=True
+        )
 
     assert [
         (violation.kind, violation.path) for violation in error.value.violations
@@ -1074,3 +1103,26 @@ def test_coerce_dataframe_project_cast_reports_every_unsupported_cast(
         ("type_mismatch", "binary_value"),
         ("type_mismatch", "date_value"),
     ]
+
+
+def test_pipeline_does_not_connect_different_dataframe_backends():
+    from polars import LazyFrame
+
+    @dataclass
+    class Order:
+        order_id: int
+
+    @transform
+    def polars_source() -> Annotated[LazyFrame, ProjectContract(Order)]:
+        return LazyFrame({"order_id": [1]})
+
+    @transform
+    def spark_sink(frame: Annotated[DataFrame, ProjectContract(Order)]) -> None:
+        pass
+
+    pipeline = Pipeline()
+    source = pipeline.add_step(polars_source)
+    sink = pipeline.add_step(spark_sink)
+
+    with pytest.raises(PipelineConnectionError, match="No compatible contract"):
+        pipeline.connect(source, sink)

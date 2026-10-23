@@ -21,6 +21,7 @@
 
 ## Documentation
 
+- Public module-level functions, class methods, and classes must have Google-style docstrings.
 - Documentation is generated using `zensical`
 - The just command to build docs is `just docs-build`
 - The documentation relies on `docs_src` for runnable code snippets which `just docs-examples` updates for you
@@ -58,4 +59,16 @@ begin with `test_` and the documentation script will run it with pytest.
 
 ## Skills
 
-If making changes to the public API or adding new features, please ensure that the relevant skills in `src/data_joinery/.agents` are updated to reflect the new functionality. This includes updating any documentation, examples, and tests that demonstrate the use of the new features.
+Skills in `src/data_joinery/.agents` describe how to use the library as it exists now.
+They are task-oriented guidance, not a changelog or a complete API reference.
+
+- Update a skill when a change makes its existing instructions or examples incorrect or
+  incomplete, or changes the recommended way to perform a task covered by that skill.
+- Add guidance for a new feature only when it helps users perform a task within the skill's
+  scope. A new public symbol or feature does not automatically require a skill update.
+- Do not update skills for internal refactors, implementation details, test-only changes, or
+  export cleanup unless they affect the usage taught by a skill.
+- Edit the relevant guidance in place to describe the current behavior. Do not append change
+  summaries, migration history, lists of removed symbols, or unrelated API inventories.
+- Update supporting documentation, examples, and tests when the revised guidance requires it.
+  Leave skills unchanged when their guidance remains accurate and sufficient.

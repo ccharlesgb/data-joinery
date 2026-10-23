@@ -1,17 +1,14 @@
-from collections.abc import Callable, Sequence
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any
 from typing import cast as type_cast
 
 from pyspark.sql import Column, DataFrame, SparkSession, types
 from pyspark.sql import functions as F
 
-from data_joinery.model_schema import (
-    ModelSchema,
-    get_model_fields,
-    is_schema_model,
-)
-from data_joinery.schema_types import (
+from data_joinery.schemas.coercion import (
     CoercionMode,
     DifferenceKind,
     SchemaCoercionError,
@@ -19,8 +16,12 @@ from data_joinery.schema_types import (
     SchemaDifference,
 )
 
-from .. import type_inspection
-from .base import DataFrameBackend, register_backend
+from ..protocol import DataFrameBackend
+from ..registry import register_backend
+from .types import _get_spark_field_type
+
+if TYPE_CHECKING:
+    from data_joinery.schemas.model_schema import ModelSchema
 
 
 @dataclass(frozen=True)
@@ -334,38 +335,6 @@ def _is_cast_compatible(
     return CAST_MATRIX.get((given_category, expected_category), False)
 
 
-def _get_spark_schema_from_model(klass: type[Any]) -> types.StructType:
-    if not is_schema_model(klass):
-        raise ValueError(
-            f"{klass.__name__} is neither a dataclass nor a pydantic model"
-        )
-
-    struct_fields = [
-        types.StructField(name, _get_spark_field_type(field_type), True)
-        for name, field_type in get_model_fields(klass)
-    ]
-
-    return types.StructType(struct_fields)
-
-
-def _get_spark_field_type(field_type: Any) -> types.DataType:
-    annotated_spark_type = type_inspection.spark_type_from_annotated(field_type)
-    if annotated_spark_type is not None:
-        return annotated_spark_type
-
-    normalized_type = type_inspection.normalize_python_type(field_type)
-
-    if is_schema_model(normalized_type):
-        return _get_spark_schema_from_model(normalized_type)
-
-    if type_inspection.is_list(normalized_type):
-        element_type = type_inspection.get_list_element_type(normalized_type)
-        element_spark_type = _get_spark_field_type(element_type)
-        return types.ArrayType(element_spark_type, True)
-
-    return type_inspection.get_spark_type_from_python_type(normalized_type)
-
-
 def _coerce_strict(
     dataframe: DataFrame,
     schema: types.StructType,
@@ -516,46 +485,6 @@ def _project_fields(
     return dataframe.select(*columns)
 
 
-class SchemaCoercionMode(Protocol):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame: ...
-
-
-class Strict(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _coerce_strict(dataframe, schema)
-
-
-class ProjectTopLevel(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _project_fields(
-            dataframe, schema, mode="project_top_level", cast=False, recurse=False
-        )
-
-
-class Project(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _project_fields(
-            dataframe, schema, mode="project", cast=False, recurse=True
-        )
-
-
-class ProjectCast(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _project_fields(
-            dataframe, schema, mode="project_cast", cast=True, recurse=True
-        )
-
-
-_MODE_HANDLERS: dict[
-    CoercionMode, Callable[[DataFrame, types.StructType], DataFrame]
-] = {
-    "strict": Strict(),
-    "project": Project(),
-    "project_top_level": ProjectTopLevel(),
-    "project_cast": ProjectCast(),
-}
-
-
 def _session_from_create_options(options: dict[str, object]) -> SparkSession:
     unexpected = set(options) - {"session"}
     if unexpected:
@@ -608,13 +537,27 @@ class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
                 "Spark coercion requires a pyspark.sql.DataFrame; "
                 f"got {type(dataframe).__name__}."
             )
-        if mode not in _MODE_HANDLERS:
+        expected = self.compile_schema(schema)
+        if mode == "strict":
+            result = _coerce_strict(dataframe, expected)
+        elif mode == "project_top_level":
+            result = _project_fields(
+                dataframe, expected, mode=mode, cast=False, recurse=False
+            )
+        elif mode == "project":
+            result = _project_fields(
+                dataframe, expected, mode=mode, cast=False, recurse=True
+            )
+        elif mode == "project_cast":
+            result = _project_fields(
+                dataframe, expected, mode=mode, cast=True, recurse=True
+            )
+        else:
             raise ValueError(
                 f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
                 "'project_top_level', or 'project_cast'."
             )
-        handler = _MODE_HANDLERS[mode]
-        return _make_dataframe_nullable(handler(dataframe, self.compile_schema(schema)))
+        return _make_dataframe_nullable(result)
 
 
 SPARK_BACKEND = SparkBackend()

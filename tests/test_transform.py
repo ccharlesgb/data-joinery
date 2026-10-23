@@ -12,8 +12,8 @@ from data_joinery import (
     Strict,
     schemas,
 )
+from data_joinery.context import Context
 from data_joinery.contract import DataFrameContract, InstanceContract, VoidContract
-from data_joinery.dependencies import Context
 from data_joinery.transform import (
     Transform,
     TransformSpec,

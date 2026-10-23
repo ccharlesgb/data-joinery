@@ -1,10 +1,10 @@
+from .context import Context
 from .contract import (
     Project,
     ProjectCast,
     ProjectTopLevel,
     Strict,
 )
-from .dependencies import Context
 from .pipeline import (
     Pipeline,
     PipelineExecutionError,
@@ -18,7 +18,7 @@ from .pipeline_result import (
     PipelineResult,
     StepInvocation,
 )
-from .schemas import Schema
+from .schemas import Schema, SchemaCoercionError
 from .transform import side_effect, transform
 
 __all__ = [
@@ -34,6 +34,7 @@ __all__ = [
     "ProjectCast",
     "ProjectTopLevel",
     "Schema",
+    "SchemaCoercionError",
     "Step",
     "StepInvocation",
     "Strict",

@@ -5,7 +5,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from data_joinery.backends.spark import SparkContext
-from data_joinery.dependencies import inspect_context_type
+from data_joinery.context import inspect_context_type
 
 
 @dataclass(frozen=True)
