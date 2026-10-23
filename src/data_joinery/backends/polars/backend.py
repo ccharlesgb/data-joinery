@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from data_joinery.schemas.coercion import (
+from data_joinery.schemas.coercion_error import (
     CoercionMode,
     DifferenceKind,
     SchemaCoercionError,

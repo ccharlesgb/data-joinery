@@ -4,7 +4,7 @@ from typing import Any
 
 from data_joinery import Schema
 from data_joinery.backends import DataFrameBackend, register_backend
-from data_joinery.schemas.coercion import (
+from data_joinery.schemas.coercion_error import (
     CoercionMode,
     SchemaCoercionError,
     SchemaDifference,

@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from ..schemas.coercion import CoercionMode
+    from ..schemas.coercion_error import CoercionMode
     from ..schemas.model_schema import ModelSchema
 
 

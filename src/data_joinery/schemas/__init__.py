@@ -1,6 +1,6 @@
 """Schema definitions, model adaptation, and coercion diagnostics."""
 
-from .coercion import (
+from .coercion_error import (
     CoercionMode,
     DifferenceKind,
     SchemaCoercionError,

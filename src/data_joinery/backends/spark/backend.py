@@ -8,7 +8,7 @@ from typing import cast as type_cast
 from pyspark.sql import Column, DataFrame, SparkSession, types
 from pyspark.sql import functions as F
 
-from data_joinery.schemas.coercion import (
+from data_joinery.schemas.coercion_error import (
     CoercionMode,
     DifferenceKind,
     SchemaCoercionError,

@@ -7,7 +7,7 @@ from ..backends import (
     backend_for_schema_type,
     backend_for_value,
 )
-from .coercion import (
+from .coercion_error import (
     CoercionMode,
     SchemaCoercionError,
 )
@@ -44,11 +44,6 @@ class Schema[T]:
     def __init__(self, model: type[T]):
         self.model = model
         self._model_schema = ModelSchema.from_model(model)
-
-    @property
-    def model_schema(self) -> ModelSchema[T]:
-        """Return the fields parsed from the model."""
-        return self._model_schema
 
     def native_schema[NativeSchemaT](
         self, schema_type: type[NativeSchemaT]

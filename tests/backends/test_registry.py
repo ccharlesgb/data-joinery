@@ -11,7 +11,7 @@ from data_joinery.backends import (
     backend_for_schema_type,
     register_backend,
 )
-from data_joinery.schemas.coercion import CoercionMode
+from data_joinery.schemas.coercion_error import CoercionMode
 from data_joinery.schemas.model_schema import ModelSchema
 
 

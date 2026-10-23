@@ -21,11 +21,35 @@ class ModelField:
 
 @dataclass(frozen=True)
 class ModelSchema[T]:
+    """Represent a dataclass or Pydantic model for DataFrame backends.
+
+    Keep the original model and its field names and Python annotations in a
+    common form for compiling native schemas and serializing model instances.
+
+    Attributes:
+        model: Original dataclass or Pydantic model class.
+        fields: Model fields in declaration order.
+    """
+
     model: type[T]
     fields: tuple[ModelField, ...]
 
     @classmethod
     def from_model(cls, model: type[T]) -> "ModelSchema[T]":
+        """Normalize a model's fields for use by DataFrame backends.
+
+        Read dataclass and Pydantic fields through a common interface so
+        backends can compile schemas without handling each model style.
+
+        Args:
+            model: Dataclass or Pydantic model class to describe.
+
+        Returns:
+            The original model and its fields in declaration order.
+
+        Raises:
+            ValueError: If the class is neither a dataclass nor a Pydantic model.
+        """
         if not is_schema_model(model):
             raise ValueError(
                 f"{model.__name__} is neither a dataclass nor a pydantic model. "
@@ -71,6 +95,16 @@ class ModelSchema[T]:
 
 
 def is_pydantic_model(klass: Any) -> bool:
+    """Check if a class definition is a Pydantic model.
+
+    Uses duck typing to avoid importing Pydantic unless it is installed.
+
+    Args:
+        klass: Class to check.
+
+    Returns:
+        True if the class is a Pydantic model, False otherwise.
+    """
     return (
         _PYDANTIC_AVAILABLE
         and _PydanticBaseModel is not None
@@ -80,10 +114,30 @@ def is_pydantic_model(klass: Any) -> bool:
 
 
 def is_schema_model(klass: Any) -> bool:
+    """Check if a class definition is a dataclass or Pydantic model.
+
+    Args:
+        klass: Class to check.
+
+    Returns:
+        True if the class is a dataclass or Pydantic model, False otherwise.
+    """
     return is_dataclass(klass) or is_pydantic_model(klass)
 
 
 def get_model_fields(klass: type[Any]) -> list[tuple[str, Any]]:
+    """
+    Get the fields of a dataclass or Pydantic model.
+
+    Args:
+        klass: Dataclass or Pydantic model class to describe.
+
+    Returns:
+        A list of tuples containing the field names and types.
+
+    Raises:
+        ValueError: If the class is neither a dataclass nor a Pydantic model.
+    """
     if is_dataclass(klass):
         return [(field.name, field.type) for field in fields(klass)]
 
