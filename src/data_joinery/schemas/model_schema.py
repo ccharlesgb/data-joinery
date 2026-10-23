@@ -1,6 +1,9 @@
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, fields, is_dataclass
+from copy import deepcopy
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Any, cast
+
+from .joinery_model import JoineryModel
 
 try:
     from pydantic import BaseModel as _PydanticBaseModel
@@ -13,6 +16,28 @@ else:
     _PYDANTIC_AVAILABLE = True
 
 
+def _serialize_dataclass_value(value: Any) -> Any:
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            (
+                field.metadata["column_name"]
+                if is_joinery_model(type(value))
+                else field.name
+            ): _serialize_dataclass_value(getattr(value, field.name))
+            for field in fields(value)
+        }
+    if isinstance(value, tuple) and hasattr(value, "_fields"):
+        return type(value)(*(_serialize_dataclass_value(item) for item in value))
+    if isinstance(value, (list, tuple)):
+        return type(value)(_serialize_dataclass_value(item) for item in value)
+    if isinstance(value, dict):
+        return type(value)(
+            (_serialize_dataclass_value(key), _serialize_dataclass_value(item))
+            for key, item in value.items()
+        )
+    return deepcopy(value)
+
+
 @dataclass(frozen=True)
 class ModelField:
     name: str
@@ -21,7 +46,7 @@ class ModelField:
 
 @dataclass(frozen=True)
 class ModelSchema[T]:
-    """Represent a dataclass or Pydantic model for DataFrame backends.
+    """Represent a JoineryModel, dataclass, or Pydantic model for DataFrame backends.
 
     Keep the original model and its field names and Python annotations in a
     common form for compiling native schemas and serializing model instances.
@@ -75,7 +100,8 @@ class ModelSchema[T]:
 
         Returns:
             One dictionary per row, in input order. Nested models are converted
-            to dictionaries.
+            to dictionaries. JoineryModel fields use their column names,
+            including inside nested dataclasses and containers.
 
         Raises:
             ValueError: If a row is not an instance of this schema's model.
@@ -88,10 +114,22 @@ class ModelSchema[T]:
                     f"{type(row).__name__}. Pass {self.model.__name__} instances."
                 )
             if is_dataclass(row) and not isinstance(row, type):
-                serialized.append(asdict(row))
+                serialized.append(_serialize_dataclass_value(row))
             else:
                 serialized.append(cast(Any, row).model_dump(mode="python"))
         return serialized
+
+
+def is_joinery_model(klass: Any) -> bool:
+    """Check if a class definition is a JoineryModel.
+
+    Args:
+        klass: Class to check.
+
+    Returns:
+        True if the class inherits from JoineryModel, False otherwise.
+    """
+    return isinstance(klass, type) and issubclass(klass, JoineryModel)
 
 
 def is_pydantic_model(klass: Any) -> bool:
@@ -127,17 +165,24 @@ def is_schema_model(klass: Any) -> bool:
 
 def get_model_fields(klass: type[Any]) -> list[tuple[str, Any]]:
     """
-    Get the fields of a dataclass or Pydantic model.
+    Get column names and value types from a schema model.
 
     Args:
-        klass: Dataclass or Pydantic model class to describe.
+        klass: JoineryModel, dataclass, or Pydantic model class to describe.
 
     Returns:
-        A list of tuples containing the field names and types.
+        A list of tuples containing the column names and types. JoineryModel
+        fields use their configured column names instead of attribute names.
 
     Raises:
         ValueError: If the class is neither a dataclass nor a Pydantic model.
     """
+    if is_joinery_model(klass):
+        return [
+            (field.metadata["column_name"], field.type)
+            for field in fields(cast(Any, klass))
+        ]
+
     if is_dataclass(klass):
         return [(field.name, field.type) for field in fields(klass)]
 
