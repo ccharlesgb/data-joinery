@@ -106,6 +106,19 @@ def test_unbound_contract_accepts_the_second_dataframe_type():
     )
 
 
+def test_contract_rejects_a_backend_returning_a_different_dataframe_type(monkeypatch):
+    def coerce_dataframe(dataframe, schema, mode):
+        return OtherFakeDataFrame(("order_id",))
+
+    monkeypatch.setattr(FAKE_BACKEND, "coerce_dataframe", coerce_dataframe)
+
+    with pytest.raises(
+        TypeError,
+        match="returned DataFrame type OtherFakeDataFrame; expected FakeDataFrame",
+    ):
+        Project(Order).validate(FakeDataFrame(("order_id",)))
+
+
 def test_backend_matches_subclasses_of_its_registered_types():
     class SpecializedFrame(FakeDataFrame):
         pass

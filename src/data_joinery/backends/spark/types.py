@@ -17,7 +17,7 @@ SPARK_MAX_DECIMAL_PRECISION = 38
 DEFAULT_FRACTIONAL_DIGITS = 18
 
 
-def spark_type_from_annotated(python_type: Any) -> types.DataType | None:
+def _spark_type_from_annotated(python_type: Any) -> types.DataType | None:
     origin = get_origin(python_type)
     args = get_args(python_type)
 
@@ -31,7 +31,7 @@ def spark_type_from_annotated(python_type: Any) -> types.DataType | None:
     return None
 
 
-def spark_type_from_literal(python_type: Any) -> types.DataType | None:
+def _spark_type_from_literal(python_type: Any) -> types.DataType | None:
     if get_origin(python_type) is not Literal:
         return None
 
@@ -40,8 +40,7 @@ def spark_type_from_literal(python_type: Any) -> types.DataType | None:
         raise ValueError("Literal type must include at least one value")
 
     spark_types = {
-        get_spark_type_from_python_type(type(literal_value))
-        for literal_value in literal_values
+        _get_spark_field_type(type(literal_value)) for literal_value in literal_values
     }
 
     if len(spark_types) != 1:
@@ -52,66 +51,45 @@ def spark_type_from_literal(python_type: Any) -> types.DataType | None:
     return next(iter(spark_types))
 
 
-def get_spark_type_from_python_type(python_type: type) -> types.DataType:
-    annotated_spark_type = spark_type_from_annotated(python_type)
-    if annotated_spark_type is not None:
-        return annotated_spark_type
-
-    literal_spark_type = spark_type_from_literal(python_type)
-    if literal_spark_type is not None:
-        return literal_spark_type
-
-    python_type = normalize_python_type(python_type)
-
-    if python_type is int:
-        return types.LongType()
-    elif python_type is str:
-        return types.StringType()
-    elif python_type is float:
-        return types.DoubleType()
-    elif python_type is bool:
-        return types.BooleanType()
-    elif python_type is datetime.datetime:
-        return types.TimestampType()
-    elif python_type is datetime.date:
-        return types.DateType()
-    elif python_type is datetime.timedelta:
-        return types.DayTimeIntervalType()
-    elif python_type is decimal.Decimal:
-        return types.DecimalType(SPARK_MAX_DECIMAL_PRECISION, DEFAULT_FRACTIONAL_DIGITS)
-    elif python_type is bytes:
-        return types.BinaryType()
-    else:
-        raise ValueError(f"Unsupported Python type: {python_type}")
-
-
-def _get_spark_schema_from_model(klass: type[Any]) -> types.StructType:
-    if not is_schema_model(klass):
-        raise ValueError(
-            f"{klass.__name__} is neither a dataclass nor a pydantic model"
-        )
-
-    struct_fields = [
-        types.StructField(name, _get_spark_field_type(field_type), True)
-        for name, field_type in get_model_fields(klass)
-    ]
-
-    return types.StructType(struct_fields)
-
-
 def _get_spark_field_type(field_type: Any) -> types.DataType:
-    annotated_spark_type = spark_type_from_annotated(field_type)
+    annotated_spark_type = _spark_type_from_annotated(field_type)
     if annotated_spark_type is not None:
         return annotated_spark_type
 
     normalized_type = normalize_python_type(field_type)
+    literal_spark_type = _spark_type_from_literal(normalized_type)
+    if literal_spark_type is not None:
+        return literal_spark_type
 
     if is_schema_model(normalized_type):
-        return _get_spark_schema_from_model(normalized_type)
+        return types.StructType(
+            [
+                types.StructField(name, _get_spark_field_type(annotation), True)
+                for name, annotation in get_model_fields(normalized_type)
+            ]
+        )
 
     if is_list(normalized_type):
         element_type = get_list_element_type(normalized_type)
-        element_spark_type = _get_spark_field_type(element_type)
-        return types.ArrayType(element_spark_type, True)
+        return types.ArrayType(_get_spark_field_type(element_type), True)
 
-    return get_spark_type_from_python_type(normalized_type)
+    if normalized_type is int:
+        return types.LongType()
+    elif normalized_type is str:
+        return types.StringType()
+    elif normalized_type is float:
+        return types.DoubleType()
+    elif normalized_type is bool:
+        return types.BooleanType()
+    elif normalized_type is datetime.datetime:
+        return types.TimestampType()
+    elif normalized_type is datetime.date:
+        return types.DateType()
+    elif normalized_type is datetime.timedelta:
+        return types.DayTimeIntervalType()
+    elif normalized_type is decimal.Decimal:
+        return types.DecimalType(SPARK_MAX_DECIMAL_PRECISION, DEFAULT_FRACTIONAL_DIGITS)
+    elif normalized_type is bytes:
+        return types.BinaryType()
+    else:
+        raise ValueError(f"Unsupported Python type: {normalized_type}")

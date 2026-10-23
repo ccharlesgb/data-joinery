@@ -23,6 +23,7 @@ from data_joinery.backends.spark import types as spark_types
         (Literal["a", "b"], types.StringType()),
         (Literal[1, 2], types.LongType()),
         (Literal[True, False], types.BooleanType()),
+        (Literal[1, 2] | None, types.LongType()),
         (Annotated[Literal[1, 2], types.IntegerType()], types.IntegerType()),
         (Annotated[Literal[1, 2], types.StringType()], types.StringType()),
         (datetime.datetime, types.TimestampType()),
@@ -38,17 +39,17 @@ from data_joinery.backends.spark import types as spark_types
         (bytes, types.BinaryType()),
     ],
 )
-def test_get_spark_type_from_python_type(python_type, expected_spark_type):
-    actual_spark_type = spark_types.get_spark_type_from_python_type(python_type)
+def test_get_spark_field_type(python_type, expected_spark_type):
+    actual_spark_type = spark_types._get_spark_field_type(python_type)
     assert actual_spark_type == expected_spark_type
 
 
-def test_get_spark_type_from_python_type_raises_value_error_for_mixed_literal_types():
+def test_get_spark_field_type_raises_value_error_for_mixed_literal_types():
     with pytest.raises(
         ValueError,
         match=r"Literal values must resolve to a single Spark type",
     ):
-        spark_types.get_spark_type_from_python_type(Literal[1, "a"])
+        spark_types._get_spark_field_type(Literal[1, "a"])
 
 
 def test_get_spark_field_type_maps_nested_optional_models():
