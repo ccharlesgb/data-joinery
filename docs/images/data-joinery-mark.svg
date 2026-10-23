@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Data Joinery — Dovetail</title>
+  <desc id="desc">Two square halves fit around one dovetail, representing compatible input and output contracts.</desc>
+  <path fill="#287A78" d="M48 36H112V100L152 84V172L112 156V220H48Q36 220 36 208V48Q36 36 48 36Z"/>
+  <path fill="#D59B55" d="M124 36H208Q220 36 220 48V208Q220 220 208 220H124V174L164 190V66L124 82Z"/>
+</svg>

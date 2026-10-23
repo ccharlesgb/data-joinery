@@ -1,7 +1,5 @@
-# Data Joinery
-
-<figure markdown="span">
-![Image title](images/data-joinery-logo.png){ width="300" }
+<figure markdown="block">
+# ![Data Joinery](images/data-joinery-hero.svg){ width="640" }
 <figcaption>Schema first data transformations</figcaption>
 </figure>
 

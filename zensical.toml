@@ -46,8 +46,8 @@ nav = [
 ]
 
 [project.theme]
-logo = "images/data-joinery-logo.png"
-favicon = "images/favicon.png"
+logo = "images/data-joinery-logo.svg"
+favicon = "images/data-joinery-logo.svg"
 language = "en"
 features = [
     "content.code.copy",

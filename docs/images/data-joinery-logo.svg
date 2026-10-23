@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Data Joinery — Isometric dovetail</title>
+  <desc id="desc">Two solid-color blocks interlock through a dovetail, viewed from above.</desc>
+  <polygon fill="#1D5C5B" points="165.38,59.58 133.75,77.84 133.75,151.84 165.38,133.58"/>
+  <polygon fill="#AE773A" points="179.75,84.48 152.44,77.01 152.44,151.01 179.75,158.48"/>
+  <polygon fill="#1D5C5B" points="161.06,85.31 117.94,110.21 117.94,184.21 161.06,159.31"/>
+  <polygon fill="#1D5C5B" points="73.38,112.70 36.00,91.12 36.00,165.12 73.38,186.70"/>
+  <polygon fill="#1D5C5B" points="117.94,110.21 105.00,94.44 105.00,168.44 117.94,184.21"/>
+  <polygon fill="#1D5C5B" points="105.00,94.44 73.38,112.70 73.38,186.70 105.00,168.44"/>
+  <polygon fill="#AE773A" points="220.00,91.12 128.00,144.24 128.00,218.24 220.00,165.12"/>
+  <polygon fill="#AE773A" points="128.00,144.24 82.00,117.68 82.00,191.68 128.00,218.24"/>
+  <polygon fill="#287A78" points="128.00,38.00 165.38,59.58 133.75,77.84 161.06,85.31 117.94,110.21 105.00,94.44 73.38,112.70 36.00,91.12"/>
+  <polygon fill="#D59B55" points="174.00,64.56 220.00,91.12 128.00,144.24 82.00,117.68 103.56,105.23 116.50,121.00 179.75,84.48 152.44,77.01"/>
+  
+</svg>

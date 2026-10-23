@@ -2,6 +2,7 @@
 name = "data-joinery"
 version = "0.5.0"
 description = "Schema safety for DataFrame transformations"
+readme = "README.md"
 authors = [
     { name = "Connor Charles", email = "ccharles.gb@gmail.com" }
 ]
