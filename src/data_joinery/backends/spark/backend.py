@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 from typing import cast as type_cast
 
 from pyspark.sql import Column, DataFrame, SparkSession, types
@@ -485,46 +485,6 @@ def _project_fields(
     return dataframe.select(*columns)
 
 
-class SchemaCoercionMode(Protocol):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame: ...
-
-
-class Strict(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _coerce_strict(dataframe, schema)
-
-
-class ProjectTopLevel(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _project_fields(
-            dataframe, schema, mode="project_top_level", cast=False, recurse=False
-        )
-
-
-class Project(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _project_fields(
-            dataframe, schema, mode="project", cast=False, recurse=True
-        )
-
-
-class ProjectCast(SchemaCoercionMode):
-    def __call__(self, dataframe: DataFrame, schema: types.StructType) -> DataFrame:
-        return _project_fields(
-            dataframe, schema, mode="project_cast", cast=True, recurse=True
-        )
-
-
-_MODE_HANDLERS: dict[
-    CoercionMode, Callable[[DataFrame, types.StructType], DataFrame]
-] = {
-    "strict": Strict(),
-    "project": Project(),
-    "project_top_level": ProjectTopLevel(),
-    "project_cast": ProjectCast(),
-}
-
-
 def _session_from_create_options(options: dict[str, object]) -> SparkSession:
     unexpected = set(options) - {"session"}
     if unexpected:
@@ -577,13 +537,27 @@ class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
                 "Spark coercion requires a pyspark.sql.DataFrame; "
                 f"got {type(dataframe).__name__}."
             )
-        if mode not in _MODE_HANDLERS:
+        expected = self.compile_schema(schema)
+        if mode == "strict":
+            result = _coerce_strict(dataframe, expected)
+        elif mode == "project_top_level":
+            result = _project_fields(
+                dataframe, expected, mode=mode, cast=False, recurse=False
+            )
+        elif mode == "project":
+            result = _project_fields(
+                dataframe, expected, mode=mode, cast=False, recurse=True
+            )
+        elif mode == "project_cast":
+            result = _project_fields(
+                dataframe, expected, mode=mode, cast=True, recurse=True
+            )
+        else:
             raise ValueError(
                 f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
                 "'project_top_level', or 'project_cast'."
             )
-        handler = _MODE_HANDLERS[mode]
-        return _make_dataframe_nullable(handler(dataframe, self.compile_schema(schema)))
+        return _make_dataframe_nullable(result)
 
 
 SPARK_BACKEND = SparkBackend()

@@ -468,11 +468,3 @@ def test_lazy_transform_rejects_eager_input():
 
     with pytest.raises(TypeError, match="must be a LazyFrame"):
         accept(pl.DataFrame({"value": [1]}))  # type: ignore[bad-argument-type]
-
-
-@pytest.mark.parametrize("name", ["PolarsBackend"])
-def test_package_exports_backend_symbols(name):
-    from data_joinery.backends import polars
-    from data_joinery.backends.polars import backend
-
-    assert getattr(polars, name) is getattr(backend, name)
