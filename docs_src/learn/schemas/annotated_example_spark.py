@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 from pyspark.sql.types import (
@@ -12,16 +11,16 @@ from pyspark.sql.types import (
 )
 
 from data_joinery import Schema
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class AnnotatedSchema:
-    my_byte: Annotated[int, ByteType()]
-    my_short: Annotated[int, ShortType()]
-    my_int: Annotated[int, IntegerType()]
-    my_long: Annotated[int, LongType()]
-    my_float: Annotated[float, FloatType()]
-    my_double: Annotated[float, DoubleType()]
+class AnnotatedSchema(JoineryModel):
+    my_byte: Column[Annotated[int, ByteType()]]
+    my_short: Column[Annotated[int, ShortType()]]
+    my_int: Column[Annotated[int, IntegerType()]]
+    my_long: Column[Annotated[int, LongType()]]
+    my_float: Column[Annotated[float, FloatType()]]
+    my_double: Column[Annotated[float, DoubleType()]]
 
 
 schema = Schema(AnnotatedSchema)

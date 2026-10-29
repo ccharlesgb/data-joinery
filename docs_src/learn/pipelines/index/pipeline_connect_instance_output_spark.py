@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 from pyspark.ml.feature import VectorAssembler
@@ -8,21 +7,20 @@ from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import Context, Pipeline, Strict, transform
 from data_joinery.backends.spark import SparkContext
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Housing:
-    number_of_bedrooms: int
-    square_footage: int
-    price: float
+class Housing(JoineryModel):
+    number_of_bedrooms: Column[int]
+    square_footage: Column[int]
+    price: Column[float]
 
 
-@dataclass
-class PreparedHousing:
-    number_of_bedrooms: int
-    square_footage: int
-    price: float
-    features: Annotated[object, VectorUDT()]
+class PreparedHousing(JoineryModel):
+    number_of_bedrooms: Column[int]
+    square_footage: Column[int]
+    price: Column[float]
+    features: Column[Annotated[object, VectorUDT()]]
 
 
 @transform
@@ -31,10 +29,10 @@ def read_data(
 ) -> Annotated[DataFrame, Strict(Housing)]:
     return spark.createDataFrame(
         [
-            Housing(1, 650, 180_000.0),
-            Housing(2, 900, 260_000.0),
-            Housing(3, 1_200, 360_000.0),
-            Housing(4, 1_600, 480_000.0),
+            Housing(number_of_bedrooms=1, square_footage=650, price=180_000.0),
+            Housing(number_of_bedrooms=2, square_footage=900, price=260_000.0),
+            Housing(number_of_bedrooms=3, square_footage=1_200, price=360_000.0),
+            Housing(number_of_bedrooms=4, square_footage=1_600, price=480_000.0),
         ]
     )
 
@@ -44,8 +42,8 @@ def prepare_features(
     housing: Annotated[DataFrame, Strict(Housing)],
 ) -> Annotated[DataFrame, Strict(PreparedHousing)]:
     return VectorAssembler(
-        inputCols=["number_of_bedrooms", "square_footage"],
-        outputCol="features",
+        inputCols=[Housing.number_of_bedrooms, Housing.square_footage],
+        outputCol=PreparedHousing.features,
     ).transform(housing)
 
 
@@ -54,7 +52,9 @@ def fit_model(
     housing: Annotated[DataFrame, Strict(PreparedHousing)],
 ) -> LinearRegressionModel:
     return LinearRegression(
-        featuresCol="features", labelCol="price", regParam=1e-3
+        featuresCol=PreparedHousing.features,
+        labelCol=PreparedHousing.price,
+        regParam=1e-3,
     ).fit(housing)
 
 

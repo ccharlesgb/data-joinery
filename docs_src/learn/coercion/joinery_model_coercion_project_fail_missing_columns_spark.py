@@ -1,35 +1,34 @@
 import traceback
-from dataclasses import dataclass
 
-import polars as pl
+from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import Schema, SchemaCoercionError
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class SubModel:
-    subfield1: str
-    subfield2: str
+class SubModel(JoineryModel):
+    subfield1: Column[str]
+    subfield2: Column[str]
 
 
-@dataclass
-class Model:
-    field1: str
-    field2: str
-    sub_schema: SubModel
+class Model(JoineryModel):
+    field1: Column[str]
+    field2: Column[str]
+    sub_schema: Column[SubModel]
 
 
 schema = Schema(Model)
 
 
-@dataclass
-class ModelWithMissingColumn:
-    field1: str
-    sub_schema: SubModel
+class ModelWithMissingColumn(JoineryModel):
+    field1: Column[str]
+    sub_schema: Column[SubModel]
 
 
 input_schema = Schema(ModelWithMissingColumn)
 
+
+spark = SparkSession.builder.getOrCreate()
 
 input_df = input_schema.create_dataframe(
     [
@@ -38,7 +37,8 @@ input_df = input_schema.create_dataframe(
             sub_schema=SubModel(subfield1="subvalue1", subfield2="subvalue2"),
         )
     ],
-    pl.LazyFrame,
+    DataFrame,
+    session=spark,
 )
 
 try:

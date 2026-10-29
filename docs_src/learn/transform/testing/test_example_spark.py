@@ -1,24 +1,23 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.testing import assertDataFrameEqual
 
 from data_joinery import Schema, Strict, transform
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Customer:
-    customer_id: str
-    name: str
-    is_active: bool
+class Customer(JoineryModel):
+    customer_id: Column[str]
+    name: Column[str]
+    is_active: Column[bool]
 
 
 @transform
 def filter_active_customers(
     customers: Annotated[DataFrame, Strict(Customer)],
 ) -> Annotated[DataFrame, Strict(Customer)]:
-    return customers.filter(customers.is_active)
+    return customers.filter(customers[Customer.is_active])
 
 
 def test_filter_active_customers():
@@ -27,17 +26,17 @@ def test_filter_active_customers():
 
     customers = customer_schema.create_dataframe(
         [
-            Customer("1", "Alice", True),
-            Customer("2", "Bob", False),
-            Customer("3", "Charlie", True),
+            Customer(customer_id="1", name="Alice", is_active=True),
+            Customer(customer_id="2", name="Bob", is_active=False),
+            Customer(customer_id="3", name="Charlie", is_active=True),
         ],
         DataFrame,
         session=spark,
     )
     expected_active_customers = customer_schema.create_dataframe(
         [
-            Customer("1", "Alice", True),
-            Customer("3", "Charlie", True),
+            Customer(customer_id="1", name="Alice", is_active=True),
+            Customer(customer_id="3", name="Charlie", is_active=True),
         ],
         DataFrame,
         session=spark,

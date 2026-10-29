@@ -1,31 +1,27 @@
-from dataclasses import dataclass
-
 import polars as pl
 
 from data_joinery import Schema
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class SubModel:
-    subfield1: str
-    subfield2: str
+class SubModel(JoineryModel):
+    subfield1: Column[str]
+    subfield2: Column[str]
 
 
-@dataclass
-class Model:
-    field1: str
-    field2: str
-    sub_schema: SubModel
+class Model(JoineryModel):
+    field1: Column[str]
+    field2: Column[str]
+    sub_schema: Column[SubModel]
 
 
 schema = Schema(Model)
 
 
-@dataclass
-class ModelWithExtraFieldAndDifferentType:
-    field1: int
-    field2: str
-    sub_schema: SubModel
+class ModelWithExtraFieldAndDifferentType(JoineryModel):
+    field1: Column[int]
+    field2: Column[str]
+    sub_schema: Column[SubModel]
 
 
 input_schema = Schema(ModelWithExtraFieldAndDifferentType)

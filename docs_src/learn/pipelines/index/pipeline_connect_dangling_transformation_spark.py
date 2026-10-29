@@ -1,27 +1,25 @@
 import traceback
-from dataclasses import dataclass
 from typing import Annotated
 
 from pyspark.sql import DataFrame
 
 from data_joinery import Pipeline, PipelineExecutionError, Strict, transform
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class A:
-    a: str
+class A(JoineryModel):
+    a: Column[str]
 
 
-@dataclass
-class B:
-    b: str
+class B(JoineryModel):
+    b: Column[str]
 
 
 @transform
 def transform_data(
     a: Annotated[DataFrame, Strict(A)],
 ) -> Annotated[DataFrame, Strict(B)]:
-    return a.withColumnRenamed("a", "b")
+    return a.withColumnRenamed(A.a, B.b)
 
 
 @transform

@@ -158,7 +158,7 @@ def ProjectCast(schema: type) -> DataFrameContract:
     """Project columns and cast their values to the model's field types.
 
     Args:
-        schema: Dataclass or Pydantic model that defines the expected fields.
+        schema: JoineryModel, dataclass, or Pydantic model class defining the fields.
 
     Returns:
         A DataFrame contract for use in a transform annotation.
@@ -170,7 +170,7 @@ def ProjectTopLevel(schema: type) -> DataFrameContract:
     """Keep the model's top-level columns and validate nested fields.
 
     Args:
-        schema: Dataclass or Pydantic model that defines the expected fields.
+        schema: JoineryModel, dataclass, or Pydantic model class defining the fields.
 
     Returns:
         A DataFrame contract for use in a transform annotation.
@@ -182,7 +182,7 @@ def Project(schema: type) -> DataFrameContract:
     """Keep the model's fields, including fields in nested structs.
 
     Args:
-        schema: Dataclass or Pydantic model that defines the expected fields.
+        schema: JoineryModel, dataclass, or Pydantic model class defining the fields.
 
     Returns:
         A DataFrame contract for use in a transform annotation.
@@ -196,7 +196,7 @@ def Strict(schema: type) -> DataFrameContract:
     Field order and nullability are ignored.
 
     Args:
-        schema: Dataclass or Pydantic model that defines the expected fields.
+        schema: JoineryModel, dataclass, or Pydantic model class defining the fields.
 
     Returns:
         A DataFrame contract for use in a transform annotation.

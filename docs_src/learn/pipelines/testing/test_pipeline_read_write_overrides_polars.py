@@ -5,6 +5,7 @@ import polars as pl
 from polars.testing import assert_frame_equal
 
 from data_joinery import Context, Pipeline, Project, transform
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
 @dataclass(frozen=True)
@@ -18,16 +19,14 @@ class OrderPipelineContext:
     storage: Storage
 
 
-@dataclass
-class Order:
-    order_id: int
-    amount: int
+class Order(JoineryModel):
+    order_id: Column[int]
+    amount: Column[int]
 
 
-@dataclass
-class OrderTotal:
-    order_id: int
-    total: int
+class OrderTotal(JoineryModel):
+    order_id: Column[int]
+    total: Column[int]
 
 
 @transform
@@ -41,7 +40,9 @@ def read_orders(
 def calculate_totals(
     orders: Annotated[pl.LazyFrame, Project(Order)],
 ) -> Annotated[pl.LazyFrame, Project(OrderTotal)]:
-    return orders.select("order_id", (pl.col("amount") * 2).alias("total"))
+    return orders.select(
+        Order.order_id, (pl.col(Order.amount) * 2).alias(OrderTotal.total)
+    )
 
 
 @transform
@@ -62,7 +63,7 @@ def build_pipeline() -> Pipeline[OrderPipelineContext]:
 
 
 def test_order_pipeline_end_to_end():
-    fixture_orders = pl.LazyFrame({"order_id": [1, 2], "amount": [10, 25]})
+    fixture_orders = pl.LazyFrame({Order.order_id: [1, 2], Order.amount: [10, 25]})
 
     @transform
     def read_fixture() -> Annotated[pl.LazyFrame, Project(Order)]:
@@ -83,5 +84,5 @@ def test_order_pipeline_end_to_end():
     )
 
     written = result.get_one_input("write", pl.LazyFrame)
-    expected = pl.LazyFrame({"order_id": [1, 2], "total": [20, 50]})
+    expected = pl.LazyFrame({Order.order_id: [1, 2], OrderTotal.total: [20, 50]})
     assert_frame_equal(written.collect(), expected.collect())

@@ -1,26 +1,25 @@
-from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, StructType
 
 from data_joinery import Context, Pipeline, Schema, Strict, transform
 from data_joinery.backends.spark import SparkContext
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Orders:
-    order_timestamp: datetime
-    customer_id: str
-    order_value: float
+class Orders(JoineryModel):
+    order_timestamp: Column[datetime]
+    customer_id: Column[str]
+    order_value: Column[float]
 
 
-@dataclass
-class OrderMetrics:
-    order_date: date
-    customer_id: str
-    total_order_value: Annotated[float, DoubleType()]
+class OrderMetrics(JoineryModel):
+    order_date: Column[date]
+    customer_id: Column[str]
+    total_order_value: Column[Annotated[float, DoubleType()]]
 
 
 @transform
@@ -42,19 +41,15 @@ def read_orders(
 def get_metrics(
     order_table: Annotated[DataFrame, Strict(Orders)],
 ) -> Annotated[DataFrame, Strict(OrderMetrics)]:
-    return (
-        order_table.groupBy(
-            order_table["order_timestamp"].cast("date").alias("order_date"),
-            order_table["customer_id"],
-        )
-        .sum("order_value")
-        .withColumnRenamed("sum(order_value)", "total_order_value")
-    )
+    return order_table.groupBy(
+        F.col(Orders.order_timestamp).cast("date").alias(OrderMetrics.order_date),
+        Orders.customer_id,
+    ).agg(F.sum(Orders.order_value).alias(OrderMetrics.total_order_value))
 
 
 @transform(side_effect=True)
 def print_metrics(metrics_table: Annotated[DataFrame, Strict(OrderMetrics)]) -> None:
-    metrics_table.orderBy("customer_id").show()
+    metrics_table.orderBy(OrderMetrics.customer_id).show()
 
 
 order_metrics = Pipeline(SparkContext)

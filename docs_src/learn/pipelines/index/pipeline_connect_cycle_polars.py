@@ -1,19 +1,17 @@
 import traceback
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 
 from data_joinery import Pipeline, Strict, transform
 from data_joinery.pipeline import PipelineCycleError
+from data_joinery.schemas.joinery_model import JoineryModel
 
 
-@dataclass
-class A: ...
+class A(JoineryModel): ...
 
 
-@dataclass
-class B: ...
+class B(JoineryModel): ...
 
 
 @transform

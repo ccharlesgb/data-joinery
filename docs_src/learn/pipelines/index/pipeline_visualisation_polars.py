@@ -6,19 +6,18 @@ from typing import Annotated, cast
 import polars as pl
 
 from data_joinery import Pipeline, Strict, transform
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Orders:
-    order_id: int
-    amount: float
+class Orders(JoineryModel):
+    order_id: Column[int]
+    amount: Column[float]
 
 
-@dataclass
-class ScoredOrders:
-    order_id: int
-    amount: float
-    score: float
+class ScoredOrders(JoineryModel):
+    order_id: Column[int]
+    amount: Column[float]
+    score: Column[float]
 
 
 @dataclass
@@ -28,21 +27,21 @@ class ScoreModel:
 
 @transform
 def read_orders() -> Annotated[pl.LazyFrame, Strict(Orders)]:
-    return pl.LazyFrame({"order_id": [1, 2], "amount": [50.0, 150.0]})
+    return pl.LazyFrame({Orders.order_id: [1, 2], Orders.amount: [50.0, 150.0]})
 
 
 @transform
 def clean_orders(
     orders: Annotated[pl.LazyFrame, Strict(Orders)],
 ) -> Annotated[pl.LazyFrame, Strict(Orders)]:
-    return orders.filter(pl.col("amount") >= 0)
+    return orders.filter(pl.col(Orders.amount) >= 0)
 
 
 @transform
 def priority_orders(
     orders: Annotated[pl.LazyFrame, Strict(Orders)],
 ) -> Annotated[pl.LazyFrame, Strict(Orders)]:
-    return orders.filter(pl.col("amount") > 100)
+    return orders.filter(pl.col(Orders.amount) > 100)
 
 
 @transform
@@ -51,7 +50,7 @@ def combine_orders(
     priority: Annotated[pl.LazyFrame, Strict(Orders)],
 ) -> Annotated[pl.LazyFrame, Strict(Orders)]:
     return pl.concat([cleaned, priority]).unique(
-        subset=["order_id"], maintain_order=True
+        subset=[Orders.order_id], maintain_order=True
     )
 
 
@@ -59,7 +58,9 @@ def combine_orders(
 def fit_threshold(
     orders: Annotated[pl.LazyFrame, Strict(Orders)],
 ) -> ScoreModel:
-    mean = cast(float | None, orders.select(pl.col("amount").mean()).collect().item())
+    mean = cast(
+        float | None, orders.select(pl.col(Orders.amount).mean()).collect().item()
+    )
     if mean is None:
         raise ValueError("cannot fit a threshold from empty orders")
     return ScoreModel(threshold=mean)
@@ -70,7 +71,9 @@ def score_orders(
     orders: Annotated[pl.LazyFrame, Strict(Orders)],
     model: ScoreModel,
 ) -> Annotated[pl.LazyFrame, Strict(ScoredOrders)]:
-    return orders.with_columns((pl.col("amount") / model.threshold).alias("score"))
+    return orders.with_columns(
+        (pl.col(Orders.amount) / model.threshold).alias(ScoredOrders.score)
+    )
 
 
 @transform(side_effect=True)

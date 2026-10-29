@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Annotated, cast
 
 import polars as pl
@@ -7,12 +6,12 @@ from pyspark.sql.types import LongType, StructType
 
 from data_joinery import Schema, Strict, transform
 from data_joinery.contract import ProjectCast
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Record:
-    record_id: Annotated[int, pl.UInt32, LongType()]
-    label: str
+class Record(JoineryModel):
+    record_id: Column[Annotated[int, pl.UInt32, LongType()]]
+    label: Column[str]
 
 
 record_schema = Schema(Record)
@@ -38,7 +37,8 @@ def spark_to_polars(
 spark = SparkSession.builder.getOrCreate()
 
 polars_records = record_schema.create_dataframe(
-    [Record(1, "first"), Record(2, "second")], pl.LazyFrame
+    [Record(record_id=1, label="first"), Record(record_id=2, label="second")],
+    pl.LazyFrame,
 )
 spark_records = polars_to_spark(polars_records, spark)
 polars_records_back = spark_to_polars(spark_records)

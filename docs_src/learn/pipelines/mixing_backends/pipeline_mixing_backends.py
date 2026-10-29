@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Annotated, cast
 
 import polars as pl
@@ -8,21 +7,20 @@ from sklearn.linear_model import LinearRegression
 
 from data_joinery import Context, Pipeline, Strict, transform
 from data_joinery.backends.spark import SparkContext
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class CustomerActivity:
-    customer_id: int
-    minutes: int
-    annual_spend: float
+class CustomerActivity(JoineryModel):
+    customer_id: Column[int]
+    minutes: Column[int]
+    annual_spend: Column[float]
 
 
-@dataclass
-class CustomerFeatures:
-    customer_id: int
-    visits: int
-    total_minutes: int
-    annual_spend: float
+class CustomerFeatures(JoineryModel):
+    customer_id: Column[int]
+    visits: Column[int]
+    total_minutes: Column[int]
+    annual_spend: Column[float]
 
 
 @transform
@@ -31,18 +29,18 @@ def read_activity(
 ) -> Annotated[DataFrame, Strict(CustomerActivity)]:
     return spark.createDataFrame(
         [
-            CustomerActivity(1, 10, 2_700.0),
-            CustomerActivity(1, 20, 2_700.0),
-            CustomerActivity(2, 15, 4_000.0),
-            CustomerActivity(2, 15, 4_000.0),
-            CustomerActivity(2, 20, 4_000.0),
-            CustomerActivity(3, 25, 2_000.0),
-            CustomerActivity(4, 20, 5_700.0),
-            CustomerActivity(4, 20, 5_700.0),
-            CustomerActivity(4, 20, 5_700.0),
-            CustomerActivity(4, 20, 5_700.0),
-            CustomerActivity(5, 20, 3_300.0),
-            CustomerActivity(5, 25, 3_300.0),
+            CustomerActivity(customer_id=1, minutes=10, annual_spend=2_700.0),
+            CustomerActivity(customer_id=1, minutes=20, annual_spend=2_700.0),
+            CustomerActivity(customer_id=2, minutes=15, annual_spend=4_000.0),
+            CustomerActivity(customer_id=2, minutes=15, annual_spend=4_000.0),
+            CustomerActivity(customer_id=2, minutes=20, annual_spend=4_000.0),
+            CustomerActivity(customer_id=3, minutes=25, annual_spend=2_000.0),
+            CustomerActivity(customer_id=4, minutes=20, annual_spend=5_700.0),
+            CustomerActivity(customer_id=4, minutes=20, annual_spend=5_700.0),
+            CustomerActivity(customer_id=4, minutes=20, annual_spend=5_700.0),
+            CustomerActivity(customer_id=4, minutes=20, annual_spend=5_700.0),
+            CustomerActivity(customer_id=5, minutes=20, annual_spend=3_300.0),
+            CustomerActivity(customer_id=5, minutes=25, annual_spend=3_300.0),
         ]
     )
 
@@ -51,10 +49,10 @@ def read_activity(
 def aggregate_features(
     activity: Annotated[DataFrame, Strict(CustomerActivity)],
 ) -> Annotated[DataFrame, Strict(CustomerFeatures)]:
-    return activity.groupBy("customer_id").agg(
-        F.count("*").alias("visits"),
-        F.sum("minutes").alias("total_minutes"),
-        F.max("annual_spend").alias("annual_spend"),
+    return activity.groupBy(CustomerActivity.customer_id).agg(
+        F.count("*").alias(CustomerFeatures.visits),
+        F.sum(CustomerActivity.minutes).alias(CustomerFeatures.total_minutes),
+        F.max(CustomerActivity.annual_spend).alias(CustomerFeatures.annual_spend),
     )
 
 
@@ -71,8 +69,8 @@ def train_model(
 ) -> LinearRegression:
     collected = features.collect()
     return LinearRegression().fit(
-        collected[["visits", "total_minutes"]],
-        collected["annual_spend"],
+        collected[[CustomerFeatures.visits, CustomerFeatures.total_minutes]],
+        collected[CustomerActivity.annual_spend],
     )
 
 

@@ -1,24 +1,23 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 
 from data_joinery import Project, Strict, transform
 from data_joinery.schemas import Schema
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Customer:
-    customer_id: str
-    name: str
-    is_active: bool
+class Customer(JoineryModel):
+    customer_id: Column[str]
+    name: Column[str]
+    is_active: Column[bool]
 
 
 @transform
 def filter_active_customers(
     customers: Annotated[pl.LazyFrame, Project(Customer)],
 ) -> Annotated[pl.LazyFrame, Strict(Customer)]:
-    return customers.filter(pl.col("is_active"))
+    return customers.filter(pl.col(Customer.is_active))
 
 
 customers = Schema(Customer).create_dataframe(

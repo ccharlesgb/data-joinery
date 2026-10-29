@@ -1,19 +1,18 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 
 from data_joinery import Pipeline, Project, transform
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Order:
-    order_id: int
+class Order(JoineryModel):
+    order_id: Column[int]
 
 
 @transform
 def read_orders() -> Annotated[pl.LazyFrame, Project(Order)]:
-    return pl.LazyFrame({"order_id": [1, 2]})
+    return pl.LazyFrame({Order.order_id: [1, 2]})
 
 
 @transform

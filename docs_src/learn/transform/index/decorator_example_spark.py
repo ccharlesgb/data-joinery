@@ -1,24 +1,23 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import Project, Strict, transform
 from data_joinery.schemas import Schema
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class Customer:
-    customer_id: str
-    name: str
-    is_active: bool
+class Customer(JoineryModel):
+    customer_id: Column[str]
+    name: Column[str]
+    is_active: Column[bool]
 
 
 @transform
 def filter_active_customers(
     customers: Annotated[DataFrame, Project(Customer)],
 ) -> Annotated[DataFrame, Strict(Customer)]:
-    return customers.filter(customers.is_active)
+    return customers.filter(customers[Customer.is_active])
 
 
 spark = SparkSession.builder.getOrCreate()

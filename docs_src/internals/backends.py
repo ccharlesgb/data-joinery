@@ -9,6 +9,7 @@ from data_joinery.schemas.coercion_error import (
     SchemaCoercionError,
     SchemaDifference,
 )
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 from data_joinery.schemas.model_schema import ModelSchema
 
 
@@ -66,10 +67,11 @@ backend: DataFrameBackend[ExampleDataFrame, tuple[str, ...]] = ExampleBackend()
 register_backend(backend)
 
 
-@dataclass
-class Order:
-    order_id: int
+class Order(JoineryModel):
+    """Input columns for an order."""
+
+    order_id: Column[int]
 
 
 print(Schema(Order).native_schema(tuple))
-print(Schema(Order).create_dataframe([Order(1)], ExampleDataFrame))
+print(Schema(Order).create_dataframe([Order(order_id=1)], ExampleDataFrame))

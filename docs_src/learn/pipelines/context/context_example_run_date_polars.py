@@ -6,11 +6,11 @@ from typing import Annotated
 import polars as pl
 
 from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class A:
-    snapshot_date: str
+class A(JoineryModel):
+    snapshot_date: Column[str]
 
 
 class RunDate(date):
@@ -27,7 +27,7 @@ def read_data(
     run_date: Annotated[RunDate, Context()],
 ) -> Annotated[pl.LazyFrame, Strict(A)]:
     expected_path = Path(__file__).parent / f"example_{run_date.strftime('%Y%m%d')}.csv"
-    return pl.scan_csv(expected_path, schema_overrides={"snapshot_date": pl.String})
+    return pl.scan_csv(expected_path, schema_overrides={A.snapshot_date: pl.String})
 
 
 @transform

@@ -1,33 +1,30 @@
 import traceback
-from dataclasses import dataclass
 
 import polars as pl
 
 from data_joinery import Schema, SchemaCoercionError
+from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
-@dataclass
-class SubModel:
-    subfield1: str
-    subfield2: str
+class SubModel(JoineryModel):
+    subfield1: Column[str]
+    subfield2: Column[str]
 
 
-@dataclass
-class Model:
-    field1: str
-    field2: str
-    sub_schema: SubModel
+class Model(JoineryModel):
+    field1: Column[str]
+    field2: Column[str]
+    sub_schema: Column[SubModel]
 
 
 schema = Schema(Model)
 
 
-@dataclass
-class ModelWithExtraColumn:
-    field1: str
-    field2: str
-    sub_schema: SubModel
-    extra_field: str
+class ModelWithExtraColumn(JoineryModel):
+    field1: Column[str]
+    field2: Column[str]
+    sub_schema: Column[SubModel]
+    extra_field: Column[str]
 
 
 input_schema = Schema(ModelWithExtraColumn)

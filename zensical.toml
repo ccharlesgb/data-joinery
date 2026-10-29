@@ -15,7 +15,7 @@ nav = [
       "learn/schemas/overriding_types.md",
       "learn/schemas/creating_dataframes.md",
       "learn/schemas/coercion.md",
-      "learn/schemas/joinery_model.md",
+      "learn/schemas/alternative_schemas.md",
     ] },
     { "Transformations" = [
       "learn/transform/index.md",
