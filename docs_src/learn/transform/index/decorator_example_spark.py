@@ -2,9 +2,8 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Project, Strict, transform
+from data_joinery import Column, JoineryModel, Project, Strict, transform
 from data_joinery.schemas import Schema
-from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
 class Customer(JoineryModel):

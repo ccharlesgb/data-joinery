@@ -3,8 +3,7 @@ from typing import Annotated
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from data_joinery import Pipeline, Project, transform
-from data_joinery.schemas.joinery_model import Column, JoineryModel
+from data_joinery import Column, JoineryModel, Pipeline, Project, transform
 
 
 class Order(JoineryModel):

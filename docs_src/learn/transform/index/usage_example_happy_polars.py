@@ -2,8 +2,7 @@ from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Schema, Strict, transform
-from data_joinery.schemas.joinery_model import Column, JoineryModel
+from data_joinery import Column, JoineryModel, Schema, Strict, transform
 
 
 class Customer(JoineryModel):

@@ -3,8 +3,7 @@ from typing import Annotated
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Schema, Strict, transform
-from data_joinery.schemas.joinery_model import Column, JoineryModel
+from data_joinery import Column, JoineryModel, Schema, Strict, transform
 
 
 class Customer(JoineryModel):

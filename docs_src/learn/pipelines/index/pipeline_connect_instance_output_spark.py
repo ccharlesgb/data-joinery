@@ -5,9 +5,8 @@ from pyspark.ml.linalg import VectorUDT
 from pyspark.ml.regression import LinearRegression, LinearRegressionModel
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
 from data_joinery.backends.spark import SparkContext
-from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
 class Housing(JoineryModel):

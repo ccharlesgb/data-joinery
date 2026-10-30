@@ -14,8 +14,7 @@ Prefer `JoineryModel` with each field annotated as `Column[T]`, where `T` is the
 No `@dataclass` decorator is needed:
 
 ```python
-from data_joinery import Schema
-from data_joinery.schemas.joinery_model import Column, JoineryModel, column
+from data_joinery import Column, JoineryModel, Schema, column
 
 
 class Customer(JoineryModel):

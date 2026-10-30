@@ -3,8 +3,7 @@ from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Pipeline, Schema, Strict, transform
-from data_joinery.schemas.joinery_model import Column, JoineryModel
+from data_joinery import Column, JoineryModel, Pipeline, Schema, Strict, transform
 
 
 class Orders(JoineryModel):

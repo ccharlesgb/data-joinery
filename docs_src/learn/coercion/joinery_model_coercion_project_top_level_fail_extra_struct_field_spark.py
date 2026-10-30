@@ -2,8 +2,7 @@ import traceback
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Schema, SchemaCoercionError
-from data_joinery.schemas.joinery_model import Column, JoineryModel
+from data_joinery import Column, JoineryModel, Schema, SchemaCoercionError
 
 
 class SubModel(JoineryModel):

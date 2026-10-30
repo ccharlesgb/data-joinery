@@ -2,14 +2,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from data_joinery import Schema
+from data_joinery import Column, JoineryModel, Schema
 from data_joinery.backends import DataFrameBackend, register_backend
 from data_joinery.schemas.coercion_error import (
     CoercionMode,
     SchemaCoercionError,
     SchemaDifference,
 )
-from data_joinery.schemas.joinery_model import Column, JoineryModel
 from data_joinery.schemas.model_schema import ModelSchema
 
 

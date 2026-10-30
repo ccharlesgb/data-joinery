@@ -4,9 +4,8 @@ import polars as pl
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import LongType, StructType
 
-from data_joinery import Schema, Strict, transform
+from data_joinery import Column, JoineryModel, Schema, Strict, transform
 from data_joinery.contract import ProjectCast
-from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
 class Record(JoineryModel):

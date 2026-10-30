@@ -3,8 +3,14 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame
 
-from data_joinery import Pipeline, PipelineExecutionError, Strict, transform
-from data_joinery.schemas.joinery_model import Column, JoineryModel
+from data_joinery import (
+    Column,
+    JoineryModel,
+    Pipeline,
+    PipelineExecutionError,
+    Strict,
+    transform,
+)
 
 
 class A(JoineryModel):

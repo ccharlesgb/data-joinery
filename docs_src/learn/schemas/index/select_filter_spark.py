@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-from data_joinery.schemas.joinery_model import Column, JoineryModel, column
+from data_joinery import Column, JoineryModel, column
 
 
 class Order(JoineryModel):

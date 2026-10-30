@@ -1,5 +1,4 @@
-from data_joinery import Schema
-from data_joinery.schemas.joinery_model import Column, JoineryModel
+from data_joinery import Column, JoineryModel, Schema
 
 
 class SubModel(JoineryModel):

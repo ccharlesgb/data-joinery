@@ -3,9 +3,8 @@ from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Pipeline, Strict, transform
+from data_joinery import Column, JoineryModel, Pipeline, Strict, transform
 from data_joinery.pipeline import PipelineConnectionError
-from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
 class A(JoineryModel):

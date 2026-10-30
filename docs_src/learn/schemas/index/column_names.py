@@ -1,4 +1,4 @@
-from data_joinery.schemas.joinery_model import Column, JoineryModel, column
+from data_joinery import Column, JoineryModel, column
 
 
 class OrderTotal(JoineryModel):

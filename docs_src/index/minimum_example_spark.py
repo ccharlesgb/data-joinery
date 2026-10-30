@@ -5,9 +5,16 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, StructType
 
-from data_joinery import Context, Pipeline, Schema, Strict, transform
+from data_joinery import (
+    Column,
+    Context,
+    JoineryModel,
+    Pipeline,
+    Schema,
+    Strict,
+    transform,
+)
 from data_joinery.backends.spark import SparkContext
-from data_joinery.schemas.joinery_model import Column, JoineryModel
 
 
 class Orders(JoineryModel):
