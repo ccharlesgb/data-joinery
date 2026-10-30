@@ -49,13 +49,13 @@ see [default type mappings.](../../reference/type_mapping.md#spark)
 The below example shows the effect of annotating your fields has on the resulting schema:
 
 ``` python
---8<-- "docs_src/learn/schemas/annotated_example_spark.py"
+--8<-- "docs_src/learn/schemas/overriding_types/annotated_example_spark.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` python
---8<-- "docs_src/learn/schemas/annotated_example_spark_stdout.log"
+--8<-- "docs_src/learn/schemas/overriding_types/annotated_example_spark_stdout.log"
 ```
 
 !!! warning "Nullability in Spark"

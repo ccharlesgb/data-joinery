@@ -7,23 +7,23 @@ its backend. Spark also requires its session through the `session` keyword:
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/learn/schemas/fixture_example_polars.py"
+    --8<-- "docs_src/learn/schemas/creating_dataframes/fixture_example_polars.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/schemas/fixture_example_polars_stdout.log"
+    --8<-- "docs_src/learn/schemas/creating_dataframes/fixture_example_polars_stdout.log"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/learn/schemas/fixture_example_spark.py"
+    --8<-- "docs_src/learn/schemas/creating_dataframes/fixture_example_spark.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/schemas/fixture_example_spark_stdout.log"
+    --8<-- "docs_src/learn/schemas/creating_dataframes/fixture_example_spark_stdout.log"
     ```

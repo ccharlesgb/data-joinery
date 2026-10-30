@@ -18,8 +18,12 @@ SNIPPET = re.compile(r'--8<-- "(docs_src/[^"\n]+)"')
 
 
 def validate_snippets() -> None:
-    """Keep every displayed backend example and its generated output together."""
+    """Check that every example is included in its corresponding docs page."""
+    referenced_examples = set()
     for page in DOCS_DIRECTORY.rglob("*.md"):
+        expected_directory = DOCS_SOURCE_DIRECTORY / page.relative_to(
+            DOCS_DIRECTORY
+        ).with_suffix("")
         references = {
             reference.split(":", 1)[0]
             for reference in SNIPPET.findall(page.read_text())
@@ -28,7 +32,13 @@ def validate_snippets() -> None:
             path = REPOSITORY_ROOT / reference
             if not path.is_file():
                 raise FileNotFoundError(f"{page}: missing snippet {reference}")
+            if path.parent != expected_directory:
+                raise ValueError(
+                    f"{page}: snippet {reference} belongs in "
+                    f"{expected_directory.relative_to(REPOSITORY_ROOT)}/"
+                )
             if path.suffix == ".py":
+                referenced_examples.add(path)
                 for backend, other_backend in (
                     ("spark", "polars"),
                     ("polars", "spark"),
@@ -45,6 +55,16 @@ def validate_snippets() -> None:
                         raise ValueError(
                             f"{page}: missing {other_backend} tab for {reference}"
                         )
+
+    unreferenced_examples = (
+        set(DOCS_SOURCE_DIRECTORY.rglob("*.py")) - referenced_examples
+    )
+    if unreferenced_examples:
+        paths = ", ".join(
+            str(path.relative_to(REPOSITORY_ROOT))
+            for path in sorted(unreferenced_examples)
+        )
+        raise ValueError(f"Examples not included in a docs page: {paths}")
 
 
 def _report_failure(

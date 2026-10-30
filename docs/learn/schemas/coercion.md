@@ -9,7 +9,7 @@ matches the model's schema or raise a validation error if coercion fails based o
 Let's take the following schema and walk through how each mode works:
 
 ``` python
---8<-- "docs_src/learn/coercion/joinery_model_coercion_schemas.py"
+--8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_schemas.py"
 ```
 
 ## Coercion Modes
@@ -26,25 +26,25 @@ has an extra column so will fail the `strict` validation check:
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_fail_extra_column_polars.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_fail_extra_column_polars.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_fail_extra_column_polars_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_fail_extra_column_polars_stdout.log"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_fail_extra_column_spark.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_fail_extra_column_spark.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_fail_extra_column_spark_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_fail_extra_column_spark_stdout.log"
     ```
 
 However if the Dataframe is equivalent it will pass and return the same DataFrame:
@@ -52,25 +52,25 @@ However if the Dataframe is equivalent it will pass and return the same DataFram
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_happy_polars.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_happy_polars.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_happy_polars_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_happy_polars_stdout.log"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_happy_spark.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_happy_spark.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_strict_happy_spark_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_strict_happy_spark_stdout.log"
     ```
 
 Strict does not care about ordering of the fields.
@@ -82,25 +82,25 @@ Strict does not care about ordering of the fields.
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_polars.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_polars.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_polars_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_polars_stdout.log"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_spark.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_spark.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_spark_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_top_level_fail_extra_struct_field_spark_stdout.log"
     ```
 
 ### Project
@@ -111,25 +111,25 @@ the model:
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_happy_polars.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_happy_polars.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_happy_polars_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_happy_polars_stdout.log"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_happy_spark.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_happy_spark.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_happy_spark_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_happy_spark_stdout.log"
     ```
 
 Project will still fail if there are missing columns:
@@ -137,25 +137,25 @@ Project will still fail if there are missing columns:
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_fail_missing_columns_polars.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_fail_missing_columns_polars.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_fail_missing_columns_polars_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_fail_missing_columns_polars_stdout.log"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_fail_missing_columns_spark.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_fail_missing_columns_spark.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_fail_missing_columns_spark_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_fail_missing_columns_spark_stdout.log"
     ```
 
 ### Project Cast
@@ -167,25 +167,25 @@ you want to easily align your DataFrame with the model's schema. It will also st
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_cast_polars.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_cast_polars.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_cast_polars_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_cast_polars_stdout.log"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_cast_spark.py"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_cast_spark.py"
     ```
 
     :fontawesome-solid-code: Outputs:
 
     ``` text
-    --8<-- "docs_src/learn/coercion/joinery_model_coercion_project_cast_spark_stdout.log"
+    --8<-- "docs_src/learn/schemas/coercion/joinery_model_coercion_project_cast_spark_stdout.log"
     ```
 
 Type casting in Data Joinery follows the backend's casting rules. If the cast is

@@ -10,11 +10,11 @@ different explicit representation in every backend: Polars `UInt32`, Spark `Long
 `UInt16`.
 
 ``` python
---8<-- "docs_src/learn/transform/mixing_backends.py"
+--8<-- "docs_src/learn/transform/mixing_backends/mixing_backends.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` text
---8<-- "docs_src/learn/transform/mixing_backends_stdout.log"
+--8<-- "docs_src/learn/transform/mixing_backends/mixing_backends_stdout.log"
 ```

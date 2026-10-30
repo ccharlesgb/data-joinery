@@ -199,6 +199,24 @@ Similarly to best practice with [context](context.md), you should avoid primitiv
     Instance values are held in the process running the pipeline. In PySpark, collecting
     a large DataFrame into an instance value uses driver memory.
 
+## Mixing backends
+
+A pipeline can connect transformations that use different DataFrame backends.
+This example aggregates customer activity in Spark, collects the results into Polars,
+and trains a model with scikit-learn. The aggregated results must fit in driver memory.
+See [Mixing Backends](../transform/mixing_backends.md) for more about converting
+DataFrames between backends.
+
+``` python
+--8<-- "docs_src/learn/pipelines/index/pipeline_mixing_backends.py"
+```
+
+:fontawesome-solid-code: Outputs:
+
+``` text
+--8<-- "docs_src/learn/pipelines/index/pipeline_mixing_backends_stdout.log"
+```
+
 ## Visualizing data flow
 
 Install the `vis` extra and call `pipeline.visualize()` after connecting the steps.

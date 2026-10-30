@@ -48,13 +48,13 @@ shows the registration and method shapes; a real backend must also handle values
 field types, and nested fields.
 
 ``` python
---8<-- "docs_src/internals/backends.py"
+--8<-- "docs_src/internals/backends/backends.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` text
---8<-- "docs_src/internals/backends_stdout.log"
+--8<-- "docs_src/internals/backends/backends_stdout.log"
 ```
 
 `dataframe_types` is a tuple of classes, while `schema_type` takes one class. Subclasses are recognized

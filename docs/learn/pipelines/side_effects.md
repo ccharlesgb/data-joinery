@@ -23,13 +23,13 @@ have write permissions, you might want to skip the steps that write to disk. Pas
 `include_side_effects=False` when running pipelines to run all steps leading up to side effects:
 
 ``` python
---8<-- "docs_src/learn/pipelines/side_effects.py"
+--8<-- "docs_src/learn/pipelines/side_effects/side_effects.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` text
---8<-- "docs_src/learn/pipelines/side_effects_stdout.log"
+--8<-- "docs_src/learn/pipelines/side_effects/side_effects_stdout.log"
 ```
 
 In the first run, the pipeline creates the report but skips `print_report`.
@@ -46,12 +46,12 @@ Mark only the step that calls `pl.collect_all` as a side effect to run both sink
 together:
 
 ``` python
---8<-- "docs_src/learn/pipelines/side_effects_lazy_sinks.py"
+--8<-- "docs_src/learn/pipelines/side_effects/side_effects_lazy_sinks.py"
 ```
 
 :fontawesome-solid-code: Outputs:
 
 ``` text
---8<-- "docs_src/learn/pipelines/side_effects_lazy_sinks_stdout.log"
+--8<-- "docs_src/learn/pipelines/side_effects/side_effects_lazy_sinks_stdout.log"
 ```
 
