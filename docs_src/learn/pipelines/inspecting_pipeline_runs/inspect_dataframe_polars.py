@@ -1,31 +1,28 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Pipeline, Project, transform
+from data_joinery import Column, JoineryModel, Pipeline, Project, transform
 
 
-@dataclass
-class Order:
-    amount: int
+class Order(JoineryModel):
+    amount: Column[int]
 
 
-@dataclass
-class OrderTotal:
-    total: int
+class OrderTotal(JoineryModel):
+    total: Column[int]
 
 
 @transform
 def read_orders() -> Annotated[pl.LazyFrame, Project(Order)]:
-    return pl.LazyFrame({"amount": [10, 20]})
+    return pl.LazyFrame({Order.amount: [10, 20]})
 
 
 @transform
 def total_orders(
     orders: Annotated[pl.LazyFrame, Project(Order)],
 ) -> Annotated[pl.LazyFrame, Project(OrderTotal)]:
-    return orders.select(pl.col("amount").sum().alias("total"))
+    return orders.select(pl.col(Order.amount).sum().alias(OrderTotal.total))
 
 
 pipeline = Pipeline()

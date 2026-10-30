@@ -23,9 +23,10 @@ built-in backends when no registered backend matches
 | `coerce_dataframe(frame, schema, mode)`                | Checks or reshapes a frame according to the requested mode. Return the same frame class or raise `SchemaCoercionError` for schema mismatches.   |
 
 Use `ModelSchema[T].serialize_rows(rows)` to validate model instances before creating
-a frame. It returns `list[dict[str, Any]]`: dataclass rows become dictionaries through
-`dataclasses.asdict()`, and Pydantic rows through `model_dump(mode="python")`.
-Nested models are converted to dictionaries as well.
+a frame. It returns `list[dict[str, Any]]`: `JoineryModel` rows use their column names,
+including names configured with `column(name=...)`. Dataclass rows use their field names,
+and Pydantic rows use `model_dump(mode="python")`. Nested models are converted to
+dictionaries as well.
 
 The four coercion modes have distinct promises:
 

@@ -1,16 +1,15 @@
-from dataclasses import dataclass
 from types import GenericAlias
 from typing import Annotated, Literal
 
 import polars as pl
 import pytest
 
+from data_joinery import Column, JoineryModel
 from data_joinery.backends.polars.types import _get_polars_field_type
 
 
-@dataclass
-class Nested:
-    value: int
+class Nested(JoineryModel):
+    value: Column[int]
 
 
 @pytest.mark.parametrize(

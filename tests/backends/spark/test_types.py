@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Optional
 import pytest
 from pyspark.sql import types
 
+from data_joinery import Column, JoineryModel
 from data_joinery.backends.spark import types as spark_types
 
 
@@ -53,11 +54,8 @@ def test_get_spark_field_type_raises_value_error_for_mixed_literal_types():
 
 
 def test_get_spark_field_type_maps_nested_optional_models():
-    from dataclasses import dataclass
-
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
     expected = types.ArrayType(
         types.StructType([types.StructField("value", types.LongType(), True)]), True

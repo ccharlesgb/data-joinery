@@ -1,39 +1,34 @@
 import traceback
-from dataclasses import dataclass
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Schema, SchemaCoercionError
+from data_joinery import Column, JoineryModel, Schema, SchemaCoercionError
 
 
-@dataclass
-class SubModel:
-    subfield1: str
-    subfield2: str
+class SubModel(JoineryModel):
+    subfield1: Column[str]
+    subfield2: Column[str]
 
 
-@dataclass
-class Model:
-    field1: str
-    field2: str
-    sub_schema: SubModel
+class Model(JoineryModel):
+    field1: Column[str]
+    field2: Column[str]
+    sub_schema: Column[SubModel]
 
 
 schema = Schema(Model)
 
 
-@dataclass
-class SubModelWithExtraField:
-    subfield1: str
-    subfield2: str
-    extra_field: str
+class SubModelWithExtraField(JoineryModel):
+    subfield1: Column[str]
+    subfield2: Column[str]
+    extra_field: Column[str]
 
 
-@dataclass
-class ModelWithExtraStructField:
-    field1: str
-    field2: str
-    sub_schema: SubModelWithExtraField
+class ModelWithExtraStructField(JoineryModel):
+    field1: Column[str]
+    field2: Column[str]
+    sub_schema: Column[SubModelWithExtraField]
 
 
 input_schema = Schema(ModelWithExtraStructField)

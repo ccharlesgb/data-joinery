@@ -1,6 +1,6 @@
 ---
 name: data-joinery-schemas
-description: Define and use Data Joinery schemas with dataclasses or Pydantic models, including nested fields, backend type overrides, DataFrame fixtures, and coercion modes. Use for schema/model and test-data tasks, not transform graphs.
+description: Define and use Data Joinery schemas with JoineryModel, including column names, nested fields, backend type overrides, DataFrame fixtures, and coercion modes. Use for schema/model and test-data tasks, not transform graphs.
 ---
 
 # Data Joinery Schemas
@@ -10,28 +10,35 @@ Schemas can be used independently of transforms and pipelines.
 
 ## Define a Model
 
-Use either a Python dataclass or a Pydantic `BaseModel`:
+Prefer `JoineryModel` with each field annotated as `Column[T]`, where `T` is the Python value type.
+No `@dataclass` decorator is needed:
 
 ```python
-from dataclasses import dataclass
-
-from data_joinery import Schema
+from data_joinery import Column, JoineryModel, Schema, column
 
 
-@dataclass
-class Customer:
-    customer_id: str
-    name: str
-    is_active: bool
+class Customer(JoineryModel):
+    """Columns describing a customer."""
+
+    customer_id: Column[str]
+    name: Column[str]
+    is_active: Column[bool]
 
 
 customer_schema = Schema(Customer)
 ```
 
-Nested dataclasses or Pydantic models become struct fields. Collections such as
-`list[Employee]` become nested collection fields. If dataclass inheritance is useful, prefer
-`@dataclass(kw_only=True)` for base and derived models so inherited field ordering does not make
-construction fragile.
+Class attributes such as `Customer.customer_id` return column names for DataFrame expressions;
+instance attributes hold row values. Constructors require keyword arguments. Use
+`column(name="Display Name")` to override a column name while keeping the Python attribute name
+as the constructor argument. Configure defaults with `column(default=...)` or
+`column(default_factory=...)`.
+
+Nested models become struct fields. Use `Column[Employee]` for a nested model and
+`Column[list[Employee]]` for a list of nested models.
+
+Dataclasses and Pydantic models are also supported. For dataclass inheritance, prefer
+`@dataclass(kw_only=True)` for base and derived models to avoid field-ordering issues.
 
 Pydantic constraints and validators can document models and produce valid model instances, but
 Data Joinery enforces field data types only. It does not apply Pydantic field validation to
@@ -63,9 +70,10 @@ import polars as pl
 from pyspark.sql.types import ShortType
 
 
-@dataclass
-class Measurement:
-    value: Annotated[int, ShortType(), pl.Int16]
+class Measurement(JoineryModel):
+    """A measurement with backend-specific integer types."""
+
+    value: Column[Annotated[int, ShortType(), pl.Int16]]
 ```
 
 Do not assume equivalent widths exist across backends. Crossing backends can overflow or lose
@@ -82,7 +90,10 @@ Use model instances as concise, typed test rows and pass the desired DataFrame c
 ```python
 from pyspark.sql import DataFrame
 
-rows = [Customer("1", "Alice", True), Customer("2", "Bob", False)]
+rows = [
+    Customer(customer_id="1", name="Alice", is_active=True),
+    Customer(customer_id="2", name="Bob", is_active=False),
+]
 customers = customer_schema.create_dataframe(rows, DataFrame, session=spark)
 ```
 

@@ -8,7 +8,7 @@ description: Orient work that uses Data Joinery and route schema, transformation
 Data Joinery is a schema-first framework for testable DataFrame transformations. It supports
 PySpark and Polars and can be used in three independent layers:
 
-1. `Schema(Model)` turns a dataclass or Pydantic model into a backend schema, creates fixture
+1. `Schema(Model)` turns a `JoineryModel` class into a backend schema, creates fixture
    DataFrames, and coerces existing DataFrames.
 2. `@transform` gives DataFrame parameters and return values runtime schema contracts.
 3. `Pipeline` connects transforms into a validated directed graph and injects typed context.
@@ -41,8 +41,8 @@ skills.
 
 ## Core vocabulary
 
-- A **model** is a dataclass or Pydantic model describing logical fields independently of the
-  DataFrame backend.
+- A **model** is a `JoineryModel` class describing logical fields independently of the
+  DataFrame backend. Dataclasses and Pydantic models are also supported.
 - A **schema** is `Schema(Model)`, which compiles the model for a selected backend.
 - A **contract** is metadata such as `Strict(Model)` or `Project(Model)` on an `Annotated`
   DataFrame type.

@@ -1,17 +1,15 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import pytest
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Context, Pipeline, Project, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Project, transform
 from data_joinery.backends.spark import SparkContext
 
 
-@dataclass
-class Observation:
-    value: int
+class Observation(JoineryModel):
+    value: Column[int]
 
 
 class Model:
@@ -44,7 +42,9 @@ def predict(
     observations: Annotated[DataFrame, Project(Observation)],
     model: Model,
 ) -> Annotated[DataFrame, Project(Observation)]:
-    predictions = [(model.predict(row.value),) for row in observations.collect()]
+    predictions = [
+        (model.predict(row[Observation.value]),) for row in observations.collect()
+    ]
     return spark.createDataFrame(
         predictions,
         "value BIGINT",

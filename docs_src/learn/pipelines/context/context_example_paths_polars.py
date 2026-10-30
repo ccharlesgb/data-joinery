@@ -4,17 +4,15 @@ from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
 
 
-@dataclass
-class A:
-    a: str
+class A(JoineryModel):
+    a: Column[str]
 
 
-@dataclass
-class B:
-    b: str
+class B(JoineryModel):
+    b: Column[str]
 
 
 @dataclass
@@ -32,14 +30,14 @@ class PipelineDependencies:
 def read_data(
     path_config: Annotated[PathConfig, Context()],
 ) -> Annotated[pl.LazyFrame, Strict(A)]:
-    return pl.scan_csv(path_config.input_path, schema_overrides={"a": pl.String})
+    return pl.scan_csv(path_config.input_path, schema_overrides={A.a: pl.String})
 
 
 @transform
 def transform_data(
     a: Annotated[pl.LazyFrame, Strict(A)],
 ) -> Annotated[pl.LazyFrame, Strict(B)]:
-    return a.rename({"a": "b"})
+    return a.rename({A.a: B.b})
 
 
 @transform

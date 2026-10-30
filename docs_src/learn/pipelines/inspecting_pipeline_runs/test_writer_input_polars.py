@@ -1,20 +1,18 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from data_joinery import Pipeline, Project, transform
+from data_joinery import Column, JoineryModel, Pipeline, Project, transform
 
 
-@dataclass
-class Order:
-    order_id: int
+class Order(JoineryModel):
+    order_id: Column[int]
 
 
 @transform
 def read_orders() -> Annotated[pl.LazyFrame, Project(Order)]:
-    return pl.LazyFrame({"order_id": [1, 2]})
+    return pl.LazyFrame({Order.order_id: [1, 2]})
 
 
 @transform
@@ -30,5 +28,5 @@ def test_writer_input():
 
     result = pipeline.run()
     actual = result.get_one_input(write, pl.LazyFrame)
-    expected = pl.LazyFrame({"order_id": [1, 2]})
+    expected = pl.LazyFrame({Order.order_id: [1, 2]})
     assert_frame_equal(actual.collect(), expected.collect())

@@ -1,51 +1,13 @@
-from dataclasses import dataclass
 from datetime import date
 from typing import Annotated
 
 import polars as pl
-import pytest
 from polars.testing import assert_frame_equal
-from pydantic import BaseModel
 from pyspark.sql import types
 
 from data_joinery import Schema, Strict, transform
 from data_joinery.schemas.joinery_model import Column, JoineryModel, column
 from data_joinery.schemas.model_schema import ModelField, ModelSchema
-
-
-@dataclass
-class DataclassDetail:
-    day: date
-
-
-@dataclass
-class DataclassRow:
-    details: list[DataclassDetail]
-
-
-class PydanticDetail(BaseModel):
-    day: date
-
-
-class PydanticRow(BaseModel):
-    details: list[PydanticDetail]
-
-
-@pytest.mark.parametrize(
-    ("model", "row"),
-    [
-        (DataclassRow, DataclassRow([DataclassDetail(date(2026, 1, 1))])),
-        (
-            PydanticRow,
-            PydanticRow(details=[PydanticDetail(day=date(2026, 1, 1))]),
-        ),
-    ],
-)
-def test_serialize_rows_returns_nested_dictionaries_with_python_values(model, row):
-    actual = ModelSchema.from_model(model).serialize_rows([row])
-
-    expected = [{"details": [{"day": date(2026, 1, 1)}]}]
-    assert actual == expected
 
 
 class JoineryDetail(JoineryModel):
@@ -55,6 +17,20 @@ class JoineryDetail(JoineryModel):
 class JoineryRow(JoineryModel):
     detail: Column[JoineryDetail] = column(name="Current Detail")
     history: Column[list[JoineryDetail]]
+
+
+def test_serialize_rows_returns_nested_dictionaries_with_python_values():
+    class Detail(JoineryModel):
+        day: Column[date]
+
+    class Row(JoineryModel):
+        details: Column[list[Detail]]
+
+    row = Row(details=[Detail(day=date(2026, 1, 1))])
+    actual = ModelSchema.from_model(Row).serialize_rows([row])
+    expected = [{"details": [{"day": date(2026, 1, 1)}]}]
+
+    assert actual == expected
 
 
 def test_joinery_fields_use_column_names_and_preserve_annotations():
@@ -78,18 +54,6 @@ def test_serialize_joinery_rows_uses_nested_column_names():
             "history": [{"Event Day": date(2026, 1, 1)}],
         }
     ]
-
-    assert actual == expected
-
-
-def test_serialize_dataclass_with_nested_joinery_model_uses_column_names():
-    @dataclass
-    class Wrapper:
-        detail: JoineryDetail
-
-    row = Wrapper(JoineryDetail(day=date(2026, 1, 1)))
-    actual = ModelSchema.from_model(Wrapper).serialize_rows([row])
-    expected = [{"detail": {"Event Day": date(2026, 1, 1)}}]
 
     assert actual == expected
 

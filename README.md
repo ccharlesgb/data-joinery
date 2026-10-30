@@ -18,34 +18,36 @@ def get_metrics(fact_table: pl.LazyFrame) -> pl.LazyFrame: ...
 ```
 
 From this we have no idea what the inputs or outputs of the transformation are. With Data Joinery you
-can make it much clearer:
+can make it much clearer by defining schemas with `JoineryModel`. Annotate each field with `Column[T]`,
+where `T` is the field's Python type:
 
 ``` python
-from dataclasses import dataclass
 from datetime import date
 from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Strict, transform
+from data_joinery import Column, JoineryModel, Strict, transform
 
 
-@dataclass
-class Customer:
-    snapshot_date: date
-    customer_id: str
-    name: str
-    is_active: bool
-    package: str
+class Customer(JoineryModel):
+    """Input columns for a customer."""
+
+    snapshot_date: Column[date]
+    customer_id: Column[str]
+    name: Column[str]
+    is_active: Column[bool]
+    package: Column[str]
 
 
-@dataclass
-class CustomerMetrics:
-    snapshot_date: date
-    total_customer_count: int
-    active_customer_count: int
-    basic_package_customer_count: int
-    pro_package_customer_count: int
+class CustomerMetrics(JoineryModel):
+    """Customer counts for each snapshot date."""
+
+    snapshot_date: Column[date]
+    total_customer_count: Column[int]
+    active_customer_count: Column[int]
+    basic_package_customer_count: Column[int]
+    pro_package_customer_count: Column[int]
 
 
 @transform

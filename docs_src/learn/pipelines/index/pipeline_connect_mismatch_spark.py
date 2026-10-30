@@ -1,41 +1,37 @@
 import traceback
-from dataclasses import dataclass
 from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
 from data_joinery.backends.spark import SparkContext
 from data_joinery.pipeline import PipelineConnectionError
 
 
-@dataclass
-class A:
-    a: str
+class A(JoineryModel):
+    a: Column[str]
 
 
-@dataclass
-class B:
-    b: str
+class B(JoineryModel):
+    b: Column[str]
 
 
-@dataclass
-class C:
-    c: str
+class C(JoineryModel):
+    c: Column[str]
 
 
 @transform
 def read_data(
     spark: Annotated[SparkSession, Context()],
 ) -> Annotated[DataFrame, Strict(A)]:
-    return spark.createDataFrame([{"a": "value"}])
+    return spark.createDataFrame([{A.a: "value"}])
 
 
 @transform
 def transform_data(
     a: Annotated[DataFrame, Strict(A)],
 ) -> Annotated[DataFrame, Strict(B)]:
-    return a.withColumnRenamed("a", "b")
+    return a.withColumnRenamed(A.a, B.b)
 
 
 @transform

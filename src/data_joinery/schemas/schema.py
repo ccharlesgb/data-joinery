@@ -31,7 +31,7 @@ def _require_backend(
 
 
 class Schema[T]:
-    """Define DataFrame fields from a dataclass or Pydantic model.
+    """Define DataFrame fields from a JoineryModel, dataclass, or Pydantic model.
 
     Args:
         model: Class whose fields define the schema.

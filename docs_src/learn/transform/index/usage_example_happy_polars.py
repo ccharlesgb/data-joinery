@@ -1,44 +1,41 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Schema, Strict, transform
+from data_joinery import Column, JoineryModel, Schema, Strict, transform
 
 
-@dataclass
-class Customer:
-    customer_id: str
-    name: str
-    is_active: bool
+class Customer(JoineryModel):
+    customer_id: Column[str]
+    name: Column[str]
+    is_active: Column[bool]
 
 
-@dataclass
-class CustomerCount:
-    customer_count: int
+class CustomerCount(JoineryModel):
+    customer_count: Column[int]
 
 
 @transform
 def filter_active_customers(
     customers: Annotated[pl.LazyFrame, Strict(Customer)],
 ) -> Annotated[pl.LazyFrame, Strict(Customer)]:
-    return customers.filter(pl.col("is_active"))
+    return customers.filter(pl.col(Customer.is_active))
 
 
 @transform
 def get_customer_count(
     customers: Annotated[pl.LazyFrame, Strict(Customer)],
 ) -> Annotated[pl.LazyFrame, Strict(CustomerCount)]:
-    return customers.select(pl.len().cast(pl.Int64).alias("customer_count"))
+    return customers.select(pl.len().cast(pl.Int64).alias(CustomerCount.customer_count))
 
 
 customer_schema = Schema(Customer)
 
 customers = customer_schema.create_dataframe(
     [
-        Customer("1", "Alice", True),
-        Customer("2", "Bob", False),
-        Customer("3", "Charlie", True),
+        Customer(customer_id="1", name="Alice", is_active=True),
+        Customer(customer_id="2", name="Bob", is_active=False),
+        Customer(customer_id="3", name="Charlie", is_active=True),
     ],
     pl.LazyFrame,
 )

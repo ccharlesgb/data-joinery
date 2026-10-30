@@ -5,7 +5,7 @@ import pytest
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Context, Pipeline, Project, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Project, transform
 
 
 @dataclass(frozen=True)
@@ -20,16 +20,14 @@ class OrderPipelineContext:
     storage: Storage
 
 
-@dataclass
-class Order:
-    order_id: int
-    amount: int
+class Order(JoineryModel):
+    order_id: Column[int]
+    amount: Column[int]
 
 
-@dataclass
-class OrderTotal:
-    order_id: int
-    total: int
+class OrderTotal(JoineryModel):
+    order_id: Column[int]
+    total: Column[int]
 
 
 @transform
@@ -44,7 +42,9 @@ def read_orders(
 def calculate_totals(
     orders: Annotated[DataFrame, Project(Order)],
 ) -> Annotated[DataFrame, Project(OrderTotal)]:
-    return orders.selectExpr("order_id", "amount * 2 AS total")
+    return orders.select(
+        Order.order_id, (orders[Order.amount] * 2).alias(OrderTotal.total)
+    )
 
 
 @transform

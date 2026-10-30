@@ -3,14 +3,13 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
 from data_joinery.backends.spark import SparkContext
 
 
-@dataclass
-class InputDataset:
-    a: str
-    b: str
+class InputDataset(JoineryModel):
+    a: Column[str]
+    b: Column[str]
 
 
 @dataclass
@@ -25,10 +24,10 @@ def read_data(
 ) -> Annotated[DataFrame, Strict(InputDataset)]:
     return spark.createDataFrame(
         [
-            InputDataset("a1", "b1"),
-            InputDataset("a2", "b2"),
-            InputDataset("a3", "b2"),
-            InputDataset("a4", "b2"),
+            InputDataset(a="a1", b="b1"),
+            InputDataset(a="a2", b="b2"),
+            InputDataset(a="a3", b="b2"),
+            InputDataset(a="a4", b="b2"),
         ]
     )
 
@@ -37,8 +36,8 @@ def read_data(
 def collect_stats(
     input: Annotated[DataFrame, Strict(InputDataset)],
 ) -> CollectedStats:
-    distinct_a = input.select("a").distinct().count()
-    distinct_b = input.select("b").distinct().count()
+    distinct_a = input.select(InputDataset.a).distinct().count()
+    distinct_b = input.select(InputDataset.b).distinct().count()
     return CollectedStats(distinct_a=distinct_a, distinct_b=distinct_b)
 
 

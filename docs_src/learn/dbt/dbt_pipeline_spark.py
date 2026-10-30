@@ -3,28 +3,31 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, Project, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Project, transform
 from data_joinery.backends.spark import SparkContext
 from data_joinery.dbt import Dbt
 
 
-@dataclass
-class Order:
-    customer_id: int
-    amount: float
+class Order(JoineryModel):
+    """Input columns for an order."""
+
+    customer_id: Column[int]
+    amount: Column[float]
 
 
-@dataclass
-class Customer:
-    customer_id: int
-    name: str
+class Customer(JoineryModel):
+    """Input columns for a customer."""
+
+    customer_id: Column[int]
+    name: Column[str]
 
 
-@dataclass
-class EnrichedOrder:
-    customer_id: int
-    amount: float
-    name: str
+class EnrichedOrder(JoineryModel):
+    """Order columns enriched with the customer name."""
+
+    customer_id: Column[int]
+    amount: Column[float]
+    name: Column[str]
 
 
 @dataclass(frozen=True)
@@ -51,7 +54,9 @@ def enrich_orders(
     orders: Annotated[DataFrame, Project(Order)],
     customers: Annotated[DataFrame, Project(Customer)],
 ) -> Annotated[DataFrame, Project(EnrichedOrder)]:
-    return orders.join(customers, "customer_id").select("customer_id", "amount", "name")
+    return orders.join(customers, Order.customer_id).select(
+        EnrichedOrder.customer_id, EnrichedOrder.amount, EnrichedOrder.name
+    )
 
 
 def build_pipeline() -> Pipeline[PipelineContext]:

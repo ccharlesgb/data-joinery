@@ -3,13 +3,12 @@ from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Pipeline, Strict, transform
+from data_joinery import Column, JoineryModel, Pipeline, Strict, transform
 
 
-@dataclass
-class InputDataset:
-    a: str
-    b: str
+class InputDataset(JoineryModel):
+    a: Column[str]
+    b: Column[str]
 
 
 @dataclass
@@ -22,10 +21,10 @@ class CollectedStats:
 def read_data() -> Annotated[pl.LazyFrame, Strict(InputDataset)]:
     return pl.LazyFrame(
         [
-            InputDataset("a1", "b1"),
-            InputDataset("a2", "b2"),
-            InputDataset("a3", "b2"),
-            InputDataset("a4", "b2"),
+            InputDataset(a="a1", b="b1"),
+            InputDataset(a="a2", b="b2"),
+            InputDataset(a="a3", b="b2"),
+            InputDataset(a="a4", b="b2"),
         ]
     )
 
@@ -34,8 +33,8 @@ def read_data() -> Annotated[pl.LazyFrame, Strict(InputDataset)]:
 def collect_stats(
     input: Annotated[pl.LazyFrame, Strict(InputDataset)],
 ) -> CollectedStats:
-    distinct_a = input.select("a").unique().collect().height
-    distinct_b = input.select("b").unique().collect().height
+    distinct_a = input.select(InputDataset.a).unique().collect().height
+    distinct_b = input.select(InputDataset.b).unique().collect().height
     return CollectedStats(distinct_a=distinct_a, distinct_b=distinct_b)
 
 

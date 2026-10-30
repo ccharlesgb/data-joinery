@@ -1,15 +1,13 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from data_joinery import Pipeline, Project, transform
+from data_joinery import Column, JoineryModel, Pipeline, Project, transform
 
 
-@dataclass
-class Observation:
-    value: int
+class Observation(JoineryModel):
+    value: Column[int]
 
 
 class Model:
@@ -24,7 +22,7 @@ class DummyModel(Model):
 
 @transform
 def read_observations() -> Annotated[pl.LazyFrame, Project(Observation)]:
-    return pl.LazyFrame({"value": [1, 2]})
+    return pl.LazyFrame({Observation.value: [1, 2]})
 
 
 @transform
@@ -40,7 +38,7 @@ def predict(
     model: Model,
 ) -> Annotated[pl.LazyFrame, Project(Observation)]:
     return observations.select(
-        pl.col("value").map_elements(model.predict, return_dtype=pl.Int64)
+        pl.col(Observation.value).map_elements(model.predict, return_dtype=pl.Int64)
     )
 
 
@@ -66,5 +64,5 @@ def test_model_pipeline_with_dummy_training():
     )
 
     predicted = result.get_output("predict", pl.LazyFrame)
-    expected = pl.LazyFrame({"value": [2, 4]})
+    expected = pl.LazyFrame({Observation.value: [2, 4]})
     assert_frame_equal(predicted.collect(), expected.collect())

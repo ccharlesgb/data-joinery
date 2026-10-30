@@ -18,14 +18,16 @@ from .pipeline_result import (
     PipelineResult,
     StepInvocation,
 )
-from .schemas import Schema, SchemaCoercionError
+from .schemas import Column, JoineryModel, Schema, SchemaCoercionError, column
 from .transform import side_effect, transform
 
 __all__ = [
     "BoundInput",
+    "Column",
     "Context",
     "ContextSource",
     "DefaultSource",
+    "JoineryModel",
     "Pipeline",
     "PipelineExecutionError",
     "PipelineOverrideError",
@@ -38,6 +40,7 @@ __all__ = [
     "Step",
     "StepInvocation",
     "Strict",
+    "column",
     "side_effect",
     "transform",
 ]

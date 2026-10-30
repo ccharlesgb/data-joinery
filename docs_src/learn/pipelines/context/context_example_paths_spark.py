@@ -4,17 +4,15 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
 
 
-@dataclass
-class A:
-    a: str
+class A(JoineryModel):
+    a: Column[str]
 
 
-@dataclass
-class B:
-    b: str
+class B(JoineryModel):
+    b: Column[str]
 
 
 @dataclass
@@ -41,7 +39,7 @@ def read_data(
 def transform_data(
     a: Annotated[DataFrame, Strict(A)],
 ) -> Annotated[DataFrame, Strict(B)]:
-    return a.withColumnRenamed("a", "b")
+    return a.withColumnRenamed(A.a, B.b)
 
 
 @transform

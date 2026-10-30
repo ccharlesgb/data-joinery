@@ -1,31 +1,28 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Pipeline, Strict, transform
+from data_joinery import Column, JoineryModel, Pipeline, Strict, transform
 
 
-@dataclass
-class A:
-    a: str
+class A(JoineryModel):
+    a: Column[str]
 
 
-@dataclass
-class B:
-    b: str
+class B(JoineryModel):
+    b: Column[str]
 
 
 @transform
 def read_data() -> Annotated[pl.LazyFrame, Strict(A)]:
-    return pl.LazyFrame({"a": ["value"]})
+    return pl.LazyFrame({A.a: ["value"]})
 
 
 @transform
 def transform_data(
     a: Annotated[pl.LazyFrame, Strict(A)],
 ) -> Annotated[pl.LazyFrame, Strict(B)]:
-    return a.rename({"a": "b"})
+    return a.rename({A.a: B.b})
 
 
 @transform

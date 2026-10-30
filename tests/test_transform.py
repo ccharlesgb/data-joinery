@@ -6,6 +6,8 @@ import pytest
 from pyspark.sql import DataFrame, SparkSession, types
 
 from data_joinery import (
+    Column,
+    JoineryModel,
     Project,
     ProjectCast,
     Schema,
@@ -23,9 +25,8 @@ from data_joinery.transform import (
 )
 
 
-@dataclass
-class Order:
-    order_id: int
+class Order(JoineryModel):
+    order_id: Column[int]
 
 
 @dataclass(frozen=True)
@@ -85,14 +86,12 @@ def test_inspect_transform_collects_spark_as_context_parameter():
 
 
 def test_transform_accepts_matching_input_and_output_schemas(spark: SparkSession):
-    @dataclass
-    class InputRow:
-        field1: int
-        field2: str
+    class InputRow(JoineryModel):
+        field1: Column[int]
+        field2: Column[str]
 
-    @dataclass
-    class OutputRow:
-        field1: int
+    class OutputRow(JoineryModel):
+        field1: Column[int]
 
     input_schema = Schema(InputRow).native_schema(types.StructType)
     output_schema = Schema(OutputRow).native_schema(types.StructType)
@@ -109,9 +108,8 @@ def test_transform_accepts_matching_input_and_output_schemas(spark: SparkSession
 
 
 def test_transform_retains_inspected_specification():
-    @dataclass
-    class InputRow:
-        field1: int
+    class InputRow(JoineryModel):
+        field1: Column[int]
 
     @transform
     def my_function(input1: Annotated[DataFrame, Project(InputRow)]):
@@ -280,10 +278,9 @@ def test_transform_validates_returned_instances_through_contract_interface():
 
 
 def test_transform_raises_for_input_schema_mismatch(spark: SparkSession):
-    @dataclass
-    class InputRow:
-        field1: int
-        field2: str
+    class InputRow(JoineryModel):
+        field1: Column[int]
+        field2: Column[str]
 
     bad_input_df = spark.createDataFrame(
         [(1,)],
@@ -303,17 +300,15 @@ def test_transform_raises_for_input_schema_mismatch(spark: SparkSession):
 
 
 def test_transform_raises_for_output_schema_mismatch(spark: SparkSession):
-    @dataclass
-    class InputRow:
-        field1: int
-        field2: str
+    class InputRow(JoineryModel):
+        field1: Column[int]
+        field2: Column[str]
 
-    @dataclass
-    class OutputRow:
-        field1: int
+    class OutputRow(JoineryModel):
+        field1: Column[int]
 
     input_df = Schema(InputRow).create_dataframe(
-        [InputRow(1, "a")], DataFrame, session=spark
+        [InputRow(field1=1, field2="a")], DataFrame, session=spark
     )
 
     @transform
@@ -331,16 +326,14 @@ def test_transform_raises_for_output_schema_mismatch(spark: SparkSession):
 
 
 def test_transform_can_disable_output_validation(spark: SparkSession):
-    @dataclass
-    class InputRow:
-        field1: int
+    class InputRow(JoineryModel):
+        field1: Column[int]
 
-    @dataclass
-    class OutputRow:
-        field1: int
+    class OutputRow(JoineryModel):
+        field1: Column[int]
 
     input_df = Schema(InputRow).create_dataframe(
-        [InputRow(1)], DataFrame, session=spark
+        [InputRow(field1=1)], DataFrame, session=spark
     )
 
     @transform
@@ -355,17 +348,15 @@ def test_transform_can_disable_output_validation(spark: SparkSession):
 def test_transform_project_drops_extra_output_columns(
     spark: SparkSession,
 ):
-    @dataclass
-    class InputRow:
-        field1: int
-        field2: str
+    class InputRow(JoineryModel):
+        field1: Column[int]
+        field2: Column[str]
 
-    @dataclass
-    class OutputRow:
-        field1: int
+    class OutputRow(JoineryModel):
+        field1: Column[int]
 
     input_df = Schema(InputRow).create_dataframe(
-        [InputRow(1, "a")], DataFrame, session=spark
+        [InputRow(field1=1, field2="a")], DataFrame, session=spark
     )
 
     @transform
@@ -379,9 +370,8 @@ def test_transform_project_drops_extra_output_columns(
 
 
 def test_transform_strict_makes_input_nullable(spark: SparkSession):
-    @dataclass
-    class InputRow:
-        field1: int
+    class InputRow(JoineryModel):
+        field1: Column[int]
 
     bad_input_df = spark.createDataFrame(
         [(1,)],
@@ -397,9 +387,8 @@ def test_transform_strict_makes_input_nullable(spark: SparkSession):
 
 
 def test_transform_project_cast_mode_casts_input_dataframe(spark: SparkSession):
-    @dataclass
-    class InputRow:
-        field1: int
+    class InputRow(JoineryModel):
+        field1: Column[int]
 
     input_df = spark.createDataFrame(
         [(1.9,)],

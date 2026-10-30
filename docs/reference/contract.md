@@ -1,8 +1,8 @@
 # Contracts
 
 Use these helpers in `Annotated` DataFrame parameters and return types to
-choose how a transform checks a schema. Each helper takes a dataclass or
-Pydantic model.
+choose how a transform checks a schema. Each helper takes a `JoineryModel` class.
+Dataclasses and Pydantic models are also supported.
 
 ::: data_joinery.contract.Strict
 

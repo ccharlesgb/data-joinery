@@ -5,12 +5,11 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Context, Pipeline, Strict, transform
+from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
 
 
-@dataclass
-class A:
-    snapshot_date: str
+class A(JoineryModel):
+    snapshot_date: Column[str]
 
 
 class RunDate(date):

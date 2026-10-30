@@ -1,15 +1,20 @@
 import datetime
 import decimal
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
-from pydantic import BaseModel
 
-from data_joinery import Project, Schema, SchemaCoercionError, transform
+from data_joinery import (
+    Column,
+    JoineryModel,
+    Project,
+    Schema,
+    SchemaCoercionError,
+    transform,
+)
 from data_joinery.backends import backend_for_frame_type, get_backend
 
 
@@ -25,26 +30,24 @@ def test_polars_backend_is_registered_for_lazyframes():
 
 
 def test_compile_schema_maps_model_types_to_polars_types():
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
-    @dataclass
-    class Row:
-        integer: int
-        text: str
-        number: float
-        flag: bool
-        timestamp: datetime.datetime
-        day: datetime.date
-        duration: datetime.timedelta
-        amount: decimal.Decimal
-        payload: bytes
-        optional: int | None
-        literal: Literal["a", "b"]
-        overridden: Annotated[int, pl.UInt32]
-        nested: Nested
-        items: list[Nested]
+    class Row(JoineryModel):
+        integer: Column[int]
+        text: Column[str]
+        number: Column[float]
+        flag: Column[bool]
+        timestamp: Column[datetime.datetime]
+        day: Column[datetime.date]
+        duration: Column[datetime.timedelta]
+        amount: Column[decimal.Decimal]
+        payload: Column[bytes]
+        optional: Column[int | None]
+        literal: Column[Literal["a", "b"]]
+        overridden: Column[Annotated[int, pl.UInt32]]
+        nested: Column[Nested]
+        items: Column[list[Nested]]
 
     assert Schema(Row).native_schema(pl.Schema) == pl.Schema(
         {
@@ -66,19 +69,18 @@ def test_compile_schema_maps_model_types_to_polars_types():
     )
 
 
-def test_create_dataframe_serializes_dataclass_rows():
-    @dataclass
-    class Nested:
-        value: str
+def test_create_dataframe_serializes_model_rows():
+    class Nested(JoineryModel):
+        value: Column[str]
 
-    @dataclass
-    class Row:
-        row_id: int
-        nested: Nested
-        items: list[Nested]
+    class Row(JoineryModel):
+        row_id: Column[int]
+        nested: Column[Nested]
+        items: Column[list[Nested]]
 
     result = Schema(Row).create_dataframe(
-        [Row(1, Nested("a"), [Nested("b")])], pl.DataFrame
+        [Row(row_id=1, nested=Nested(value="a"), items=[Nested(value="b")])],
+        pl.DataFrame,
     )
 
     expected = pl.DataFrame(
@@ -93,31 +95,18 @@ def test_create_dataframe_serializes_dataclass_rows():
     assert_frame_equal(result, expected)
 
 
-def test_create_dataframe_serializes_pydantic_rows():
-    class Row(BaseModel):
-        row_id: int
-        label: str
-
-    result = Schema(Row).create_dataframe([Row(row_id=1, label="a")], pl.DataFrame)
-
-    assert isinstance(result, pl.DataFrame)
-    assert_frame_equal(result, pl.DataFrame({"row_id": [1], "label": ["a"]}))
-
-
 def test_create_dataframe_rejects_backend_options():
-    @dataclass
-    class Row:
-        row_id: int
+    class Row(JoineryModel):
+        row_id: Column[int]
 
     with pytest.raises(TypeError, match="Unexpected Polars dataframe options: context"):
-        Schema(Row).create_dataframe([Row(1)], pl.DataFrame, context=object())
+        Schema(Row).create_dataframe([Row(row_id=1)], pl.DataFrame, context=object())
 
 
 def test_strict_accepts_reordered_columns_and_preserves_source_order():
-    @dataclass
-    class Row:
-        first: int
-        second: str
+    class Row(JoineryModel):
+        first: Column[int]
+        second: Column[str]
 
     dataframe = pl.DataFrame({"second": ["a"], "first": [1]})
 
@@ -128,10 +117,9 @@ def test_strict_accepts_reordered_columns_and_preserves_source_order():
 
 
 def test_strict_reports_all_schema_differences():
-    @dataclass
-    class Row:
-        value: int
-        required: str
+    class Row(JoineryModel):
+        value: Column[int]
+        required: Column[str]
 
     dataframe = pl.DataFrame({"value": ["wrong"], "extra": [1]})
 
@@ -146,14 +134,12 @@ def test_strict_reports_all_schema_differences():
 
 
 def test_project_top_level_selects_columns_without_projecting_nested_fields():
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
-    @dataclass
-    class Row:
-        row_id: int
-        nested: Nested
+    class Row(JoineryModel):
+        row_id: Column[int]
+        nested: Column[Nested]
 
     dataframe = pl.DataFrame(
         {
@@ -175,13 +161,11 @@ def test_project_top_level_selects_columns_without_projecting_nested_fields():
 
 
 def test_project_top_level_rejects_nested_schema_differences():
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
-    @dataclass
-    class Row:
-        nested: Nested
+    class Row(JoineryModel):
+        nested: Column[Nested]
 
     dataframe = pl.DataFrame(
         {"nested": [{"value": 2, "nested_extra": "reject"}]},
@@ -197,14 +181,12 @@ def test_project_top_level_rejects_nested_schema_differences():
 
 
 def test_project_recursively_projects_structs_and_lists_of_structs():
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
-    @dataclass
-    class Row:
-        nested: Nested
-        items: list[Nested]
+    class Row(JoineryModel):
+        nested: Column[Nested]
+        items: Column[list[Nested]]
 
     source_struct = pl.Struct({"extra": pl.String, "value": pl.Int64})
     dataframe = pl.DataFrame(
@@ -232,9 +214,8 @@ def test_project_recursively_projects_structs_and_lists_of_structs():
 
 
 def test_project_rejects_type_mismatches():
-    @dataclass
-    class Row:
-        value: int
+    class Row(JoineryModel):
+        value: Column[int]
 
     with pytest.raises(SchemaCoercionError) as caught:
         Schema(Row).coerce_dataframe(pl.DataFrame({"value": ["1"]}), "project")
@@ -245,14 +226,12 @@ def test_project_rejects_type_mismatches():
 
 
 def test_project_cast_casts_nested_structs_and_lists_of_structs():
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
-    @dataclass
-    class Row:
-        nested: Nested
-        items: list[Nested]
+    class Row(JoineryModel):
+        nested: Column[Nested]
+        items: Column[list[Nested]]
 
     source_struct = pl.Struct({"value": pl.String})
     dataframe = pl.DataFrame(
@@ -275,9 +254,8 @@ def test_project_cast_casts_nested_structs_and_lists_of_structs():
 
 
 def test_project_cast_translates_data_dependent_cast_failures():
-    @dataclass
-    class Row:
-        value: int
+    class Row(JoineryModel):
+        value: Column[int]
 
     dataframe = pl.DataFrame({"value": ["not-an-integer"]})
 
@@ -290,19 +268,18 @@ def test_project_cast_translates_data_dependent_cast_failures():
     ]
 
 
-@dataclass
-class LazyRow:
-    value: int
+class LazyRow(JoineryModel):
+    value: Column[int]
 
 
 def test_create_lazyframe_returns_requested_type():
-    result = Schema(LazyRow).create_dataframe([LazyRow(1)], pl.LazyFrame)
+    result = Schema(LazyRow).create_dataframe([LazyRow(value=1)], pl.LazyFrame)
 
     assert isinstance(result, pl.LazyFrame)
 
 
 def test_create_lazyframe_serializes_model_rows():
-    result = Schema(LazyRow).create_dataframe([LazyRow(1)], pl.LazyFrame)
+    result = Schema(LazyRow).create_dataframe([LazyRow(value=1)], pl.LazyFrame)
     expected = pl.DataFrame({"value": [1]})
 
     assert_frame_equal(result.collect(), expected)
@@ -353,14 +330,12 @@ def test_lazy_project_accepts_a_file_scan(tmp_path: Path):
 
 
 def test_lazy_project_prunes_nested_structs_and_lists():
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
-    @dataclass
-    class Row:
-        nested: Nested
-        items: list[Nested]
+    class Row(JoineryModel):
+        nested: Column[Nested]
+        items: Column[list[Nested]]
 
     source_struct = pl.Struct({"extra": pl.String, "value": pl.Int64})
     dataframe = pl.DataFrame(
@@ -394,14 +369,12 @@ def test_lazy_project_rejects_missing_column_before_execution():
 
 
 def test_lazy_project_cast_casts_nested_structs_and_lists():
-    @dataclass
-    class Nested:
-        value: int
+    class Nested(JoineryModel):
+        value: Column[int]
 
-    @dataclass
-    class Row:
-        nested: Nested
-        items: list[Nested]
+    class Row(JoineryModel):
+        nested: Column[Nested]
+        items: Column[list[Nested]]
 
     source_struct = pl.Struct({"value": pl.String})
     dataframe = pl.DataFrame(

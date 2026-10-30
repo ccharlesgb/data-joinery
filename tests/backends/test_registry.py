@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 import pytest
 
-from data_joinery import Project, Schema, Strict, transform
+from data_joinery import Column, JoineryModel, Project, Schema, Strict, transform
 from data_joinery.backends import (
     DataFrameBackend,
     backend_for_frame_type,
@@ -65,9 +65,8 @@ FAKE_BACKEND = FakeBackend()
 register_backend(FAKE_BACKEND)
 
 
-@dataclass
-class Order:
-    order_id: int
+class Order(JoineryModel):
+    order_id: Column[int]
 
 
 def test_schema_compiles_with_a_registered_backend():
@@ -79,7 +78,7 @@ def test_schema_compiles_with_a_registered_backend():
 def test_schema_creates_a_registered_dataframe_type():
     schema = Schema(Order)
 
-    assert schema.create_dataframe([Order(1)], FakeDataFrame) == FakeDataFrame(
+    assert schema.create_dataframe([Order(order_id=1)], FakeDataFrame) == FakeDataFrame(
         ("order_id",)
     )
 
@@ -95,7 +94,10 @@ def test_backend_is_discovered_from_its_second_dataframe_type():
 def test_schema_creates_the_requested_second_dataframe_type():
     expected = OtherFakeDataFrame(("order_id",))
 
-    assert Schema(Order).create_dataframe([Order(1)], OtherFakeDataFrame) == expected
+    assert (
+        Schema(Order).create_dataframe([Order(order_id=1)], OtherFakeDataFrame)
+        == expected
+    )
 
 
 def test_unbound_contract_accepts_the_second_dataframe_type():

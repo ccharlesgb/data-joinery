@@ -16,18 +16,19 @@ def get_metrics(fact_table: DataFrame) -> DataFrame:
 ```
 
 From this we have no idea what the inputs or outputs of the transformation are. With Data Joinery you
-can make it much clearer:
+can make it much clearer by defining schemas with `JoineryModel`. Annotate each field with `Column[T]`,
+where `T` is the field's Python type:
 
 === "Polars"
 
     ``` python
-    --8<-- "docs_src/index/intro_polars.py:5:"
+    --8<-- "docs_src/index/intro_polars.py"
     ```
 
 === "PySpark"
 
     ``` python
-    --8<-- "docs_src/index/intro_spark.py:5:"
+    --8<-- "docs_src/index/intro_spark.py"
     ```
 
 Using a schema first approach makes it much clearer what this transformation does, for

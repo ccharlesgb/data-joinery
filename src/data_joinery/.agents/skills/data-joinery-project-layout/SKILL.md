@@ -84,7 +84,7 @@ Marker types let data-joinery resolve dependencies by meaning rather than treati
 ### `schemas.py`
 
 Define the logical records exchanged by transforms.
-Prefer focused dataclasses whose fields describe the expected columns and Python value types. Create separate schemas for materially different stages, such as source records, enriched records, features, predictions, or metrics.
+Prefer focused `JoineryModel` classes whose `Column[T]` fields describe the expected columns and Python value types. Create separate schemas for materially different stages, such as source records, enriched records, features, predictions, or metrics.
 Schema inheritance is appropriate when an output genuinely extends an input record. Do not force inheritance when the records represent different concepts.
 Keep transformation logic and runtime configuration out of this module.
 ### `transform.py`

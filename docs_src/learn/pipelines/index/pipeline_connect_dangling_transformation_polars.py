@@ -1,27 +1,31 @@
 import traceback
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
 
-from data_joinery import Pipeline, PipelineExecutionError, Strict, transform
+from data_joinery import (
+    Column,
+    JoineryModel,
+    Pipeline,
+    PipelineExecutionError,
+    Strict,
+    transform,
+)
 
 
-@dataclass
-class A:
-    a: str
+class A(JoineryModel):
+    a: Column[str]
 
 
-@dataclass
-class B:
-    b: str
+class B(JoineryModel):
+    b: Column[str]
 
 
 @transform
 def transform_data(
     a: Annotated[pl.LazyFrame, Strict(A)],
 ) -> Annotated[pl.LazyFrame, Strict(B)]:
-    return a.rename({"a": "b"})
+    return a.rename({A.a: B.b})
 
 
 @transform
