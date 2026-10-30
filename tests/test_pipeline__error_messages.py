@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Annotated
 
 import polars as pl
@@ -6,7 +5,9 @@ import pytest
 
 from data_joinery import (
     BoundInput,
+    Column,
     DefaultSource,
+    JoineryModel,
     Project,
     Schema,
     SchemaCoercionError,
@@ -22,15 +23,13 @@ from data_joinery.pipeline import (
 )
 
 
-@dataclass
-class User:
-    user_id: int
-    name: str
+class User(JoineryModel):
+    user_id: Column[int]
+    name: Column[str]
 
 
-@dataclass
-class Department:
-    department_id: int
+class Department(JoineryModel):
+    department_id: Column[int]
 
 
 def test_schema_error_names_fields_types_and_repair():

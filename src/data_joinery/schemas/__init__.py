@@ -7,11 +7,12 @@ from .coercion_error import (
     SchemaDiff,
     SchemaDifference,
 )
-from .joinery_model import JoineryModel, column, Column
+from .joinery_model import Column, JoineryModel, column
 from .schema import Schema
 
 __all__ = [
     "CoercionMode",
+    "Column",
     "DifferenceKind",
     "JoineryModel",
     "Schema",
@@ -19,5 +20,4 @@ __all__ = [
     "SchemaDiff",
     "SchemaDifference",
     "column",
-    "Column"
 ]

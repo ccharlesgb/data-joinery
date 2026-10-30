@@ -6,7 +6,9 @@ import pytest
 from pyspark.sql import DataFrame, SparkSession
 
 from data_joinery import (
+    Column,
     Context,
+    JoineryModel,
     Project,
     Strict,
     transform,
@@ -21,20 +23,17 @@ from data_joinery.pipeline import (
 )
 
 
-@dataclass
-class User:
-    user_id: int
+class User(JoineryModel):
+    user_id: Column[int]
 
 
-@dataclass
-class Department:
-    department_id: int
+class Department(JoineryModel):
+    department_id: Column[int]
 
 
-@dataclass
-class UserWithDepartment:
-    user_id: int
-    department_id: int
+class UserWithDepartment(JoineryModel):
+    user_id: Column[int]
+    department_id: Column[int]
 
 
 @dataclass(frozen=True)

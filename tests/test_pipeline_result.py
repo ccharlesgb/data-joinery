@@ -7,9 +7,11 @@ from polars.testing import assert_frame_equal
 
 from data_joinery import (
     BoundInput,
+    Column,
     Context,
     ContextSource,
     DefaultSource,
+    JoineryModel,
     Pipeline,
     Project,
     StepInvocation,
@@ -17,9 +19,8 @@ from data_joinery import (
 )
 
 
-@dataclass
-class Row:
-    value: int
+class Row(JoineryModel):
+    value: Column[int]
 
 
 @dataclass

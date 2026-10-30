@@ -1,33 +1,22 @@
-from collections.abc import Generator
-from dataclasses import dataclass
 from typing import Annotated
 
 import pytest
-from pydantic import BaseModel
 from pyspark.sql import DataFrame, SparkSession, types
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Pipeline, Schema, schemas, transform
+from data_joinery import Column, JoineryModel, Pipeline, Schema, schemas, transform
 from data_joinery import Project as ProjectContract
 from data_joinery.backends.spark import backend as spark_backend
 from data_joinery.pipeline import PipelineConnectionError
 
 
-@pytest.fixture(scope="session")
-def spark() -> Generator[SparkSession, None, None]:
-    spark = SparkSession.builder.master("local[*]").getOrCreate()
-    yield spark
-    spark.stop()
-
-
 def test_schema_create_dataframe_makes_spark_dataframe(spark: SparkSession):
-    @dataclass
-    class MyDataClass:
-        field1: int
-        field2: str
+    class Row(JoineryModel):
+        field1: Column[int]
+        field2: Column[str]
 
-    rows = [MyDataClass(1, "a"), MyDataClass(2, "b")]
-    dataframe = Schema(MyDataClass).create_dataframe(rows, DataFrame, session=spark)
+    rows = [Row(field1=1, field2="a"), Row(field1=2, field2="b")]
+    dataframe = Schema(Row).create_dataframe(rows, DataFrame, session=spark)
 
     expected_schema = types.StructType(
         [
@@ -42,21 +31,19 @@ def test_schema_create_dataframe_makes_spark_dataframe(spark: SparkSession):
 
 
 def test_schema_create_dataframe_with_nested_schemas(spark: SparkSession):
-    @dataclass
-    class NestedDataClass:
-        nested_field1: int
-        nested_field2: str
+    class NestedRow(JoineryModel):
+        nested_field1: Column[int]
+        nested_field2: Column[str]
 
-    @dataclass
-    class MyDataClass:
-        top_level: str
-        nested: NestedDataClass
+    class Row(JoineryModel):
+        top_level: Column[str]
+        nested: Column[NestedRow]
 
     rows = [
-        MyDataClass("a", NestedDataClass(1, "x")),
-        MyDataClass("b", NestedDataClass(2, "y")),
+        Row(top_level="a", nested=NestedRow(nested_field1=1, nested_field2="x")),
+        Row(top_level="b", nested=NestedRow(nested_field1=2, nested_field2="y")),
     ]
-    dataframe = Schema(MyDataClass).create_dataframe(rows, DataFrame, session=spark)
+    dataframe = Schema(Row).create_dataframe(rows, DataFrame, session=spark)
 
     expected_schema = types.StructType(
         [
@@ -83,51 +70,24 @@ def test_schema_create_dataframe_with_nested_schemas(spark: SparkSession):
 def test_schema_create_dataframe_rejects_rows_of_a_different_type(
     spark: SparkSession,
 ):
-    @dataclass
-    class MyDataClass:
-        field1: int
-        field2: str
+    class Row(JoineryModel):
+        field1: Column[int]
+        field2: Column[str]
 
-    @dataclass
-    class MyDataClass2:
-        field1: int
+    class OtherRow(JoineryModel):
+        field1: Column[int]
 
-    rows = [MyDataClass(1, "a"), MyDataClass2(2)]
-    with pytest.raises(
-        ValueError, match="Row 1: expected MyDataClass, got MyDataClass2"
-    ):
-        Schema(MyDataClass).create_dataframe(rows, DataFrame, session=spark)  # type: ignore
+    rows = [Row(field1=1, field2="a"), OtherRow(field1=2)]
+    with pytest.raises(ValueError, match="Row 1: expected Row, got OtherRow"):
+        Schema(Row).create_dataframe(rows, DataFrame, session=spark)  # type: ignore
 
 
-def test_schema_create_dataframe_makes_spark_dataframe_from_pydantic_rows(
-    spark: SparkSession,
-):
-    class Product(BaseModel):
-        field1: int
-        field2: str
+def test_schema_native_schema_returns_struct_type_for_model():
+    class Row(JoineryModel):
+        field1: Column[int]
+        field2: Column[str]
 
-    rows = [Product(field1=1, field2="a"), Product(field1=2, field2="b")]
-    dataframe = Schema(Product).create_dataframe(rows, DataFrame, session=spark)
-
-    expected_schema = types.StructType(
-        [
-            types.StructField("field1", types.LongType(), True),
-            types.StructField("field2", types.StringType(), True),
-        ]
-    )
-
-    assertDataFrameEqual(
-        dataframe, spark.createDataFrame([(1, "a"), (2, "b")], expected_schema)
-    )
-
-
-def test_schema_native_schema_returns_struct_type_for_dataclass():
-    @dataclass
-    class MyDataClass:
-        field1: int
-        field2: str
-
-    actual_schema = Schema(MyDataClass).native_schema(types.StructType)
+    actual_schema = Schema(Row).native_schema(types.StructType)
     expected_schema = types.StructType(
         [
             types.StructField("field1", types.LongType(), True),
@@ -138,11 +98,10 @@ def test_schema_native_schema_returns_struct_type_for_dataclass():
 
 
 def test_schema_native_schema_honors_annotated_spark_type():
-    @dataclass
-    class MyDataClass:
-        field1: Annotated[float, types.DoubleType()]
+    class Row(JoineryModel):
+        field1: Column[Annotated[float, types.DoubleType()]]
 
-    actual_schema = Schema(MyDataClass).native_schema(types.StructType)
+    actual_schema = Schema(Row).native_schema(types.StructType)
 
     assert actual_schema == types.StructType(
         [types.StructField("field1", types.DoubleType(), True)]
@@ -150,11 +109,10 @@ def test_schema_native_schema_honors_annotated_spark_type():
 
 
 def test_schema_native_schema_honors_annotated_array_element_type():
-    @dataclass
-    class MyDataClass:
-        field1: list[Annotated[float, types.DoubleType()]]
+    class Row(JoineryModel):
+        field1: Column[list[Annotated[float, types.DoubleType()]]]
 
-    actual_schema = Schema(MyDataClass).native_schema(types.StructType)
+    actual_schema = Schema(Row).native_schema(types.StructType)
 
     assert actual_schema == types.StructType(
         [types.StructField("field1", types.ArrayType(types.DoubleType(), True), True)]
@@ -162,12 +120,11 @@ def test_schema_native_schema_honors_annotated_array_element_type():
 
 
 def test_schema_native_schema_returns_struct_type_for_optional_fields():
-    @dataclass
-    class MyDataClass:
-        field1: int | None
-        field2: str | None
+    class Row(JoineryModel):
+        field1: Column[int | None]
+        field2: Column[str | None]
 
-    actual_schema = Schema(MyDataClass).native_schema(types.StructType)
+    actual_schema = Schema(Row).native_schema(types.StructType)
     expected_schema = types.StructType(
         [
             types.StructField("field1", types.LongType(), True),
@@ -178,17 +135,15 @@ def test_schema_native_schema_returns_struct_type_for_optional_fields():
 
 
 def test_schema_native_schema_returns_nested_schema():
-    @dataclass
-    class NestedDataClass:
-        nested_field1: int
-        nested_field2: str
+    class NestedRow(JoineryModel):
+        nested_field1: Column[int]
+        nested_field2: Column[str]
 
-    @dataclass
-    class MyDataClass:
-        field1: NestedDataClass
-        field2: str
+    class Row(JoineryModel):
+        field1: Column[NestedRow]
+        field2: Column[str]
 
-    actual_schema = Schema(MyDataClass).native_schema(types.StructType)
+    actual_schema = Schema(Row).native_schema(types.StructType)
     expected_schema = types.StructType(
         [
             types.StructField(
@@ -208,20 +163,18 @@ def test_schema_native_schema_returns_nested_schema():
 
 
 def test_schema_native_schema_returns_array_fields():
-    @dataclass
-    class NestedDataClass:
-        nested_field: int
+    class NestedRow(JoineryModel):
+        nested_field: Column[int]
 
-    @dataclass
-    class MyDataClass:
-        array_field: list[str]
-        optional_array_field: list[int] | None
-        array_field_with_optional_elements: list[float | None]
-        array_field_of_datclasses: list[NestedDataClass]
-        array_field_of_optional_datclasses: list[NestedDataClass | None]
-        optional_array_field_of_optional_datclasses: list[NestedDataClass | None] | None
+    class Row(JoineryModel):
+        array_field: Column[list[str]]
+        optional_array_field: Column[list[int] | None]
+        array_field_with_optional_elements: Column[list[float | None]]
+        array_field_of_models: Column[list[NestedRow]]
+        array_field_of_optional_models: Column[list[NestedRow | None]]
+        optional_array_field_of_optional_models: Column[list[NestedRow | None] | None]
 
-    actual_schema = Schema(MyDataClass).native_schema(types.StructType)
+    actual_schema = Schema(Row).native_schema(types.StructType)
     expected_schema = types.StructType(
         [
             types.StructField(
@@ -236,7 +189,7 @@ def test_schema_native_schema_returns_array_fields():
                 True,
             ),
             types.StructField(
-                "array_field_of_datclasses",
+                "array_field_of_models",
                 types.ArrayType(
                     types.StructType(
                         [types.StructField("nested_field", types.LongType(), True)]
@@ -246,7 +199,7 @@ def test_schema_native_schema_returns_array_fields():
                 True,
             ),
             types.StructField(
-                "array_field_of_optional_datclasses",
+                "array_field_of_optional_models",
                 types.ArrayType(
                     types.StructType(
                         [types.StructField("nested_field", types.LongType(), True)]
@@ -256,52 +209,10 @@ def test_schema_native_schema_returns_array_fields():
                 True,
             ),
             types.StructField(
-                "optional_array_field_of_optional_datclasses",
+                "optional_array_field_of_optional_models",
                 types.ArrayType(
                     types.StructType(
                         [types.StructField("nested_field", types.LongType(), True)]
-                    ),
-                    True,
-                ),
-                True,
-            ),
-        ]
-    )
-    assert actual_schema == expected_schema
-
-
-def test_schema_native_schema_returns_struct_type_for_pydantic_model():
-    class Product(BaseModel):
-        product_id: int
-        product_name: str
-
-    actual_schema = Schema(Product).native_schema(types.StructType)
-    expected_schema = types.StructType(
-        [
-            types.StructField("product_id", types.LongType(), True),
-            types.StructField("product_name", types.StringType(), True),
-        ]
-    )
-    assert actual_schema == expected_schema
-
-
-def test_schema_native_schema_returns_nested_pydantic_schema():
-    class Product(BaseModel):
-        product_id: int
-
-    class Order(BaseModel):
-        order_id: int
-        products: list[Product]
-
-    actual_schema = Schema(Order).native_schema(types.StructType)
-    expected_schema = types.StructType(
-        [
-            types.StructField("order_id", types.LongType(), True),
-            types.StructField(
-                "products",
-                types.ArrayType(
-                    types.StructType(
-                        [types.StructField("product_id", types.LongType(), True)]
                     ),
                     True,
                 ),
@@ -571,10 +482,9 @@ def test_schema_coercion_error_exposes_all_violations():
 def test_schema_coerce_dataframe_strict_makes_all_fields_nullable(
     spark: SparkSession,
 ):
-    @dataclass
-    class TargetRow:
-        a: int
-        b: str
+    class TargetRow(JoineryModel):
+        a: Column[int]
+        b: Column[str]
 
     dataframe = spark.createDataFrame(
         [(1, "a")],
@@ -593,10 +503,9 @@ def test_schema_coerce_dataframe_strict_makes_all_fields_nullable(
 def test_schema_coerce_dataframe_strict_preserves_source_column_order(
     spark: SparkSession,
 ):
-    @dataclass
-    class TargetRow:
-        first: int
-        second: str
+    class TargetRow(JoineryModel):
+        first: Column[int]
+        second: Column[str]
 
     dataframe = spark.createDataFrame(
         [("a", 1)],
@@ -620,12 +529,13 @@ def test_schema_coerce_dataframe_makes_nested_values_nullable(
         [types.StructField("value", types.LongType(), False)]
     )
 
-    @dataclass
-    class TargetRow:
-        nested: Annotated[object, nested_type]
-        items: Annotated[object, types.ArrayType(types.LongType(), False)]
-        lookup: Annotated[
-            object, types.MapType(types.StringType(), types.LongType(), False)
+    class TargetRow(JoineryModel):
+        nested: Column[Annotated[object, nested_type]]
+        items: Column[Annotated[object, types.ArrayType(types.LongType(), False)]]
+        lookup: Column[
+            Annotated[
+                object, types.MapType(types.StringType(), types.LongType(), False)
+            ]
         ]
 
     dataframe = spark.createDataFrame(
@@ -1108,9 +1018,8 @@ def test_coerce_dataframe_project_cast_reports_every_unsupported_cast(
 def test_pipeline_does_not_connect_different_dataframe_backends():
     from polars import LazyFrame
 
-    @dataclass
-    class Order:
-        order_id: int
+    class Order(JoineryModel):
+        order_id: Column[int]
 
     @transform
     def polars_source() -> Annotated[LazyFrame, ProjectContract(Order)]:

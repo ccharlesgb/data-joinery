@@ -1,5 +1,5 @@
 from dataclasses import fields
-from typing import ClassVar, assert_type
+from typing import ClassVar, assert_type, get_type_hints
 
 import pytest
 
@@ -56,6 +56,31 @@ def test_instance_assignment_does_not_change_the_class():
     assert Customer.display_name == "Display Name"
 
 
+def test_instance_fields_are_mutable():
+    actual = Customer(id=1)
+    actual.display_name = "Ada"
+    expected = Customer(id=1, display_name="Ada")
+
+    assert actual == expected
+
+
+def test_instance_values_are_not_validated_at_runtime():
+    customer = Customer(id="external-id")  # type: ignore[bad-argument-type] - exercise runtime behavior
+
+    assert customer.id == "external-id"
+
+
+def test_model_annotations_describe_instance_values():
+    expected = {
+        "id": int,
+        "display_name": str,
+        "tags": list[str],
+        "nickname": str | None,
+    }
+
+    assert get_type_hints(Customer) == expected
+
+
 def test_defaults_and_keyword_only_inheritance():
     actual = PaidCustomer(id=1, account_value=12.5)
 
@@ -66,6 +91,10 @@ def test_defaults_and_keyword_only_inheritance():
         "nickname": None,
         "account_value": 12.5,
     }
+
+
+def test_inherited_fields_keep_their_column_names():
+    assert PaidCustomer.display_name == "Display Name"
 
 
 def test_default_factories_are_independent():
@@ -120,6 +149,11 @@ def test_constructor_rejects_positional_arguments():
         Customer(1)  # type: ignore[bad-argument-count] - exercise runtime checking
 
 
+def test_constructor_rejects_unknown_arguments():
+    with pytest.raises(TypeError, match="unexpected keyword argument 'unknown'"):
+        Customer(id=1, unknown="value")  # type: ignore[unexpected-keyword] - exercise runtime checking
+
+
 def test_classvars_are_not_dataclass_fields():
     assert [item.name for item in fields(User)] == [
         "id",
@@ -143,6 +177,16 @@ def test_overrides_reset_field_options_and_keep_order():
         ("tags", list[str]),
         ("nickname", str | None),
     ]
+
+
+def test_overriding_a_field_without_a_default_makes_it_required():
+    class Renamed(Customer):
+        display_name: Column[str]
+
+    with pytest.raises(
+        TypeError, match="required keyword-only argument: 'display_name'"
+    ):
+        Renamed(id=1)  # type: ignore[missing-argument] - exercise runtime checking
 
 
 @pytest.mark.parametrize("name", ["", 1])

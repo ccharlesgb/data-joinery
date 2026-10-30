@@ -2,13 +2,12 @@ from dataclasses import dataclass
 
 import pytest
 
-from data_joinery import Project, Strict
+from data_joinery import Column, JoineryModel, Project, Strict
 from data_joinery.contract import InstanceContract, VoidContract
 
 
-@dataclass
-class Order:
-    order_id: int
+class Order(JoineryModel):
+    order_id: Column[int]
 
 
 @dataclass(frozen=True)
