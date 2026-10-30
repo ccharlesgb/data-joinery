@@ -29,6 +29,26 @@ for the backend does the type get overridden. The tabs show backend-specific ove
     --8<-- "docs_src/learn/schemas/overriding_types/annotated_example_intro_spark_stdout.log"
     ```
 
+## Reusing annotations
+
+If in your pipeline you often find yourself overriding the Data Joinery defaults then you can
+define an `Annotated` type once and reuse it across fields and models. You can also
+put these aliases in a shared module and import them wherever you need them.
+
+This example uses the same alias for two fields, so both use Polars `Int16`:
+
+``` python
+--8<-- "docs_src/learn/schemas/overriding_types/reusing_annotations.py"
+```
+
+:fontawesome-solid-code: Outputs:
+
+``` python
+--8<-- "docs_src/learn/schemas/overriding_types/reusing_annotations_stdout.log"
+```
+
+An alias can include overrides for multiple backends, just like an inline annotation.
+
 ## Backend specific type behaviour
 
 It isn't a perfect mapping between Python types and backend-specific types, and there may not be
