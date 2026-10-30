@@ -92,32 +92,3 @@ The same example schema can be defined with Pydantic as well:
 
     Data Joinery does not enforce Pydantic validation rules. It can be useful to include them in your models for
     documentation and for generating valid test fixtures, but only the data type is enforced.
-
-## Nested schemas
-
-If your data contains nested structs or arrays, describe them with nested dataclasses
-or Pydantic models:
-
-=== "Polars"
-
-    ``` python
-    --8<-- "docs_src/learn/schemas/index/dataclass_example_nested_polars.py"
-    ```
-
-    :fontawesome-solid-code: Outputs:
-
-    ``` text
-    --8<-- "docs_src/learn/schemas/index/dataclass_example_nested_polars_stdout.log"
-    ```
-
-=== "PySpark"
-
-    ``` python
-    --8<-- "docs_src/learn/schemas/index/dataclass_example_nested_spark.py"
-    ```
-
-    :fontawesome-solid-code: Outputs:
-
-    ``` text
-    --8<-- "docs_src/learn/schemas/index/dataclass_example_nested_spark_stdout.log"
-    ```

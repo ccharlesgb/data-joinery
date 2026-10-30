@@ -11,14 +11,14 @@ def write_output(df: Annotated[DataFrame, Project(OutputSchema)], path: str) -> 
     df.write.parquet(path)
 
 @side_effect
-def log_ml_model(model: LinearRegression, experimet_id: str) -> None:
+def log_ml_model(model: LinearRegression, experiment_id: str) -> None:
     mlflow.log_model(model, experiment_id)
 ```
 
 ## Running without side effects
 
-You might want to run a pipeline without it's side effects to inspect the
-intermediate results. Or if you a running in an environment where you don't
+You might want to run a pipeline without its side effects to inspect the
+intermediate results. Or if you are running in an environment where you don't
 have write permissions, you might want to skip the steps that write to disk. Pass
 `include_side_effects=False` when running pipelines to run all steps leading up to side effects:
 

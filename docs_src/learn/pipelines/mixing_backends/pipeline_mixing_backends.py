@@ -70,7 +70,7 @@ def train_model(
     collected = features.collect()
     return LinearRegression().fit(
         collected[[CustomerFeatures.visits, CustomerFeatures.total_minutes]],
-        collected[CustomerActivity.annual_spend],
+        collected[CustomerFeatures.annual_spend],
     )
 
 

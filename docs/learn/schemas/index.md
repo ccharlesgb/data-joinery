@@ -90,6 +90,39 @@ We can use these attributes to select and filter columns in a DataFrame:
     --8<-- "docs_src/learn/schemas/index/select_filter_spark_stdout.log"
     ```
 
+## Default Values
+
+For test fixtures it can be useful for your model to provide default values for columns to reduce
+the verbosity of your tests. Defaults can be set using the `default` or `default_factory` in the
+same way as conventional dataclasses:
+
+=== "Polars"
+
+    ``` python
+    --8<-- "docs_src/learn/schemas/index/model_defaults_polars.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/schemas/index/model_defaults_polars_stdout.log"
+    ```
+
+=== "PySpark"
+
+    ``` python
+    --8<-- "docs_src/learn/schemas/index/model_defaults_spark.py"
+    ```
+
+    :fontawesome-solid-code: Outputs:
+
+    ``` text
+    --8<-- "docs_src/learn/schemas/index/model_defaults_spark_stdout.log"
+    ```
+
+Defaults are only relevant for dataframe construction, they do not have an impact on the underlying
+dataframe schema.
+
 ## Nested schemas
 
 If your data contains nested structs or arrays, describe them with nested JoineryModels:
