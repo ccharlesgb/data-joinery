@@ -2,6 +2,10 @@
 
 ::: data_joinery.Pipeline
 
+## Jobs
+
+::: data_joinery.Job
+
 ## Steps
 
 ::: data_joinery.Step

@@ -1,4 +1,4 @@
-"""Command line entry point for running and drawing pipelines."""
+"""Load jobs and delegate command line inputs to their Typer applications."""
 
 from __future__ import annotations
 
@@ -6,13 +6,14 @@ import importlib
 import importlib.util
 import sys
 from pathlib import Path
-from typing import Annotated, Any, NoReturn
+from types import ModuleType
+from typing import Any, NoReturn
 
 import typer
 
-from data_joinery.pipeline import Pipeline
+from data_joinery.job import Job
 
-app = typer.Typer(help="Run and visualize Data Joinery pipelines.")
+app = typer.Typer(help="Run and visualize Data Joinery jobs.")
 
 
 def _error(message: str) -> NoReturn:
@@ -20,11 +21,7 @@ def _error(message: str) -> NoReturn:
     raise typer.Exit(1)
 
 
-def _load_pipeline(target: str) -> Pipeline[Any]:
-    location, separator, attribute = target.partition(":")
-    if separator and not attribute:
-        _error("A pipeline name is required after ':'.")
-
+def _import_target(location: str) -> ModuleType:
     path: Path | None = None
     if location.endswith(".py") or "/" in location or "\\" in location:
         path = Path(location).resolve()
@@ -63,116 +60,73 @@ def _load_pipeline(target: str) -> Pipeline[Any]:
     except (ImportError, SyntaxError) as error:
         _error(f"Cannot import {location}: {error}")
 
-    names = (attribute,) if separator else ("pipeline", "build_pipeline")
+    return module
+
+
+def _load_job(target: str) -> Job[Any]:
+    location, separator, attribute = target.partition(":")
+    if separator and not attribute:
+        _error("A job name is required after ':'.")
+    module = _import_target(location)
+
+    names = (attribute,) if separator else ("job", "build_job")
     for name in names:
         if not hasattr(module, name):
             continue
         value = getattr(module, name)
         try:
-            pipeline = value() if callable(value) else value
+            if isinstance(value, Job):
+                return value
+            job = value() if callable(value) else value
         except (TypeError, ValueError, RuntimeError) as error:
-            _error(f"Cannot build pipeline '{name}': {error}")
-        if not isinstance(pipeline, Pipeline):
-            _error(f"'{name}' in {location} is not a Pipeline.")
-        return pipeline
-    _error(f"No pipeline found in {location}; expected " + ", ".join(names) + ".")
+            _error(f"Cannot build job '{name}': {error}")
+        if not isinstance(job, Job):
+            _error(f"'{name}' in {location} is not a Job.")
+        return job
+    _error(f"No job found in {location}; expected " + ", ".join(names) + ".")
 
 
-def _build_context(pipeline: Pipeline[Any], values: list[str]) -> Any:
-    context_type = pipeline._context_type
-    if context_type is None:
-        if values:
-            _error("This pipeline has no context; remove --context.")
-        return None
-
-    kwargs: dict[str, str] = {}
-    for value in values:
-        key, separator, raw = value.partition("=")
-        if not separator or not key:
-            _error("--context values must use NAME=VALUE.")
-        if key in kwargs:
-            _error(f"Duplicate context value: {key}")
-        kwargs[key] = raw
-
-    factory = getattr(context_type, "from_kwargs", None)
-    if factory is None and kwargs:
-        _error(
-            f"{context_type.__name__} must define from_kwargs(**values) "
-            "to accept --context values."
-        )
-    try:
-        context = factory(**kwargs) if factory is not None else context_type()
-    except (TypeError, ValueError) as error:
-        _error(f"Cannot create {context_type.__name__}: {error}")
-    if not isinstance(context, context_type):
-        _error(
-            f"{context_type.__name__}.from_kwargs() must return a "
-            f"{context_type.__name__} instance."
-        )
-    return context
-
-
-@app.command()
-def run(
-    target: Annotated[
-        str,
-        typer.Argument(
-            help="Python file or module, optionally followed by :attribute."
-        ),
-    ] = "main.py",
-    context: Annotated[
-        list[str] | None,
-        typer.Option("--context", help="Context value as NAME=VALUE; may be repeated."),
-    ] = None,
-    skip_side_effects: Annotated[
-        bool, typer.Option("--skip-side-effects", help="Skip marked side effect steps.")
-    ] = False,
-) -> None:
-    """Run a pipeline and its steps in dependency order."""
-    pipeline = _load_pipeline(target)
-    run_context = _build_context(pipeline, context or [])
-    typer.echo(f"Running pipeline from {target}...")
-    pipeline.run(
-        run_context,
-        include_side_effects=not skip_side_effects,
+def _delegate(command: str, context: typer.Context) -> None:
+    # Parse only the target here; the job owns all application inputs and help.
+    remaining = list(context.args)
+    if remaining and remaining[0] == "--help":
+        typer.echo(context.get_help())
+        return
+    target = (
+        remaining.pop(0)
+        if remaining and not remaining[0].startswith("-")
+        else "main.py"
     )
-    typer.echo("Pipeline finished.")
+    job = _load_job(target)
+    job(args=[command, *remaining], prog_name=f"data-joinery {target}")
 
 
-@app.command()
-def visualize(
-    target: Annotated[
-        str,
-        typer.Argument(
-            help="Python file or module, optionally followed by :attribute."
-        ),
-    ] = "main.py",
-    output: Annotated[
-        Path | None,
-        typer.Option("--output", help="Save the diagram to an SVG or PNG file."),
-    ] = None,
-) -> None:
-    """Display a pipeline diagram, or save it to a file."""
-    if output is not None and output.suffix.lower() not in {".svg", ".png"}:
-        _error("--output must end in .svg or .png.")
-    pipeline = _load_pipeline(target)
-    typer.echo(f"Visualizing pipeline from {target}...")
-    try:
-        figure = pipeline.visualize(show=output is None)
-    except ImportError as error:
-        _error(str(error))
-    if output is not None:
-        try:
-            figure.savefig(output)
-        except OSError as error:
-            _error(f"Cannot save {output}: {error}")
-        finally:
-            from matplotlib import pyplot as plt
+@app.command(
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "help_option_names": [],
+    },
+)
+def run(context: typer.Context) -> None:
+    """Run a job: run [TARGET] [COMMAND_INPUTS...].
 
-            plt.close(figure)
-        typer.echo(f"Pipeline visualization saved to {output}.")
-    else:
-        typer.echo("Pipeline visualization displayed.")
+    TARGET is a Python file or module, optionally followed by :attribute.
+    It defaults to main.py. Put the target before application inputs.
+    """
+    _delegate("run", context)
+
+
+@app.command(
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "help_option_names": [],
+    },
+)
+def visualize(context: typer.Context) -> None:
+    """Draw a job: visualize [TARGET] [--output diagram.svg]."""
+    _delegate("visualize", context)
 
 
 if __name__ == "__main__":

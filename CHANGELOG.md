@@ -6,6 +6,14 @@ Notable changes to Data Joinery are documented here. This changelog follows
 
 ## [Unreleased]
 
+### Added
+
+- Add `Job` with typed Typer context providers, managed resource cleanup, and shared `run` and `visualize` commands for scripts and the launcher.
+
+### Changed
+
+- Breaking experimental CLI change: targets now expose `job` or `build_job()` returning a `Job`, replacing `pipeline` and `build_pipeline()` discovery. Register providers with `@job.context()` instead of passing `--context NAME=VALUE`; the CLI no longer calls `from_kwargs()` automatically.
+
 ## [0.6.0] - 2026-10-30
 
 ### Changed

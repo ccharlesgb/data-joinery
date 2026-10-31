@@ -113,82 +113,75 @@ transforms to fetch upstream models or sources.
 
 ## Make a Pipeline Available to the CLI
 
-Put a `Pipeline` object named `pipeline` or a no-argument `build_pipeline()` function in a Python
-file. The CLI loads that object or calls the function to get the graph. Keep graph construction
-separate from execution: importing the file and building the graph should not run steps, read
-data, or create external sessions. `visualize` builds the graph without creating a context or
-running the pipeline.
-
-For example, `main.py` can define a context factory that converts a command line date into a
-typed dependency:
+Create `Job(pipeline=...)` named `job`, or a zero-argument `build_job()` returning one.
+Keep module imports and graph construction free of runtime resource acquisition.
+Register a typed provider to prepare the context only when `run` executes:
 
 ```python
 from dataclasses import dataclass
-from datetime import date
+from pathlib import Path
 from typing import Annotated
 
-from data_joinery import Context, Pipeline, side_effect, transform
-
-
-class RunDate(date):
-    pass
+import typer
+from data_joinery import Job, Pipeline
 
 
 @dataclass(frozen=True)
 class ReportContext:
-    run_date: RunDate
-
-    @classmethod
-    def from_kwargs(cls, *, run_date: str) -> "ReportContext":
-        return cls(run_date=RunDate.fromisoformat(run_date))
+    destination: Path
 
 
-@transform
-def make_report(run_date: Annotated[RunDate, Context()]) -> str:
-    return f"Report for {run_date.isoformat()}"
+job = Job(pipeline=Pipeline(ReportContext))
 
 
-@side_effect
-def print_report(report: str) -> None:
-    print(report)
+@job.context()
+def context(
+    destination: Annotated[Path, typer.Option(help="Report destination.")],
+) -> ReportContext:
+    """Prepare dependencies for a report run."""
+    return ReportContext(destination)
 
 
-def build_pipeline() -> Pipeline[ReportContext]:
-    pipeline = Pipeline(ReportContext)
-    pipeline.add_step(make_report) >> pipeline.add_step(print_report)
-    return pipeline
+if __name__ == "__main__":
+    job()
 ```
 
-From the directory containing `main.py`, run:
+Add transforms and connections to the graph as usual. Typer parses the provider's parameters,
+including `Annotated` metadata, defaults, positional arguments, and enum choices. Use
+`typer.BadParameter` for application input validation. Context dataclasses just hold dependencies.
 
 ```shell
-data-joinery run --context run_date=2026-10-11
-data-joinery run --context run_date=2026-10-11 --skip-side-effects
-data-joinery visualize --output report.svg
+python main.py run --destination report.csv
+data-joinery run main.py --destination report.csv
+data-joinery run main.py --destination report.csv --skip-side-effects
+data-joinery run main.py --help
+data-joinery visualize main.py --output report.svg
 ```
 
-For another file, pass its path, such as `data-joinery run pipelines/report.py`. An importable
-module also works, such as `data-joinery run my_project.report`. Add `:attribute` when the
-pipeline object or builder has a different name, for example
-`data-joinery run my_project.report:build_report_pipeline`. Without a target, the CLI uses
-`main.py` and looks for `pipeline` first, then `build_pipeline`.
+The shared launcher accepts `COMMAND [TARGET] [COMMAND_INPUTS...]`. A target can be a file,
+module, or explicit attribute such as `my_project.report:build_report_job`. It defaults to
+`main.py`, looking for `job` then `build_job()`. Always supply a target before positional
+application inputs. Bare launcher help does not import the application; help after a target
+shows the job's inputs. Direct scripts always show job-specific help.
 
-Each repeated `--context NAME=VALUE` supplies one string keyword argument to the context
-class's `from_kwargs` method. The method must convert those strings into dependencies and
-return an instance of that context class. Define it whenever the CLI must accept context
-values; the CLI does not derive options or conversions from dataclass fields. If the pipeline
-has a context but no `--context` options, the CLI calls `from_kwargs()` when it exists or
-constructs the context with no arguments. A context-free pipeline accepts no `--context`
-options. Keep required runtime services in the context factory or steps so drawing the graph
-does not start them. Manage the lifetime of services created by the factory yourself; the CLI
-does not close them after a run.
+To manage resources, decorate a synchronous `@contextmanager` provider with `@job.context()`
+on the outside. Acquire resources inside the provider, yield the context, and release owned
+resources in `finally`. Job exits the manager after success, validation errors, execution errors,
+and interruptions. Plain context objects are never automatically entered or closed. Keep Spark
+session provisioning in the application provider, and stop sessions only when the application
+owns them. An environment enum can select application configuration; it does not itself select
+a Spark cluster.
 
-`run` executes marked side effects unless `--skip-side-effects` is passed. In the example,
-skipping prevents `print_report` from running while `make_report` still runs. Mark only terminal
-steps that should be skipped with `@side_effect`; an unmarked `-> None` step still runs. Install
-the `vis` extra to use `visualize`. It opens a Matplotlib window by default, or saves an SVG or
-PNG when passed `--output report.svg` or `--output report.png`. See the Pipeline CLI guide
-in the project documentation for a runnable version of this example.
+Register one provider before accessing `job.app` or calling `job()`. Raw generators, async
+providers, positional-only parameters, `*args`, and `**kwargs` are unsupported. The name
+`skip_side_effects` and option aliases `--skip-side-effects` and `--help` are reserved.
+A context-free Job needs no provider and rejects registration. Help and visualization do not
+invoke providers. Install the `vis` extra to display diagrams or save SVG/PNG files.
+
+`--skip-side-effects` skips only marked side effects. Ordinary steps and context initialization
+still run, and managed resources still close. Use `pipeline.run(context)` from Python for results
+and transform overrides. The registered provider remains independently callable; `job.app`
+supports Typer's `CliRunner`.
 
 ## Pass Ordinary Instance Values
 

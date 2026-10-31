@@ -5,6 +5,7 @@ from .contract import (
     ProjectTopLevel,
     Strict,
 )
+from .job import Job
 from .pipeline import (
     Pipeline,
     PipelineExecutionError,
@@ -27,6 +28,7 @@ __all__ = [
     "Context",
     "ContextSource",
     "DefaultSource",
+    "Job",
     "JoineryModel",
     "Pipeline",
     "PipelineExecutionError",
