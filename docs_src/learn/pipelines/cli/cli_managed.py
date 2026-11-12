@@ -42,10 +42,8 @@ def write_report(report: str, destination: Annotated[Path, Context()]) -> None:
 
 pipeline = Pipeline(ReportContext)
 pipeline.add_step(make_report) >> pipeline.add_step(write_report)
-job = Job(pipeline=pipeline)
 
 
-@job.context()
 @contextmanager
 def context(
     environment: Annotated[
@@ -61,8 +59,11 @@ def context(
             print("Releasing workspace.")
 
 
+job = Job(pipeline=pipeline, context_provider=context)
+
+
 if __name__ == "__main__":
-    result = CliRunner().invoke(job.app, ["run", "--environment", "preprod"])
+    result = CliRunner().invoke(job, ["run", "--environment", "preprod"])
     if result.exception is not None:
         raise result.exception
     print(result.output, end="")

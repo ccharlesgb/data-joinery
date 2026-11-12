@@ -37,11 +37,10 @@ def build_pipeline():
     pipeline.add_step(produce) >> pipeline.add_step(publish)
     return pipeline
 
-job = Job(pipeline=build_pipeline())
-
-@job.context()
 def context(destination: Path) -> RunContext:
     return RunContext(destination)
+
+job = Job(pipeline=build_pipeline(), context_provider=context)
 
 def build_job():
     return job
@@ -83,20 +82,20 @@ def test_run_does_not_report_completion_after_failure(
     assert result.output == "Running pipeline...\n"
 
 
-def test_run_skips_side_effects(pipeline_file: Path, tmp_path: Path):
-    destination = tmp_path / "run.txt"
-    result = CliRunner().invoke(
-        app,
-        [
-            "run",
-            str(pipeline_file),
-            str(destination),
-            "--skip-side-effects",
-        ],
+@pytest.mark.parametrize("command", ["run", "visualize"])
+@pytest.mark.parametrize("position", ["root", "command"])
+def test_launcher_rejects_skip_side_effects_option(
+    pipeline_file: Path, command, position
+):
+    arguments = (
+        ["--skip-side-effects", command, str(pipeline_file)]
+        if position == "root"
+        else [command, str(pipeline_file), "--skip-side-effects"]
     )
 
-    assert result.exit_code == 0
-    assert destination.read_text() == "produce"
+    result = CliRunner().invoke(app, arguments)
+
+    assert result.exit_code == 2
 
 
 @pytest.mark.parametrize("extension", ["png", "svg"])

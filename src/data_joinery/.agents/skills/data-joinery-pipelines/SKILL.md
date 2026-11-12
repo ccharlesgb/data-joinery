@@ -113,9 +113,10 @@ transforms to fetch upstream models or sources.
 
 ## Make a Pipeline Available to the CLI
 
-Create `Job(pipeline=...)` named `job`, or a zero-argument `build_job()` returning one.
+Create `Job(pipeline=..., context_provider=...)` named `job`, or a zero-argument
+`build_job()` returning one.
 Keep module imports and graph construction free of runtime resource acquisition.
-Register a typed provider to prepare the context only when `run` executes:
+Pass a typed provider at construction to prepare the context only when `run` executes:
 
 ```python
 from dataclasses import dataclass
@@ -131,15 +132,14 @@ class ReportContext:
     destination: Path
 
 
-job = Job(pipeline=Pipeline(ReportContext))
-
-
-@job.context()
 def context(
     destination: Annotated[Path, typer.Option(help="Report destination.")],
 ) -> ReportContext:
     """Prepare dependencies for a report run."""
     return ReportContext(destination)
+
+
+job = Job(pipeline=Pipeline(ReportContext), context_provider=context)
 
 
 if __name__ == "__main__":
@@ -153,7 +153,6 @@ including `Annotated` metadata, defaults, positional arguments, and enum choices
 ```shell
 python main.py run --destination report.csv
 data-joinery run main.py --destination report.csv
-data-joinery run main.py --destination report.csv --skip-side-effects
 data-joinery run main.py --help
 data-joinery visualize main.py --output report.svg
 ```
@@ -164,24 +163,24 @@ module, or explicit attribute such as `my_project.report:build_report_job`. It d
 application inputs. Bare launcher help does not import the application; help after a target
 shows the job's inputs. Direct scripts always show job-specific help.
 
-To manage resources, decorate a synchronous `@contextmanager` provider with `@job.context()`
-on the outside. Acquire resources inside the provider, yield the context, and release owned
-resources in `finally`. Job exits the manager after success, validation errors, execution errors,
+To manage resources, pass a synchronous `@contextmanager` function as `context_provider`.
+Acquire resources inside the provider, yield the context, and release owned resources
+in `finally`. Job exits the manager after success, validation errors, execution errors,
 and interruptions. Plain context objects are never automatically entered or closed. Keep Spark
 session provisioning in the application provider, and stop sessions only when the application
 owns them. An environment enum can select application configuration; it does not itself select
 a Spark cluster.
 
-Register one provider before accessing `job.app` or calling `job()`. Raw generators, async
-providers, positional-only parameters, `*args`, and `**kwargs` are unsupported. The name
-`skip_side_effects` and option aliases `--skip-side-effects` and `--help` are reserved.
-A context-free Job needs no provider and rejects registration. Help and visualization do not
+Pass the provider when constructing the Job. Raw generators and async providers are
+unsupported. A context-free Job omits the provider. Help and visualization do not
 invoke providers. Install the `vis` extra to display diagrams or save SVG/PNG files.
 
-`--skip-side-effects` skips only marked side effects. Ordinary steps and context initialization
-still run, and managed resources still close. Use `pipeline.run(context)` from Python for results
-and transform overrides. The registered provider remains independently callable; `job.app`
-supports Typer's `CliRunner`.
+Use `pipeline.run(context)` from Python for results and transform overrides.
+
+Job inherits Typer: use `@job.command()` for additional commands and pass `job` directly
+to Typer's `CliRunner`. The pipeline command is always named `run`; its help says
+"Run the pipeline." and its inputs come from the provider's parameters. Put startup behavior in the provider, or call a
+shared setup function inside additional commands. Providers remain independently callable.
 
 ## Pass Ordinary Instance Values
 

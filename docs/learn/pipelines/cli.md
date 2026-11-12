@@ -5,14 +5,13 @@
     CLI is experimental
 
 Use a `Job` to run your pipeline from the command line. You can pass in values
-such as a report date or environment, skip side effects, and draw the pipeline
-without running it.
+such as a report date or environment, and draw the pipeline without running it.
 
 ## Define a job
 
-Create a `Job` from your pipeline and use `@job.context()` to define the function
-that prepares its [context](context.md). In this example, the function takes a
-date from the command line and supplies it to the report pipeline:
+Define a function that prepares the pipeline's [context](context.md), then pass
+it to `Job(pipeline=..., context_provider=...)`. In this example, the function
+takes a date from the command line and supplies it to the report pipeline:
 
 ``` python
 --8<-- "docs_src/learn/pipelines/cli/cli_job.py"
@@ -59,18 +58,6 @@ python reports.py run --help
 data-joinery run reports.py --help
 ```
 
-## Run without side effects
-
-To make the report without printing it, pass `--skip-side-effects`:
-
-``` shell
-python reports.py run 2026-10-11 --skip-side-effects
-```
-
-This skips `print_report` because it is marked with `@side_effect`. The context
-function and other steps still run. See [Side effects](side_effects.md) for more
-about choosing which steps to mark.
-
 ## Draw the pipeline
 
 Install `data-joinery[vis]` to draw your pipeline. The `visualize` command opens a
@@ -93,7 +80,7 @@ You don't need to supply the report date to draw the pipeline.
 
 Some pipelines need a temporary directory, a database connection, or a Spark
 session. Use `@contextmanager` to keep setup and cleanup together in your context
-function. Put `@job.context()` above it, as shown here:
+function, then pass that function as `context_provider`, as shown here:
 
 ``` python
 --8<-- "docs_src/learn/pipelines/cli/cli_managed.py"
@@ -136,3 +123,13 @@ data-joinery run my_project.reports:build_job 2026-10-11
 
 Put the file or module before the job's inputs. When passing a positional value
 such as a date, include the file name so the command knows which is which.
+
+## Add commands and startup behavior
+
+`Job` is a Typer application. Add other commands with `@job.command()` and pass
+`job` directly to Typer's `CliRunner` in tests. The pipeline command is always
+named `run`, regardless of your context function's name. Its help says "Run the
+pipeline." and uses the context function's parameters to describe its inputs.
+
+Put setup needed for a pipeline run inside the context function. For an additional
+command, call any shared setup function inside that command.

@@ -3,7 +3,6 @@ from datetime import date
 from typing import Annotated
 
 import typer
-from typer.testing import CliRunner
 
 from data_joinery import Context, Job, Pipeline, side_effect, transform
 
@@ -38,10 +37,6 @@ def build_pipeline() -> Pipeline[PipelineContext]:
     return pipeline
 
 
-job = Job(pipeline=build_pipeline())
-
-
-@job.context()
 def context(
     run_date: Annotated[str, typer.Argument(help="Report date in YYYY-MM-DD format.")],
 ) -> PipelineContext:
@@ -52,8 +47,4 @@ def context(
         raise typer.BadParameter("Use a date in YYYY-MM-DD format.") from error
 
 
-if __name__ == "__main__":
-    result = CliRunner().invoke(job.app, ["run", "2026-10-11"])
-    if result.exception is not None:
-        raise result.exception
-    print(result.output, end="")
+job = Job(pipeline=build_pipeline(), context_provider=context)

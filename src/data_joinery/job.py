@@ -4,21 +4,19 @@ from __future__ import annotations
 
 import inspect
 import sys
-from collections.abc import Callable, Iterator
-from contextlib import ExitStack, contextmanager
+from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager, ExitStack, contextmanager
+from functools import wraps
 from pathlib import Path
-from typing import Annotated, Any, TypeVar, cast, get_type_hints
+from typing import Annotated, Any, cast
 
 import typer
-from typer.main import get_click_param, get_params_from_function
 
 from data_joinery.pipeline import Pipeline
 
-ProviderT = TypeVar("ProviderT", bound=Callable[..., Any])
-
 
 @contextmanager
-def _resource_scope(manager: Any) -> Iterator[Any]:
+def _resource_scope(manager: Any) -> Generator[Any]:
     context = manager.__enter__()
     try:
         yield context
@@ -29,171 +27,87 @@ def _resource_scope(manager: Any) -> Iterator[Any]:
         manager.__exit__(None, None, None)
 
 
-def _provider_signature(provider: Callable[..., Any]) -> inspect.Signature:
-    original = inspect.unwrap(provider)
-    name = getattr(provider, "__qualname__", repr(provider))
-    if inspect.iscoroutinefunction(original) or inspect.isasyncgenfunction(original):
-        raise TypeError(f"Provider {name}: async providers are not supported.")
-    if inspect.isgeneratorfunction(provider):
-        raise TypeError(
-            f"Provider {name}: wrap generator providers with @contextmanager."
-        )
-    signature = inspect.signature(provider)
-    hints = get_type_hints(original, include_extras=True)
-    parameters = []
-    for parameter in signature.parameters.values():
-        if parameter.kind not in {
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            inspect.Parameter.KEYWORD_ONLY,
-        }:
-            raise TypeError(
-                f"Provider {name}: unsupported parameter '{parameter.name}'."
-            )
-        if parameter.name == "skip_side_effects":
-            raise ValueError(
-                f"Provider {name}: parameter 'skip_side_effects' is reserved."
-            )
-        parameters.append(
-            parameter.replace(
-                annotation=hints.get(parameter.name, parameter.annotation)
-            )
-        )
-    return signature.replace(parameters=parameters, return_annotation=None)
-
-
-def _check_options(adapter: Callable[..., Any], provider: Callable[..., Any]) -> None:
-    for name, parameter in get_params_from_function(adapter).items():
-        option, _ = get_click_param(parameter)
-        aliases = [*option.opts, *getattr(option, "secondary_opts", [])]
-        if any(alias in {"--skip-side-effects", "--help"} for alias in aliases):
-            raise ValueError(
-                f"Provider {provider.__qualname__}: parameter '{name}' uses a reserved "
-                "option (--skip-side-effects or --help)."
-            )
-
-
-class Job[ContextT]:
+class Job[ContextT](typer.Typer):
     """Expose a pipeline as typed run and visualize commands.
 
     Args:
-        pipeline: Constructed graph. Acquire runtime resources inside a provider
-            registered with :meth:`context`.
+        pipeline: Constructed graph, without runtime resource acquisition.
+        context_provider: Function accepting CLI inputs and returning the pipeline
+            context, or a synchronous context manager yielding it. Omit for a
+            context-free pipeline. Put runtime setup inside this function.
     """
 
-    def __init__(self, *, pipeline: Pipeline[ContextT]) -> None:
-        self.pipeline = pipeline
-        self._provider: Callable[..., Any] | None = None
-        self._signature: inspect.Signature | None = None
-        self._app: typer.Typer | None = None
+    RUN_COMMAND_NAME = "run"
+    VISUALIZE_COMMAND_NAME = "visualize"
 
-    def context(self) -> Callable[[ProviderT], ProviderT]:
-        """Register one plain or synchronous context manager provider.
+    def __init__(
+        self,
+        *,
+        pipeline: Pipeline[ContextT],
+        context_provider: Callable[..., ContextT | AbstractContextManager[ContextT]]
+        | None = None,
+    ) -> None:
+        super().__init__(help="Data Joinery CLI")
+        self._pipeline = pipeline
+        self._context_provider = context_provider
+        self._validate_context_provider()
+        self.command(name=self.RUN_COMMAND_NAME, help="Run the pipeline.")(
+            self._build_run_command()
+        )
+        self.command(name=self.VISUALIZE_COMMAND_NAME, help="Visualize the pipeline.")(
+            self._visualize
+        )
 
-        Returns:
-            A decorator that leaves the provider independently callable.
+    def _validate_context_provider(self) -> None:
+        """Check that the provider matches the pipeline's context requirements."""
+        context_provider = self._context_provider
+        if context_provider is None and self._pipeline._context_type is not None:
+            raise TypeError("This job requires a context_provider passed to Job().")
+        if context_provider is not None:
+            if self._pipeline._context_type is None:
+                raise TypeError("A context-free pipeline cannot accept a provider.")
+            original = inspect.unwrap(context_provider)
+            if inspect.iscoroutinefunction(original) or inspect.isasyncgenfunction(
+                original
+            ):
+                raise TypeError("Async context providers are not supported.")
+            if inspect.isgeneratorfunction(context_provider):
+                raise TypeError("Wrap generator providers with @contextmanager.")
 
-        Raises:
-            TypeError: If the provider signature or pipeline context is unsupported.
-            ValueError: If registration is duplicate, late, or uses reserved options.
-        """
+    def _execute(self, **kwargs: Any) -> None:
+        """Acquire runtime context and run the pipeline within its resource scope."""
+        typer.echo("Running pipeline...")
+        with ExitStack() as stack:
+            if self._context_provider is None:
+                cast(Pipeline[None], self._pipeline).run()
+            else:
+                context = self._context_provider(**kwargs)
+                context_type = self._pipeline._context_type
+                assert context_type is not None
+                if not isinstance(context, context_type) and (
+                    hasattr(type(context), "__enter__")
+                    and hasattr(type(context), "__exit__")
+                ):
+                    context = stack.enter_context(_resource_scope(context))
+                self._pipeline.run(cast(ContextT, context))
+        typer.echo("Pipeline finished.")
 
-        def register(provider: ProviderT) -> ProviderT:
-            name = getattr(provider, "__qualname__", repr(provider))
-            if self._app is not None:
-                raise ValueError(
-                    f"Provider {name}: job commands are already finalized."
-                )
-            if self._provider is not None:
-                raise ValueError(
-                    f"Provider {name}: a context provider is already registered."
-                )
-            if self.pipeline._context_type is None:
-                raise TypeError(
-                    f"Provider {name}: a context-free pipeline cannot register a provider."
-                )
-            signature = _provider_signature(provider)
+    def _build_run_command(self) -> Callable[..., None]:
+        """Build a CLI callback with the provider's signature, when present."""
+        if self._context_provider is not None:
 
-            def probe(**kwargs: Any) -> None:
-                pass
+            @wraps(self._context_provider)
+            def execute(**kwargs: Any) -> None:
+                self._execute(**kwargs)
 
-            probe.__signature__ = signature  # type: ignore[missing-attribute]
-            _check_options(probe, provider)
-            self._signature = signature
-            self._provider = provider
-            return provider
+            return execute
 
-        return register
+        # Typer needs a parameterless command for a context-free job.
+        def run() -> None:
+            """Run the pipeline."""
+            self._execute()
 
-    @property
-    def app(self) -> typer.Typer:
-        """Return the Typer application, finalizing its commands on first access."""
-        if self._app is None:
-            app = typer.Typer(help="Run and visualize a Data Joinery pipeline.")
-
-            @app.callback()
-            def root() -> None:
-                pass
-
-            def run(**inputs: Any) -> None:
-                skip = inputs.pop("skip_side_effects")
-                typer.echo("Running pipeline...")
-                with ExitStack() as stack:
-                    if self._provider is None:
-                        if self.pipeline._context_type is not None:
-                            raise TypeError(
-                                "This job requires a context provider; register one with @job.context()."
-                            )
-                        cast(Pipeline[None], self.pipeline).run(
-                            include_side_effects=not skip
-                        )
-                    else:
-                        context = self._provider(**inputs)
-                        context_type = self.pipeline._context_type
-                        assert context_type is not None
-                        if not isinstance(context, context_type) and (
-                            hasattr(type(context), "__enter__")
-                            and hasattr(type(context), "__exit__")
-                        ):
-                            context = stack.enter_context(_resource_scope(context))
-                        self.pipeline.run(context, include_side_effects=not skip)
-                typer.echo("Pipeline finished.")
-
-            parameters = (
-                list(self._signature.parameters.values()) if self._signature else []
-            )
-            parameters.append(
-                inspect.Parameter(
-                    "skip_side_effects",
-                    inspect.Parameter.KEYWORD_ONLY,
-                    default=False,
-                    annotation=Annotated[
-                        bool,
-                        typer.Option(
-                            "--skip-side-effects", help="Skip marked side effect steps."
-                        ),
-                    ],
-                )
-            )
-            run.__signature__ = inspect.Signature(parameters, return_annotation=None)  # type: ignore[missing-attribute]
-            run.__doc__ = (
-                self._provider.__doc__ if self._provider else "Run the pipeline."
-            )
-            app.command()(run)
-            app.command("visualize")(self._visualize)
-            self._app = app
-        return self._app
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Invoke Typer, optionally passing an explicit ``args`` list.
-
-        Args:
-            *args: Positional arguments forwarded to Typer.
-            **kwargs: Keyword arguments forwarded to Typer.
-
-        Returns:
-            Typer's invocation result.
-        """
-        return self.app(*args, **kwargs)
+        return run
 
     def _visualize(
         self,
@@ -207,7 +121,7 @@ class Job[ContextT]:
             raise typer.BadParameter("--output must end in .svg or .png.")
         typer.echo("Visualizing pipeline...")
         try:
-            figure = self.pipeline.visualize(show=output is None)
+            figure = self._pipeline.visualize(show=output is None)
         except ImportError as error:
             typer.echo(f"Error: {error}", err=True)
             raise typer.Exit(1) from error

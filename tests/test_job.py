@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 from unittest.mock import Mock
 
 import pytest
@@ -29,37 +29,22 @@ def test_plain_provider_passes_complete_context(monkeypatch):
     pipeline = Pipeline(RunContext)
     execute = Mock()
     monkeypatch.setattr(pipeline, "run", execute)
-    job = Job(pipeline=pipeline)
 
-    @job.context()
     def context(destination: Path, count: int = 2) -> RunContext:
         return RunContext(destination, count)
 
-    CliRunner().invoke(job.app, ["run", "report.csv", "--count", "4"])
+    job = Job(pipeline=pipeline, context_provider=context)
 
-    execute.assert_called_once_with(
-        RunContext(Path("report.csv"), 4), include_side_effects=True
-    )
+    CliRunner().invoke(job, ["run", "report.csv", "--count", "4"])
 
-
-def test_provider_keeps_identity():
-    job = Job(pipeline=Pipeline(RunContext))
-
-    def provider() -> RunContext:
-        return RunContext(Path("report.csv"))
-
-    registered = job.context()(provider)
-
-    assert registered is provider
+    execute.assert_called_once_with(RunContext(Path("report.csv"), 4))
 
 
 def test_typed_options_and_keyword_only_defaults(monkeypatch):
     pipeline = Pipeline(RunContext)
     execute = Mock()
     monkeypatch.setattr(pipeline, "run", execute)
-    job = Job(pipeline=pipeline)
 
-    @job.context()
     def context(
         destination: Annotated[Path, typer.Option("--destination", "-d")],
         *,
@@ -68,11 +53,11 @@ def test_typed_options_and_keyword_only_defaults(monkeypatch):
     ) -> RunContext:
         return RunContext(destination / environment.value, count)
 
-    CliRunner().invoke(job.app, ["run", "-d", "reports", "--environment", "prod"])
+    job = Job(pipeline=pipeline, context_provider=context)
 
-    execute.assert_called_once_with(
-        RunContext(Path("reports/prod")), include_side_effects=True
-    )
+    CliRunner().invoke(job, ["run", "-d", "reports", "--environment", "prod"])
+
+    execute.assert_called_once_with(RunContext(Path("reports/prod")))
 
 
 @pytest.mark.parametrize(
@@ -87,23 +72,20 @@ def test_typed_options_and_keyword_only_defaults(monkeypatch):
     ],
 )
 def test_help_and_invalid_inputs_do_not_acquire(arguments):
-    job = Job(pipeline=Pipeline(RunContext))
     acquired = Mock()
 
-    @job.context()
     def context(destination: Path, count: int = 2) -> RunContext:
         acquired()
         return RunContext(destination, count)
 
-    CliRunner().invoke(job.app, arguments)
+    job = Job(pipeline=Pipeline(RunContext), context_provider=context)
+
+    CliRunner().invoke(job, arguments)
 
     acquired.assert_not_called()
 
 
 def test_help_preserves_metadata_and_enum_choices():
-    job = Job(pipeline=Pipeline(RunContext))
-
-    @job.context()
     def context(
         environment: Annotated[
             Environment, typer.Option(help="Deployment environment.")
@@ -111,7 +93,9 @@ def test_help_preserves_metadata_and_enum_choices():
     ) -> RunContext:
         return RunContext(Path(environment.value))
 
-    result = CliRunner().invoke(job.app, ["run", "--help"])
+    job = Job(pipeline=Pipeline(RunContext), context_provider=context)
+
+    result = CliRunner().invoke(job, ["run", "--help"])
 
     assert all(
         text in result.output for text in ["Deployment environment.", "preprod", "prod"]
@@ -130,9 +114,7 @@ def test_help_preserves_metadata_and_enum_choices():
 def test_managed_provider_lifecycle(monkeypatch, failure):
     events = []
     pipeline = Pipeline(RunContext)
-    job = Job(pipeline=pipeline)
 
-    @job.context()
     @contextmanager
     def context():
         events.append("enter")
@@ -141,22 +123,22 @@ def test_managed_provider_lifecycle(monkeypatch, failure):
         finally:
             events.append("exit")
 
+    job = Job(pipeline=pipeline, context_provider=context)
+
     def execute(*args, **kwargs):
         events.append("execute")
         if failure is not None:
             raise failure
 
     monkeypatch.setattr(pipeline, "run", execute)
-    CliRunner().invoke(job.app, ["run", "--skip-side-effects"])
+    CliRunner().invoke(job, ["run"])
 
     assert events == ["enter", "execute", "exit"]
 
 
 def test_validation_failure_closes_manager():
     events = []
-    job = Job(pipeline=Pipeline(RunContext))
 
-    @job.context()
     @contextmanager
     def context():
         try:
@@ -164,7 +146,9 @@ def test_validation_failure_closes_manager():
         finally:
             events.append("closed")
 
-    result = CliRunner().invoke(job.app, ["run"])
+    job = Job(pipeline=Pipeline(RunContext), context_provider=cast(Any, context))
+
+    result = CliRunner().invoke(job, ["run"])
 
     assert isinstance(result.exception, TypeError)
     assert events == ["closed"]
@@ -173,7 +157,6 @@ def test_validation_failure_closes_manager():
 @pytest.mark.parametrize("suppress", [False, True])
 def test_manager_cannot_suppress_pipeline_failure(monkeypatch, suppress):
     pipeline = Pipeline(RunContext)
-    job = Job(pipeline=pipeline)
     failure = RuntimeError("execution failed")
     monkeypatch.setattr(pipeline, "run", Mock(side_effect=failure))
 
@@ -184,11 +167,12 @@ def test_manager_cannot_suppress_pipeline_failure(monkeypatch, suppress):
         def __exit__(self, *args):
             return suppress
 
-    @job.context()
     def context():
         return Manager()
 
-    result = CliRunner().invoke(job.app, ["run"])
+    job = Job(pipeline=pipeline, context_provider=context)
+
+    result = CliRunner().invoke(job, ["run"])
 
     assert result.exception is failure
     assert "Pipeline finished." not in result.output
@@ -196,11 +180,9 @@ def test_manager_cannot_suppress_pipeline_failure(monkeypatch, suppress):
 
 def test_cleanup_failure_chains_execution_failure(monkeypatch):
     pipeline = Pipeline(RunContext)
-    job = Job(pipeline=pipeline)
     failure = RuntimeError("execution failed")
     monkeypatch.setattr(pipeline, "run", Mock(side_effect=failure))
 
-    @job.context()
     @contextmanager
     def context():
         try:
@@ -208,22 +190,23 @@ def test_cleanup_failure_chains_execution_failure(monkeypatch):
         finally:
             raise ValueError("cleanup failed")
 
-    result = CliRunner().invoke(job.app, ["run"])
+    job = Job(pipeline=pipeline, context_provider=context)
+
+    result = CliRunner().invoke(job, ["run"])
 
     assert result.exception is not None
     assert result.exception.__context__ is failure
 
 
 def test_cleanup_failure_prevents_completion():
-    job = Job(pipeline=Pipeline(RunContext))
-
-    @job.context()
     @contextmanager
     def context():
         yield RunContext(Path("report.csv"))
         raise RuntimeError("cleanup failed")
 
-    result = CliRunner().invoke(job.app, ["run"])
+    job = Job(pipeline=Pipeline(RunContext), context_provider=context)
+
+    result = CliRunner().invoke(job, ["run"])
 
     assert isinstance(result.exception, RuntimeError)
     assert "Pipeline finished." not in result.output
@@ -240,35 +223,12 @@ def test_context_instance_is_not_entered():
         def __exit__(self, *args):
             raise AssertionError("Must not close the context instance")
 
-    job = Job(pipeline=Pipeline(ManagedContext))
-
-    @job.context()
     def context():
         return ManagedContext(1)
 
-    assert CliRunner().invoke(job.app, ["run"]).exit_code == 0
+    job = Job(pipeline=Pipeline(ManagedContext), context_provider=context)
 
-
-@pytest.mark.parametrize(
-    "declaration",
-    [
-        "skip_side_effects: bool = False",
-        "value: Annotated[str, typer.Option('--skip-side-effects')] = ''",
-        "value: Annotated[bool, typer.Option('--enabled/--skip-side-effects')] = False",
-        "value: str = typer.Option('', '--help')",
-        "*args",
-        "**kwargs",
-        "value, /",
-        "value: Annotated[str, typer.Option('--help')] = ''",
-    ],
-)
-def test_invalid_parameters_identify_offender(declaration):
-    namespace: dict[str, Any] = {"Annotated": Annotated, "typer": typer}
-    exec(f"def provider({declaration}): pass", namespace)  # noqa: S102 - test signatures
-    job = Job(pipeline=Pipeline(RunContext))
-
-    with pytest.raises((ValueError, TypeError), match="provider.*parameter"):
-        job.context()(namespace["provider"])
+    assert CliRunner().invoke(job, ["run"]).exit_code == 0
 
 
 @pytest.mark.parametrize("kind", ["async", "generator", "async_generator"])
@@ -287,91 +247,55 @@ def test_unsupported_provider_kinds(kind):
         "generator": generator,
         "async_generator": async_generator,
     }[kind]
-    with pytest.raises(TypeError, match="Provider"):
-        Job(pipeline=Pipeline(RunContext)).context()(provider)
-
-
-def test_duplicate_registration_rejected():
-    job = Job(pipeline=Pipeline(RunContext))
-    job.context()(lambda: RunContext(Path("x")))
-
-    with pytest.raises(ValueError, match="already registered"):
-        job.context()(lambda: RunContext(Path("x")))
-
-
-def test_late_registration_rejected():
-    job = Job(pipeline=Pipeline(RunContext))
-    _ = job.app
-
-    with pytest.raises(ValueError, match="finalized"):
-        job.context()(lambda: RunContext(Path("x")))
+    with pytest.raises(TypeError, match="providers"):
+        Job(pipeline=Pipeline(RunContext), context_provider=cast(Any, provider))
 
 
 def test_context_free_job_rejects_provider():
     with pytest.raises(TypeError, match="context-free"):
-        Job(pipeline=Pipeline()).context()(lambda: None)
+        Job(pipeline=Pipeline(), context_provider=lambda: None)
 
 
 def test_context_free_job_runs():
-    assert CliRunner().invoke(Job(pipeline=Pipeline()).app, ["run"]).exit_code == 0
+    assert CliRunner().invoke(Job(pipeline=Pipeline()), ["run"]).exit_code == 0
 
 
-def test_missing_provider_fails_run():
-    result = CliRunner().invoke(Job(pipeline=Pipeline(RunContext)).app, ["run"])
-
-    assert isinstance(result.exception, TypeError)
-
-
-def test_missing_provider_allows_help():
-    result = CliRunner().invoke(
-        Job(pipeline=Pipeline(RunContext)).app, ["run", "--help"]
-    )
-
-    assert result.exit_code == 0
-
-
-def test_missing_provider_allows_visualization(monkeypatch):
-    pipeline = Pipeline(RunContext)
-    visualize = Mock()
-    monkeypatch.setattr(pipeline, "visualize", visualize)
-
-    CliRunner().invoke(Job(pipeline=pipeline).app, ["visualize"])
-
-    visualize.assert_called_once_with(show=True)
+def test_missing_provider_fails_construction():
+    with pytest.raises(TypeError, match="requires a context_provider passed to Job"):
+        Job(pipeline=Pipeline(RunContext))
 
 
 def test_visualization_does_not_acquire_provider(monkeypatch):
     pipeline = Pipeline(RunContext)
     monkeypatch.setattr(pipeline, "visualize", Mock())
-    job = Job(pipeline=pipeline)
     provider = Mock()
 
-    @job.context()
     def context():
         provider()
         return RunContext(Path("x"))
 
-    CliRunner().invoke(job.app, ["visualize"])
+    job = Job(pipeline=pipeline, context_provider=context)
+
+    CliRunner().invoke(job, ["visualize"])
 
     provider.assert_not_called()
 
 
 def test_invalid_enum_never_invokes_provider():
-    job = Job(pipeline=Pipeline(RunContext))
     acquired = Mock()
 
-    @job.context()
     def context(environment: Annotated[Environment, typer.Option()]):
         acquired()
         return RunContext(Path(environment.value))
 
-    CliRunner().invoke(job.app, ["run", "--environment", "unknown"])
+    job = Job(pipeline=Pipeline(RunContext), context_provider=context)
+
+    CliRunner().invoke(job, ["run", "--environment", "unknown"])
 
     acquired.assert_not_called()
 
 
-@pytest.mark.parametrize("skip", [False, True])
-def test_managed_run_side_effects(skip):
+def test_managed_run_side_effects():
     from data_joinery import side_effect, transform
 
     events = []
@@ -387,9 +311,7 @@ def test_managed_run_side_effects(skip):
 
     pipeline = Pipeline(RunContext)
     pipeline.add_step(produce) >> pipeline.add_step(publish)
-    job = Job(pipeline=pipeline)
 
-    @job.context()
     @contextmanager
     def context():
         events.append("enter")
@@ -398,35 +320,115 @@ def test_managed_run_side_effects(skip):
         finally:
             events.append("exit")
 
-    CliRunner().invoke(job.app, ["run", *(["--skip-side-effects"] if skip else [])])
+    job = Job(pipeline=pipeline, context_provider=context)
 
-    expected = (
-        ["enter", "produce", "exit"]
-        if skip
-        else ["enter", "produce", "publish", "exit"]
-    )
+    CliRunner().invoke(job, ["run"])
+
+    expected = ["enter", "produce", "publish", "exit"]
     assert events == expected
 
 
 def test_provider_input_validation():
-    job = Job(pipeline=Pipeline(RunContext))
-
-    @job.context()
     def context():
         raise typer.BadParameter("Invalid deployment configuration")
 
-    result = CliRunner().invoke(job.app, ["run"])
+    job = Job(pipeline=Pipeline(RunContext), context_provider=context)
+
+    result = CliRunner().invoke(job, ["run"])
 
     assert result.exit_code == 2
 
 
 def test_plain_provider_wrong_context_type():
-    job = Job(pipeline=Pipeline(RunContext))
-
-    @job.context()
     def context():
         return "wrong"
 
-    result = CliRunner().invoke(job.app, ["run"])
+    job = Job(pipeline=Pipeline(RunContext), context_provider=cast(Any, context))
+
+    result = CliRunner().invoke(job, ["run"])
 
     assert "expected context of type RunContext" in str(result.exception)
+
+
+@pytest.mark.parametrize("name", ["destination", "inputs", "kwargs"])
+@pytest.mark.parametrize("postponed", [False, True])
+@pytest.mark.parametrize("managed", [False, True])
+def test_provider_annotations_from_another_module(
+    monkeypatch, name, postponed, managed
+):
+    namespace: dict[str, Any] = {"RunContext": RunContext}
+    future = "from __future__ import annotations\n" if postponed else ""
+    decorator = "@contextmanager\n" if managed else ""
+    body = "yield" if managed else "return"
+    exec(  # noqa: S102 - exercise provider globals and postponed annotations
+        future
+        + "from contextlib import contextmanager\n"
+        + "from pathlib import Path\n"
+        + "from typing import Annotated\n"
+        + "import typer\n"
+        + decorator
+        + f"def provider({name}: Annotated[Path, typer.Option(help='Report destination.')]):\n"
+        + '    """Generate the report."""\n'
+        + f"    {body} RunContext({name})\n",
+        namespace,
+    )
+    pipeline = Pipeline(RunContext)
+    execute = Mock()
+    monkeypatch.setattr(pipeline, "run", execute)
+    job = Job(pipeline=pipeline, context_provider=namespace["provider"])
+
+    CliRunner().invoke(job, ["run", f"--{name}", "report.csv"])
+
+    execute.assert_called_once_with(RunContext(Path("report.csv")))
+
+
+def test_run_help_uses_command_description():
+    def generate_report() -> RunContext:
+        """Generate the daily report."""
+        return RunContext(Path("report.csv"))
+
+    job = Job(pipeline=Pipeline(RunContext), context_provider=generate_report)
+
+    assert "Run the pipeline." in CliRunner().invoke(job, ["run", "--help"]).output
+
+
+def test_provider_can_define_skip_side_effects_option(monkeypatch):
+    pipeline = Pipeline(RunContext)
+    execute = Mock()
+    monkeypatch.setattr(pipeline, "run", execute)
+
+    def context(skip_side_effects: bool = False) -> RunContext:
+        return RunContext(Path("report.csv"), int(skip_side_effects))
+
+    job = Job(pipeline=pipeline, context_provider=context)
+    CliRunner().invoke(job, ["run", "--skip-side-effects"])
+
+    execute.assert_called_once_with(RunContext(Path("report.csv"), 1))
+
+
+def test_additional_typer_command():
+    job = Job(pipeline=Pipeline())
+
+    @job.command()
+    def status() -> None:
+        """Show application status."""
+        typer.echo("Ready")
+
+    assert CliRunner().invoke(job, ["status"]).output == "Ready\n"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--skip-side-effects", "run"],
+        ["--skip-side-effects", "visualize"],
+        ["run", "--skip-side-effects"],
+        ["visualize", "--skip-side-effects"],
+    ],
+)
+def test_job_rejects_skip_side_effects_option(arguments):
+    job = Job(pipeline=Pipeline())
+
+    result = CliRunner().invoke(job, arguments)
+
+    assert result.exit_code == 2
