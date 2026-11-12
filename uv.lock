@@ -281,6 +281,7 @@ vis = [
 dev = [
     { name = "deptry" },
     { name = "ipykernel" },
+    { name = "matplotlib" },
     { name = "mkdocstrings-python" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -308,6 +309,7 @@ provides-extras = ["all", "pyspark", "polars", "pydantic", "vis"]
 dev = [
     { name = "deptry", specifier = ">=0.25.1" },
     { name = "ipykernel", specifier = ">=7.3.0" },
+    { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "mkdocstrings-python", specifier = ">=2.0.8" },
     { name = "pandas", specifier = ">=2.0.0,<3.0.0" },
     { name = "pyarrow", specifier = ">=25.0.1" },
