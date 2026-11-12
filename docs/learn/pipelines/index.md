@@ -224,16 +224,14 @@ DataFrames between backends.
 
 ## Visualizing data flow
 
-Install the `vis` extra and call `pipeline.visualize()` after connecting the steps.
-The figure places steps from left to right in flow order. Each card shows its step name,
-transformation, inputs, and output type. Arrows point to the parameter that receives the
-data. Teal marks DataFrames, purple marks instance values, and grey marks steps without
-an output. Context dependencies appear inside the relevant step card.
+You can visualize a pipeline to see how data flows from one step to another. Simply call
+[`pipeline.visualize()`][data_joinery.Pipeline.visualize] to open a Matplotlib figure to show a diagram of the pipeline.
 
-This example splits the orders into two branches, combines them, then passes both
-DataFrames and a fitted model into later steps:
+[Context dependencies](context.md) appear as rounded grey inputs labelled with their dependency
+type. In this example, **read orders** uses `order_date` (`OrderDate · Ctx`) to select the orders for
+the report.
 
-![Order pipeline data flow: orders split into clean and priority branches, combine, then feed a model and scoring step before being written.](../../images/pipeline-data-flow.svg)
+![Read orders has a grey order_date input. Read orders and read customers feed join orders, which feeds print orders.](../../images/pipeline-data-flow.svg)
 
 Open the [full-size figure](../../images/pipeline-data-flow.svg) to inspect each input and output.
 

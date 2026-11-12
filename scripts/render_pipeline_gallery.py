@@ -16,7 +16,7 @@ import polars as pl
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
-from data_joinery import Pipeline, Strict, transform
+from data_joinery import Context, Pipeline, Strict, transform
 
 
 class Records: ...
@@ -144,6 +144,77 @@ def dataframe() -> Pipeline:
     return pipeline
 
 
+@dataclass
+class Customers:
+    customer_id: int
+    name: str
+
+
+@dataclass
+class OrdersWithCustomer:
+    order_id: int
+    amount: float
+    customer_id: int
+    name: str
+
+
+@dataclass
+class Destination:
+    path: str
+
+
+@dataclass
+class WriterContext:
+    destination: Destination
+
+
+@transform
+def read_customers() -> Annotated[pl.DataFrame, Strict(Customers)]:
+    """Read the example customer data."""
+    return pl.DataFrame({"customer_id": [1], "name": ["Alice"]})
+
+
+@transform
+def join_orders_customers(
+    orders: Annotated[pl.DataFrame, Strict(Orders)],
+    customers: Annotated[pl.DataFrame, Strict(Customers)],
+) -> Annotated[pl.DataFrame, Strict(OrdersWithCustomer)]:
+    """Combine the example orders and customers."""
+    return orders.join(customers, how="cross")
+
+
+@transform(side_effect=True)
+def write_output(
+    orders_with_customer: Annotated[pl.DataFrame, Strict(OrdersWithCustomer)],
+    destination: Annotated[Destination, Context()],
+) -> None:
+    """Guard against accidentally executing a writer while rendering."""
+    raise RuntimeError("Gallery rendering must not execute the writer")
+
+
+def schema_ribbons() -> Pipeline:
+    """Build the three-stage design reference with real DataFrame contracts."""
+    pipeline = Pipeline(WriterContext)
+    orders = pipeline.add_step(read_orders)
+    customers = pipeline.add_step(read_customers)
+    joined = pipeline.add_step(join_orders_customers)
+    writer = pipeline.add_step(write_output)
+    pipeline.connect(orders, joined, param="orders")
+    pipeline.connect(customers, joined, param="customers")
+    pipeline.connect(joined, writer)
+    return pipeline
+
+
+def repeated_inputs() -> Pipeline:
+    """Show one producer feeding two separately named inputs."""
+    pipeline = Pipeline()
+    source = pipeline.add_step(read_records)
+    combined = pipeline.add_step(combine_records)
+    pipeline.connect(source, combined, param="primary")
+    pipeline.connect(source, combined, param="secondary")
+    return pipeline
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -160,6 +231,8 @@ def main() -> None:
         ("branching", branching),
         ("large", large),
         ("dataframe", dataframe),
+        ("schema-ribbons", schema_ribbons),
+        ("repeated-inputs", repeated_inputs),
     ):
         figure = build().visualize(show=False)
         path = args.output_dir / f"{name}.png"
