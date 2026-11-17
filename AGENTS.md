@@ -25,6 +25,12 @@
 - Documentation is generated using `zensical`
 - The just command to build docs is `just docs-build`
 - The documentation relies on `docs_src` for runnable code snippets which `just docs-examples` updates for you
+- Before adding or revising a documentation page, read comparable pages and their
+  runnable examples. Start in the same section and look elsewhere in the docs if
+  another page teaches a more similar task.
+- Follow the conventions those pages share for structure, terminology, and how
+  examples present code and output. During review, compare the edited section
+  with a comparable page. Keep differences that help readers follow the lesson.
 - When including a snippet the format should be:
 
     ``` python
@@ -56,6 +62,17 @@ begin with `test_` and the documentation script will run it with pytest.
   implementation. UNLESS the page is in the `internals` section
 
 - Try to keep wording simple so that even somebody not an expert in Python can still understand it.
+
+### Page focus
+
+- Give each page or section one main teaching point. Keep the explanation
+  focused on what readers need to understand or do to apply it.
+- An example can use concepts taught elsewhere without explaining them again.
+  Explain a supporting choice only when readers need to understand it to follow
+  the example or make a decision the section asks them to make.
+- During review, try removing each aside. If readers can still follow the
+  example and apply the lesson correctly, leave it out. Link to an existing
+  explanation when readers are likely to need it.
 
 ## Skills
 
