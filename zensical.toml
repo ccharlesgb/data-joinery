@@ -19,6 +19,7 @@ nav = [
     ] },
     { "Transformations" = [
       "learn/transform/index.md",
+      "learn/transform/sql.md",
       "learn/transform/testing.md",
       "learn/transform/mixing_backends.md",
     ]},
