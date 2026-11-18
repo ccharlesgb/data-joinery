@@ -247,6 +247,24 @@ def test_palette_cycles_without_collapsing_distinct_types():
     assert list(_output_colours(dag).values()) == [*_PALETTE, _PALETTE[0]]
 
 
+@pytest.mark.parametrize(
+    ("backend_name", "expected"),
+    [
+        ("polars", "Orders · polars DF"),
+        ("pyspark", "Orders · pyspark DF"),
+        (None, "Orders · DF"),
+    ],
+)
+def test_dataframe_contract_label_includes_backend(backend_name, expected):
+    @dataclass
+    class Orders:
+        order_id: int
+
+    contract = replace(Strict(Orders), backend_name=backend_name)
+
+    assert _contract_label(contract, {Orders: "Orders"}) == expected
+
+
 def test_same_named_classes_have_distinct_labels():
     first = type("Records", (), {"__module__": "source_one"})
     second = type("Records", (), {"__module__": "source_two"})
