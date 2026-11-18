@@ -6,6 +6,7 @@ review_context_count = 5   # Recent reviews to include as context
 # Exact agent efforts: low, medium, high, xhigh, max
 review_reasoning = "medium"  # For code reviews (default: thorough)
 refine_reasoning = "medium"  # For refine command (default: standard)
+refine_model = "gpt-6.1-sol"
 
 # Severity filtering
 review_min_severity = "medium"  # Low findings are reported but do not fail reviews
