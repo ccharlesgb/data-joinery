@@ -221,7 +221,8 @@ DataFrames between backends.
 
 ## Visualizing data flow
 
-You can visualize a pipeline to see how data flows from one step to another. Simply call
+You can visualize a pipeline to see how data flows from one step to another. Install
+`data-joinery[vis]`, then call
 [`pipeline.visualize()`][data_joinery.Pipeline.visualize] to open a Matplotlib figure to show a diagram of the pipeline.
 
 [Context dependencies](context.md) appear as rounded grey inputs labelled with their dependency
