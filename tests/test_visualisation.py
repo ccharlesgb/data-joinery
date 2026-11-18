@@ -250,8 +250,8 @@ def test_palette_cycles_without_collapsing_distinct_types():
 @pytest.mark.parametrize(
     ("backend_name", "expected"),
     [
-        ("polars", "Orders · polars DF"),
-        ("pyspark", "Orders · pyspark DF"),
+        ("polars", "Orders · polars"),
+        ("pyspark", "Orders · pyspark"),
         (None, "Orders · DF"),
     ],
 )

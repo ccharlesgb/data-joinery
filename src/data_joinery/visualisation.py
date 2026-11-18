@@ -179,8 +179,7 @@ def _contract_label(contract: object, names: dict[type, str]) -> str:
     value_type = _contract_type(contract)
     name = names[value_type] if value_type else ""
     if isinstance(contract, DataFrameContract):
-        frame = f"{contract.backend_name} DF" if contract.backend_name else "DF"
-        return f"{name} · {frame}"
+        return f"{name} · {contract.backend_name or 'DF'}"
     if isinstance(contract, InstanceContract):
         return f"{name} · Instance"
     if isinstance(contract, VoidContract):
