@@ -7,6 +7,8 @@ from .contract import (
 )
 from .pipeline import (
     Pipeline,
+    PipelineConnectionError,
+    PipelineCycleError,
     PipelineExecutionError,
     PipelineOverrideError,
     Step,
@@ -29,6 +31,8 @@ __all__ = [
     "DefaultSource",
     "JoineryModel",
     "Pipeline",
+    "PipelineConnectionError",
+    "PipelineCycleError",
     "PipelineExecutionError",
     "PipelineOverrideError",
     "PipelineResult",

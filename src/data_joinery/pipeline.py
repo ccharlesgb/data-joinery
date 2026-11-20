@@ -341,7 +341,6 @@ class Pipeline[ContextT]:
             raise PipelineConnectionError(
                 f"Step '{connected_upstream.name}' is already connected to "
                 f"'{downstream.name}' input '{downstream_parameter_name}'. "
-                "Disconnect that input before connecting another step."
             )
 
         try:
