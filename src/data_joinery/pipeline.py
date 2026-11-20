@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, overload
@@ -75,16 +75,11 @@ class Step[OutputT]:
 
     def __rshift__(self, other: Step | list[Step]) -> Step | list[Step]:
         """Connect this step to downstream steps and return the right operand."""
-        downstream_steps = other if isinstance(other, list) else [other]
-        if not downstream_steps:
-            raise ValueError(">> requires at least one downstream Step.")
-        for downstream in downstream_steps:
-            if not isinstance(downstream, Step):
-                raise TypeError(
-                    "Can only connect Step instances using >>; "
-                    f"got {type(downstream).__name__}."
-                )
-            self._pipeline.connect(self, downstream)
+        if isinstance(other, Step):
+            self._pipeline.connect(self, other)
+        else:
+            downstream_steps = self._shift_steps(other, ">>", "downstream")
+            self._pipeline._connect_group((self, step) for step in downstream_steps)
         return other
 
     @overload
@@ -95,17 +90,25 @@ class Step[OutputT]:
 
     def __lshift__(self, other: Step | list[Step]) -> Step | list[Step]:
         """Connect upstream steps to this step and return the right operand."""
-        upstream_steps = other if isinstance(other, list) else [other]
-        if not upstream_steps:
-            raise ValueError("<< requires at least one upstream Step.")
-        for upstream in upstream_steps:
-            if not isinstance(upstream, Step):
-                raise TypeError(
-                    "Can only connect Step instances using <<; "
-                    f"got {type(upstream).__name__}."
-                )
-            self._pipeline.connect(upstream, self)
+        if isinstance(other, Step):
+            self._pipeline.connect(other, self)
+        else:
+            upstream_steps = self._shift_steps(other, "<<", "upstream")
+            self._pipeline._connect_group((step, self) for step in upstream_steps)
         return other
+
+    @staticmethod
+    def _shift_steps(other: object, operator: str, role: str) -> Iterator[Step]:
+        steps = other if isinstance(other, list) else [other]
+        if not steps:
+            raise ValueError(f"{operator} requires at least one {role} Step.")
+        for step in steps:
+            if not isinstance(step, Step):
+                raise TypeError(
+                    f"Can only connect Step instances using {operator}; "
+                    f"got {type(step).__name__}."
+                )
+            yield step
 
     def __rrshift__(self, other: list[Step]) -> Step[OutputT]:
         """Connect a list of upstream steps to this step."""
@@ -133,7 +136,7 @@ class Pipeline[ContextT]:
     def __init__(self, context_type: type[ContextT]) -> None: ...
 
     def __init__(self, context_type: type[ContextT] | None = None):
-        self._dag = rx.PyDAG(check_cycle=True)
+        self._dag: rx.PyDiGraph[Step, str] = rx.PyDiGraph(check_cycle=True)
         self._node_indices: dict[Step[Any], int] = {}
         self._steps_by_name: dict[str, Step[Any]] = {}
         self._context_type = context_type
@@ -238,6 +241,16 @@ class Pipeline[ContextT]:
                 be connected.
             PipelineCycleError: If the connection would create a cycle.
         """
+        self._connect(self._dag, upstream, downstream, param=param)
+
+    def _connect(
+        self,
+        dag: rx.PyDiGraph[Step, str],
+        upstream: Step,
+        downstream: Step,
+        *,
+        param: str | None = None,
+    ) -> None:
         for role, step in (("upstream", upstream), ("downstream", downstream)):
             if not isinstance(step, Step):
                 raise TypeError(
@@ -317,14 +330,14 @@ class Pipeline[ContextT]:
             )
 
         downstream_index = self._node_indices[downstream]
-        for connected_upstream_index, _, connected_parameter_name in self._dag.in_edges(
+        for connected_upstream_index, _, connected_parameter_name in dag.in_edges(
             downstream_index
         ):
             if connected_parameter_name != downstream_parameter_name:
                 continue
             if connected_upstream_index == self._node_indices[upstream]:
                 return
-            connected_upstream = self._dag[connected_upstream_index]
+            connected_upstream = dag[connected_upstream_index]
             raise PipelineConnectionError(
                 f"Step '{connected_upstream.name}' is already connected to "
                 f"'{downstream.name}' input '{downstream_parameter_name}'. "
@@ -332,7 +345,7 @@ class Pipeline[ContextT]:
             )
 
         try:
-            self._dag.add_edge(
+            dag.add_edge(
                 self._node_indices[upstream],
                 downstream_index,
                 downstream_parameter_name,
@@ -350,7 +363,8 @@ class Pipeline[ContextT]:
     ) -> None:
         """Connect several upstream steps to one downstream step.
 
-        Each output must match one unambiguous downstream input.
+        Each output must match one unambiguous downstream input. If a connection
+        fails, the pipeline keeps its existing connections.
 
         Args:
             upstream_steps: Nonempty sequence of steps that provide inputs.
@@ -366,8 +380,13 @@ class Pipeline[ContextT]:
                 "connect_many requires at least one upstream step. Pass a nonempty "
                 "sequence of Step instances."
             )
-        for upstream in upstream_steps:
-            self.connect(upstream, downstream)
+        self._connect_group((upstream, downstream) for upstream in upstream_steps)
+
+    def _connect_group(self, connections: Iterable[tuple[Step, Step]]) -> None:
+        dag = self._dag.copy()
+        for upstream, downstream in connections:
+            self._connect(dag, upstream, downstream)
+        self._dag = dag
 
     def get_upstream_steps(self, step: Step) -> set[Step]:
         """Return the steps directly connected to ``step`` as inputs."""

@@ -23,7 +23,7 @@ class _Vertex:
     edge: tuple[int, int, str] | None = None
 
 
-def topological_layout(dag: rx.PyDAG) -> dict[int, tuple[float, float]]:
+def topological_layout(dag: rx.PyDiGraph) -> dict[int, tuple[float, float]]:
     """Place steps in layers and order branches to reduce crossing lines."""
     generations = [list(group) for group in rx.topological_generations(dag)]
     layer = {index: depth for depth, group in enumerate(generations) for index in group}
@@ -95,7 +95,7 @@ def _contract_label(contract: object) -> tuple[str, str]:
     return "DataFrame", "frame"
 
 
-def draw_pipeline(dag: rx.PyDAG) -> Figure:
+def draw_pipeline(dag: rx.PyDiGraph) -> Figure:
     """Return a figure with labeled steps, data types, and input connections."""
     from matplotlib import pyplot as plt
     from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch

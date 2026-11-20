@@ -234,6 +234,61 @@ def test_step_shift_uses_contract_validation(wiring_steps):
         right >> left
 
 
+@pytest.mark.parametrize(
+    "connect",
+    [
+        pytest.param(
+            lambda pipeline, steps, sink: pipeline.connect_many(steps, sink),
+            id="connect_many",
+        ),
+        pytest.param(lambda _, steps, sink: steps >> sink, id="right_shift"),
+        pytest.param(lambda _, steps, sink: sink << steps, id="left_shift"),
+    ],
+)
+def test_grouped_connections_leave_input_free_when_second_source_conflicts(
+    wiring_steps, connect
+):
+    pipeline, source, left, _, sink = wiring_steps
+
+    with pytest.raises(PipelineConnectionError, match="already connected"):
+        connect(pipeline, [left, source], sink)
+
+    assert pipeline.get_upstream_steps(sink) == set()
+
+
+@pytest.mark.parametrize(
+    "connect",
+    [
+        pytest.param(lambda source, steps: source >> steps, id="right_shift"),
+        pytest.param(lambda source, steps: steps << source, id="left_shift"),
+    ],
+)
+def test_grouped_connections_preserve_existing_edges_on_failure(wiring_steps, connect):
+    pipeline, source, left, right, _ = wiring_steps
+    pipeline.connect(source, right)
+
+    with pytest.raises(PipelineConnectionError, match="No compatible contract"):
+        connect(source, [right, left, source])
+
+    assert {step: pipeline.get_upstream_steps(step) for step in (left, right)} == {
+        left: set(),
+        right: {source},
+    }
+
+
+def test_grouped_connections_leave_no_edges_when_a_later_edge_creates_a_cycle(
+    wiring_steps,
+):
+    pipeline, _, left, _, sink = wiring_steps
+    upstream = pipeline.add_step(left.transform, "upstream")
+    pipeline.connect(upstream, left)
+
+    with pytest.raises(PipelineCycleError):
+        left >> [sink, upstream]
+
+    assert pipeline.get_upstream_steps(sink) == set()
+
+
 def test_connect_many_rejects_empty_sources():
     @transform
     def read_users(

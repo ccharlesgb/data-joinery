@@ -43,7 +43,12 @@ transformations are compatible and can be connected together:
 
     You can also connect steps with `upstream >> downstream` or `downstream << upstream`.
     For multiple steps, use `upstream >> [first, second]` to send one result to both steps,
-    or `[first, second] >> downstream` to provide two inputs to one step. Use `connect(..., param="input_name")` when a match is ambiguous.
+    or `[first, second] >> downstream` to provide two inputs to one step. Use
+    `connect_many([first, second], downstream)` for the method form, or
+    `connect(..., param="input_name")` when a match is ambiguous.
+
+    Each grouped call or shift applies its connections only if all of them succeed.
+    In a chain of shifts, each shift applies its own group of connections.
 
 ## Validating the pipeline
 

@@ -34,6 +34,8 @@ downstream)` is equivalent to `upstream >> downstream` or `downstream << upstrea
 reversed forms are `[first, second] << upstream` and `downstream << [first, second]`.
 Lists can also appear between shifts, as in `source >> [first, second] >> joined`.
 Use `connect_many([...], downstream)` for the explicit many-to-one form.
+Each grouped call or shift applies its connections only if all of them succeed.
+In a chain, each shift applies its own group of connections.
 
 Connections are validated as the graph is built. Incompatible schema or instance contracts raise
 `PipelineConnectionError`, and a connection that creates a cycle raises `PipelineCycleError`. A run
