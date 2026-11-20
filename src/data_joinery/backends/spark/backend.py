@@ -410,7 +410,7 @@ def _build_projected_column(
                 recurse=recurse,
             )
             nested_columns.append(nested_column.alias(target_field.name))
-        return F.struct(*nested_columns)
+        return F.when(column.isNull(), F.lit(None)).otherwise(F.struct(*nested_columns))
 
     if recurse and isinstance(target_type, types.ArrayType):
         if not isinstance(source_type, types.ArrayType):

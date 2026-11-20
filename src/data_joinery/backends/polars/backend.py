@@ -123,7 +123,7 @@ def _build_projected_expression(
 ) -> pl.Expr:
     if isinstance(source_type, pl.Struct) and isinstance(target_type, pl.Struct):
         source_fields = {field.name: field.dtype for field in source_type.fields}
-        return pl.struct(
+        projected = pl.struct(
             [
                 _build_projected_expression(
                     expression.struct.field(field.name),
@@ -134,6 +134,7 @@ def _build_projected_expression(
                 for field in target_type.fields
             ]
         )
+        return pl.when(expression.is_null()).then(None).otherwise(projected)
 
     if isinstance(source_type, pl.List) and isinstance(target_type, pl.List):
         return expression.list.eval(
