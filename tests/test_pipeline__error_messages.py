@@ -21,6 +21,7 @@ from data_joinery.pipeline import (
     PipelineExecutionError,
     PipelineOverrideError,
 )
+from tests.models import Department
 
 
 class User(JoineryModel):
@@ -28,8 +29,9 @@ class User(JoineryModel):
     name: Column[str]
 
 
-class Department(JoineryModel):
-    department_id: Column[int]
+@transform
+def _empty_users() -> Annotated[pl.DataFrame, Project(User)]:
+    return pl.DataFrame()
 
 
 def test_schema_error_names_fields_types_and_repair():
@@ -61,15 +63,11 @@ def test_transform_schema_error_names_parameter_and_keeps_violations():
 
 def test_pipeline_connection_error_describes_both_contracts():
     @transform
-    def users() -> Annotated[pl.DataFrame, Project(User)]:
-        return pl.DataFrame()
-
-    @transform
     def accept(departments: Annotated[pl.DataFrame, Project(Department)]) -> None:
         pass
 
     pipeline = Pipeline()
-    source = pipeline.add_step(users)
+    source = pipeline.add_step(_empty_users, "users")
     sink = pipeline.add_step(accept)
 
     with pytest.raises(PipelineConnectionError) as caught:
@@ -85,15 +83,11 @@ def test_pipeline_connection_error_describes_both_contracts():
 
 def test_pipeline_connection_error_distinguishes_eager_and_lazy_polars_frames():
     @transform
-    def users() -> Annotated[pl.DataFrame, Project(User)]:
-        return pl.DataFrame()
-
-    @transform
     def accept(users: Annotated[pl.LazyFrame, Project(User)]) -> None:
         pass
 
     pipeline = Pipeline()
-    source = pipeline.add_step(users)
+    source = pipeline.add_step(_empty_users, "users")
     sink = pipeline.add_step(accept)
 
     with pytest.raises(PipelineConnectionError, match=r"polars LazyFrame\[User\]"):
@@ -102,10 +96,6 @@ def test_pipeline_connection_error_distinguishes_eager_and_lazy_polars_frames():
 
 def test_ambiguous_connection_rejects_unmatched_explicit_parameter():
     @transform
-    def users() -> Annotated[pl.DataFrame, Project(User)]:
-        return pl.DataFrame()
-
-    @transform
     def combine(
         left: Annotated[pl.DataFrame, Project(User)],
         right: Annotated[pl.DataFrame, Project(User)],
@@ -113,7 +103,7 @@ def test_ambiguous_connection_rejects_unmatched_explicit_parameter():
         pass
 
     pipeline = Pipeline()
-    source = pipeline.add_step(users)
+    source = pipeline.add_step(_empty_users, "users")
     sink = pipeline.add_step(combine)
 
     with pytest.raises(PipelineConnectionError, match="Choose one of: left, right"):
@@ -121,14 +111,10 @@ def test_ambiguous_connection_rejects_unmatched_explicit_parameter():
 
 
 def test_pipeline_rejects_step_from_another_pipeline_with_clear_error():
-    @transform
-    def users() -> Annotated[pl.DataFrame, Project(User)]:
-        return pl.DataFrame()
-
     first = Pipeline()
     second = Pipeline()
-    source = first.add_step(users)
-    sink = second.add_step(users)
+    source = first.add_step(_empty_users, "users")
+    sink = second.add_step(_empty_users, "users")
 
     with pytest.raises(PipelineConnectionError, match="belongs to another pipeline"):
         second.connect(source, sink)
@@ -192,42 +178,41 @@ def test_pipeline_uses_default_for_unconnected_input():
     assert result.get_step_invocation(sink) == expected
 
 
-def test_pipeline_runs_root_step_with_only_defaulted_inputs():
-    @transform
-    def read(path: str = "data.csv") -> str:
-        return path
+@transform
+def _read_path(path: str) -> str:
+    return path
 
+
+@transform
+def _read_default_path(path: str = "data.csv") -> str:
+    return path
+
+
+@transform
+def _read_fixture_path(path: str = "fixture.csv") -> str:
+    return path
+
+
+@pytest.mark.parametrize(
+    ("original", "override", "path"),
+    [
+        pytest.param(_read_default_path, None, "data.csv", id="original-default"),
+        pytest.param(
+            _read_path, _read_fixture_path, "fixture.csv", id="override-default"
+        ),
+    ],
+)
+def test_pipeline_runs_root_step_with_defaulted_input(original, override, path):
     pipeline = Pipeline()
-    step = pipeline.add_step(read)
+    step = pipeline.add_step(original, "read")
+    overrides = {"read": override} if override is not None else None
 
-    result = pipeline.run()
+    result = pipeline.run(transform_overrides=overrides)
     expected = StepInvocation(
         step=step,
-        transform=read,
-        inputs={"path": BoundInput("data.csv", DefaultSource())},
-        output="data.csv",
-    )
-    assert result.get_step_invocation(step) == expected
-
-
-def test_pipeline_runs_root_step_with_defaults_from_override():
-    @transform
-    def read(path: str) -> str:
-        return path
-
-    @transform
-    def replacement(path: str = "fixture.csv") -> str:
-        return path
-
-    pipeline = Pipeline()
-    step = pipeline.add_step(read)
-
-    result = pipeline.run(transform_overrides={"read": replacement})
-    expected = StepInvocation(
-        step=step,
-        transform=replacement,
-        inputs={"path": BoundInput("fixture.csv", DefaultSource())},
-        output="fixture.csv",
+        transform=original if override is None else override,
+        inputs={"path": BoundInput(path, DefaultSource())},
+        output=path,
     )
     assert result.get_step_invocation(step) == expected
 
@@ -265,15 +250,11 @@ def test_pipeline_uses_effective_transform_default_for_unconnected_input():
 
 def test_override_error_names_expected_and_actual_output():
     @transform
-    def users() -> Annotated[pl.DataFrame, Project(User)]:
-        return pl.DataFrame()
-
-    @transform
     def replacement() -> Annotated[pl.DataFrame, Strict(Department)]:
         return pl.DataFrame()
 
     pipeline = Pipeline()
-    pipeline.add_step(users)
+    pipeline.add_step(_empty_users, "users")
 
     with pytest.raises(PipelineOverrideError) as caught:
         pipeline.run(transform_overrides={"users": replacement})

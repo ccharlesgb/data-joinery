@@ -6,11 +6,7 @@ from pyspark.sql import SparkSession
 
 from data_joinery.backends.spark import SparkContext
 from data_joinery.context import inspect_context_type
-
-
-@dataclass(frozen=True)
-class PathConfig:
-    value: str
+from tests.models import PathConfig
 
 
 @dataclass(frozen=True)

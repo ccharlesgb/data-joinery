@@ -4,8 +4,9 @@ from datetime import date
 import pytest
 from pydantic import BaseModel
 
-from data_joinery import Column, JoineryModel, column
+from data_joinery import Column, JoineryModel
 from data_joinery.schemas.model_schema import ModelSchema
+from tests.models import JoineryDetail
 
 
 @dataclass
@@ -26,27 +27,42 @@ class PydanticRow(BaseModel):
     details: list[PydanticDetail]
 
 
+class JoineryDateDetail(JoineryModel):
+    """A nested JoineryModel with a date field."""
+
+    day: Column[date]
+
+
+class JoineryDateRow(JoineryModel):
+    """A JoineryModel row containing a list of nested dates."""
+
+    details: Column[list[JoineryDateDetail]]
+
+
 @pytest.mark.parametrize(
-    ("model", "row"),
+    "row",
     [
-        (DataclassRow, DataclassRow([DataclassDetail(date(2026, 1, 1))])),
-        (
-            PydanticRow,
+        pytest.param(
+            JoineryDateRow(details=[JoineryDateDetail(day=date(2026, 1, 1))]),
+            id="joinery",
+        ),
+        pytest.param(
+            DataclassRow([DataclassDetail(date(2026, 1, 1))]),
+            id="dataclass",
+        ),
+        pytest.param(
             PydanticRow(details=[PydanticDetail(day=date(2026, 1, 1))]),
+            id="pydantic",
         ),
     ],
 )
-def test_serialize_rows_returns_nested_dictionaries_with_python_values(model, row):
-    actual = ModelSchema.from_model(model).serialize_rows([row])
-
+def test_serialize_rows_returns_nested_dictionaries_with_python_values(row):
     expected = [{"details": [{"day": date(2026, 1, 1)}]}]
-    assert actual == expected
+
+    assert ModelSchema.from_model(type(row)).serialize_rows([row]) == expected
 
 
 def test_serialize_dataclass_with_nested_joinery_model_uses_column_names():
-    class JoineryDetail(JoineryModel):
-        day: Column[date] = column(name="Event Day")
-
     @dataclass
     class Wrapper:
         detail: JoineryDetail

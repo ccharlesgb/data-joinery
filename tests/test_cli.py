@@ -44,21 +44,30 @@ def build_pipeline():
     return path
 
 
-def test_run_executes_side_effects(pipeline_file: Path, tmp_path: Path):
-    destination = tmp_path / "run.txt"
-    result = CliRunner().invoke(
-        app, ["run", str(pipeline_file), "--context", f"destination={destination}"]
+def _run_pipeline(target: str | Path, destination: Path, *flags: str):
+    return CliRunner().invoke(
+        app, ["run", str(target), "--context", f"destination={destination}", *flags]
     )
 
-    assert (result.exit_code, destination.read_text()) == (0, "produce,publish")
+
+@pytest.mark.parametrize(
+    ("flags", "expected"),
+    [
+        pytest.param((), "produce,publish", id="side-effects-enabled"),
+        pytest.param(("--skip-side-effects",), "produce", id="side-effects-skipped"),
+    ],
+)
+def test_run_side_effects(pipeline_file: Path, tmp_path: Path, flags, expected):
+    destination = tmp_path / "run.txt"
+
+    result = _run_pipeline(pipeline_file, destination, *flags)
+
+    assert result.exit_code == 0
+    assert destination.read_text() == expected
 
 
 def test_run_reports_start_and_completion(pipeline_file: Path, tmp_path: Path):
-    destination = tmp_path / "run.txt"
-
-    result = CliRunner().invoke(
-        app, ["run", str(pipeline_file), "--context", f"destination={destination}"]
-    )
+    result = _run_pipeline(pipeline_file, tmp_path / "run.txt")
 
     assert result.output == (
         f"Running pipeline from {pipeline_file}...\nPipeline finished.\n"
@@ -72,29 +81,10 @@ def test_run_does_not_report_completion_after_failure(
         raise RuntimeError("step failed")
 
     monkeypatch.setattr(Pipeline, "run", fail)
-    destination = tmp_path / "run.txt"
 
-    result = CliRunner().invoke(
-        app, ["run", str(pipeline_file), "--context", f"destination={destination}"]
-    )
+    result = _run_pipeline(pipeline_file, tmp_path / "run.txt")
 
     assert result.output == f"Running pipeline from {pipeline_file}...\n"
-
-
-def test_run_skips_side_effects(pipeline_file: Path, tmp_path: Path):
-    destination = tmp_path / "run.txt"
-    result = CliRunner().invoke(
-        app,
-        [
-            "run",
-            str(pipeline_file),
-            "--context",
-            f"destination={destination}",
-            "--skip-side-effects",
-        ],
-    )
-
-    assert (result.exit_code, destination.read_text()) == (0, "produce")
 
 
 @pytest.mark.parametrize("extension", ["png", "svg"])
@@ -166,17 +156,10 @@ def test_run_accepts_module_and_explicit_builder(
     monkeypatch.syspath_prepend(str(pipeline_file.parent))
     destination = tmp_path / "module.txt"
 
-    result = CliRunner().invoke(
-        app,
-        [
-            "run",
-            "example_pipeline:build_pipeline",
-            "--context",
-            f"destination={destination}",
-        ],
-    )
+    result = _run_pipeline("example_pipeline:build_pipeline", destination)
 
-    assert (result.exit_code, destination.read_text()) == (0, "produce,publish")
+    assert result.exit_code == 0
+    assert destination.read_text() == "produce,publish"
 
 
 def test_run_loads_file_inside_package(tmp_path: Path):

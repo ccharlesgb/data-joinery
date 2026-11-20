@@ -18,7 +18,10 @@ def test_run_executes_side_effects_by_default():
     assert calls == ["publish"]
 
 
-def test_run_skips_side_effects_and_runs_upstream_steps():
+@pytest.fixture
+def produce_and_publish():
+    """Provide a connected pipeline and its recorded calls."""
+
     calls: list[str] = []
 
     @transform
@@ -35,24 +38,19 @@ def test_run_skips_side_effects_and_runs_upstream_steps():
     sink = pipeline.add_step(publish)
     source >> sink
 
+    return pipeline, source, calls
+
+
+def test_run_skips_side_effects_and_runs_upstream_steps(produce_and_publish):
+    pipeline, _, calls = produce_and_publish
+
     pipeline.run(include_side_effects=False)
 
     assert calls == ["produce"]
 
 
-def test_skipped_step_is_absent_from_result():
-    @transform
-    def produce() -> int:
-        return 1
-
-    @transform(side_effect=True)
-    def publish(value: int) -> None:
-        pass
-
-    pipeline = Pipeline()
-    source = pipeline.add_step(produce)
-    sink = pipeline.add_step(publish)
-    source >> sink
+def test_skipped_step_is_absent_from_result(produce_and_publish):
+    pipeline, source, _ = produce_and_publish
 
     result = pipeline.run(include_side_effects=False)
 

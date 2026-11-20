@@ -7,20 +7,15 @@ from polars.testing import assert_frame_equal
 
 from data_joinery import (
     BoundInput,
-    Column,
     Context,
     ContextSource,
     DefaultSource,
-    JoineryModel,
     Pipeline,
     Project,
     StepInvocation,
     transform,
 )
-
-
-class Row(JoineryModel):
-    value: Column[int]
+from tests.models import Row
 
 
 @dataclass
@@ -198,7 +193,12 @@ def test_result_records_dataframe_passed_before_input_coercion():
     assert_frame_equal(received[0], pl.DataFrame({"value": [1]}))
 
 
-def test_result_get_one_input_raises_for_no_match():
+@pytest.mark.parametrize(
+    ("input_type", "count"),
+    [(int, 0), (str, 2)],
+    ids=["no-match", "multiple-matches"],
+)
+def test_result_get_one_input_requires_exactly_one_match(input_type, count):
     @transform
     def write(first: str = "a", second: str = "b") -> None:
         pass
@@ -206,17 +206,5 @@ def test_result_get_one_input_raises_for_no_match():
     pipeline = Pipeline()
     pipeline.add_step(write)
 
-    with pytest.raises(LookupError, match="found 0"):
-        pipeline.run().get_one_input("write", int)
-
-
-def test_result_get_one_input_raises_for_multiple_matches():
-    @transform
-    def write(first: str = "a", second: str = "b") -> None:
-        pass
-
-    pipeline = Pipeline()
-    pipeline.add_step(write)
-
-    with pytest.raises(LookupError, match="found 2"):
-        pipeline.run().get_one_input("write", str)
+    with pytest.raises(LookupError, match=rf"\bfound {count}\b"):
+        pipeline.run().get_one_input("write", input_type)

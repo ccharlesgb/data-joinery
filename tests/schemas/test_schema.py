@@ -3,10 +3,7 @@ import pytest
 from data_joinery import Column, JoineryModel, Schema, column
 from data_joinery.schemas import CoercionMode, DifferenceKind, SchemaCoercionError
 from tests.conftest import BackendHelper
-
-
-class Item(JoineryModel):
-    value: Column[int]
+from tests.models import Item
 
 
 def test_schema_rejects_a_non_schema_model() -> None:
