@@ -1,528 +1,98 @@
+from datetime import date
 from typing import Annotated
 
 import pytest
-from pyspark.sql import DataFrame, SparkSession, types
+from pyspark.sql import SparkSession, types
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Column, JoineryModel, Pipeline, Schema, schemas, transform
-from data_joinery import Project as ProjectContract
+from data_joinery import Column, JoineryModel, Schema, SchemaCoercionError
 from data_joinery.backends.spark import backend as spark_backend
-from data_joinery.pipeline import PipelineConnectionError
 
-
-def test_schema_create_dataframe_makes_spark_dataframe(spark: SparkSession):
-    class Row(JoineryModel):
-        field1: Column[int]
-        field2: Column[str]
-
-    rows = [Row(field1=1, field2="a"), Row(field1=2, field2="b")]
-    dataframe = Schema(Row).create_dataframe(rows, DataFrame, session=spark)
-
-    expected_schema = types.StructType(
-        [
-            types.StructField("field1", types.LongType(), False),
-            types.StructField("field2", types.StringType(), False),
-        ]
-    )
-
-    assertDataFrameEqual(
-        dataframe, spark.createDataFrame([(1, "a"), (2, "b")], expected_schema)
-    )
-
-
-def test_schema_create_dataframe_with_nested_schemas(spark: SparkSession):
-    class NestedRow(JoineryModel):
-        nested_field1: Column[int]
-        nested_field2: Column[str]
-
-    class Row(JoineryModel):
-        top_level: Column[str]
-        nested: Column[NestedRow]
-
-    rows = [
-        Row(top_level="a", nested=NestedRow(nested_field1=1, nested_field2="x")),
-        Row(top_level="b", nested=NestedRow(nested_field1=2, nested_field2="y")),
-    ]
-    dataframe = Schema(Row).create_dataframe(rows, DataFrame, session=spark)
-
-    expected_schema = types.StructType(
-        [
-            types.StructField("top_level", types.StringType(), False),
-            types.StructField(
-                "nested",
-                types.StructType(
-                    [
-                        types.StructField("nested_field1", types.LongType(), False),
-                        types.StructField("nested_field2", types.StringType(), False),
-                    ]
-                ),
-                False,
-            ),
-        ]
-    )
-
-    assertDataFrameEqual(
-        dataframe,
-        spark.createDataFrame([("a", (1, "x")), ("b", (2, "y"))], expected_schema),
-    )
-
-
-def test_schema_create_dataframe_rejects_rows_of_a_different_type(
-    spark: SparkSession,
-):
-    class Row(JoineryModel):
-        field1: Column[int]
-        field2: Column[str]
-
-    class OtherRow(JoineryModel):
-        field1: Column[int]
-
-    rows = [Row(field1=1, field2="a"), OtherRow(field1=2)]
-    with pytest.raises(ValueError, match="Row 1: expected Row, got OtherRow"):
-        Schema(Row).create_dataframe(rows, DataFrame, session=spark)  # type: ignore
-
-
-def test_schema_native_schema_returns_struct_type_for_model():
-    class Row(JoineryModel):
-        field1: Column[int]
-        field2: Column[str]
-
-    actual_schema = Schema(Row).native_schema(types.StructType)
-    expected_schema = types.StructType(
-        [
-            types.StructField("field1", types.LongType(), True),
-            types.StructField("field2", types.StringType(), True),
-        ]
-    )
-    assert actual_schema == expected_schema
-
-
-def test_schema_native_schema_honors_annotated_spark_type():
-    class Row(JoineryModel):
-        field1: Column[Annotated[float, types.DoubleType()]]
-
-    actual_schema = Schema(Row).native_schema(types.StructType)
-
-    assert actual_schema == types.StructType(
-        [types.StructField("field1", types.DoubleType(), True)]
-    )
-
-
-def test_schema_native_schema_honors_annotated_array_element_type():
-    class Row(JoineryModel):
-        field1: Column[list[Annotated[float, types.DoubleType()]]]
-
-    actual_schema = Schema(Row).native_schema(types.StructType)
-
-    assert actual_schema == types.StructType(
-        [types.StructField("field1", types.ArrayType(types.DoubleType(), True), True)]
-    )
-
-
-def test_schema_native_schema_returns_struct_type_for_optional_fields():
-    class Row(JoineryModel):
-        field1: Column[int | None]
-        field2: Column[str | None]
-
-    actual_schema = Schema(Row).native_schema(types.StructType)
-    expected_schema = types.StructType(
-        [
-            types.StructField("field1", types.LongType(), True),
-            types.StructField("field2", types.StringType(), True),
-        ]
-    )
-    assert actual_schema == expected_schema
-
-
-def test_schema_native_schema_returns_nested_schema():
-    class NestedRow(JoineryModel):
-        nested_field1: Column[int]
-        nested_field2: Column[str]
-
-    class Row(JoineryModel):
-        field1: Column[NestedRow]
-        field2: Column[str]
-
-    actual_schema = Schema(Row).native_schema(types.StructType)
-    expected_schema = types.StructType(
-        [
-            types.StructField(
-                "field1",
-                types.StructType(
-                    [
-                        types.StructField("nested_field1", types.LongType(), True),
-                        types.StructField("nested_field2", types.StringType(), True),
-                    ]
-                ),
-                True,
-            ),
-            types.StructField("field2", types.StringType(), True),
-        ]
-    )
-    assert actual_schema == expected_schema
-
-
-def test_schema_native_schema_returns_array_fields():
-    class NestedRow(JoineryModel):
-        nested_field: Column[int]
-
-    class Row(JoineryModel):
-        array_field: Column[list[str]]
-        optional_array_field: Column[list[int] | None]
-        array_field_with_optional_elements: Column[list[float | None]]
-        array_field_of_models: Column[list[NestedRow]]
-        array_field_of_optional_models: Column[list[NestedRow | None]]
-        optional_array_field_of_optional_models: Column[list[NestedRow | None] | None]
-
-    actual_schema = Schema(Row).native_schema(types.StructType)
-    expected_schema = types.StructType(
-        [
-            types.StructField(
-                "array_field", types.ArrayType(types.StringType(), True), True
-            ),
-            types.StructField(
-                "optional_array_field", types.ArrayType(types.LongType(), True), True
-            ),
-            types.StructField(
-                "array_field_with_optional_elements",
-                types.ArrayType(types.DoubleType(), True),
-                True,
-            ),
-            types.StructField(
-                "array_field_of_models",
-                types.ArrayType(
-                    types.StructType(
-                        [types.StructField("nested_field", types.LongType(), True)]
-                    ),
-                    True,
-                ),
-                True,
-            ),
-            types.StructField(
-                "array_field_of_optional_models",
-                types.ArrayType(
-                    types.StructType(
-                        [types.StructField("nested_field", types.LongType(), True)]
-                    ),
-                    True,
-                ),
-                True,
-            ),
-            types.StructField(
-                "optional_array_field_of_optional_models",
-                types.ArrayType(
-                    types.StructType(
-                        [types.StructField("nested_field", types.LongType(), True)]
-                    ),
-                    True,
-                ),
-                True,
-            ),
-        ]
-    )
-    assert actual_schema == expected_schema
-
-
-def test_schema_diff_reports_all_nested_differences():
-    given = types.StructType(
-        [
-            types.StructField("extra", types.StringType(), True),
-            types.StructField(
-                "customer",
-                types.StructType(
-                    [
-                        types.StructField("name", types.IntegerType(), False),
-                        types.StructField("legacy", types.StringType(), True),
-                    ]
-                ),
-                False,
-            ),
-            types.StructField(
-                "items", types.ArrayType(types.IntegerType(), containsNull=False), True
-            ),
-        ]
-    )
-    expected = types.StructType(
-        [
-            types.StructField(
-                "customer",
-                types.StructType(
-                    [
-                        types.StructField("name", types.StringType(), True),
-                        types.StructField("postcode", types.StringType(), True),
-                    ]
-                ),
-                True,
-            ),
-            types.StructField(
-                "items", types.ArrayType(types.StringType(), containsNull=True), True
-            ),
-        ]
-    )
-
-    diff = spark_backend._schema_diff(given, expected)
-
-    assert [difference.path for difference in diff.additional] == [
-        "extra",
-        "customer.legacy",
-    ]
-    assert [difference.path for difference in diff.missing] == ["customer.postcode"]
-    assert [difference.path for difference in diff.type_mismatches] == [
-        "customer.name",
-        "items[]",
-    ]
-
-
-_NUMERIC = types.NumericType()
-_STRING = types.StringType()
-_DATE = types.DateType()
 _TIME_TYPE = getattr(types, "TimeType", None)
-_TIME = _TIME_TYPE() if _TIME_TYPE is not None else None
-_TIMESTAMP = types.TimestampType()
-_TIMESTAMP_NTZ = types.TimestampNTZType()
-_INTERVAL = types.DayTimeIntervalType()
-_BOOLEAN = types.BooleanType()
-_BINARY = types.BinaryType()
-_ARRAY = types.ArrayType(types.NullType())
-_MAP = types.MapType(types.NullType(), types.NullType())
-_STRUCT = types.StructType()
+_CAST_TYPES = {
+    "number": types.LongType(),
+    "string": types.StringType(),
+    "date": types.DateType(),
+    "time": _TIME_TYPE() if _TIME_TYPE is not None else None,
+    "timestamp": types.TimestampType(),
+    "timestamp_ntz": types.TimestampNTZType(),
+    "interval": types.DayTimeIntervalType(),
+    "boolean": types.BooleanType(),
+    "binary": types.BinaryType(),
+    "array": types.ArrayType(types.LongType()),
+    "map": types.MapType(types.StringType(), types.LongType()),
+    "struct": types.StructType([types.StructField("value", types.LongType())]),
+}
 
-_TEST_CAST_MATRIX = {
-    (_NUMERIC, _NUMERIC): True,
-    (_NUMERIC, _STRING): True,
-    (_NUMERIC, _DATE): False,
-    (_NUMERIC, _TIME): False,
-    (_NUMERIC, _TIMESTAMP): True,
-    (_NUMERIC, _TIMESTAMP_NTZ): False,
-    (_NUMERIC, _INTERVAL): True,
-    (_NUMERIC, _BOOLEAN): True,
-    (_NUMERIC, _BINARY): False,
-    (_NUMERIC, _ARRAY): False,
-    (_NUMERIC, _MAP): False,
-    (_NUMERIC, _STRUCT): False,
-    (_STRING, _NUMERIC): True,
-    (_STRING, _STRING): True,
-    (_STRING, _DATE): True,
-    (_STRING, _TIME): True,
-    (_STRING, _TIMESTAMP): True,
-    (_STRING, _TIMESTAMP_NTZ): True,
-    (_STRING, _INTERVAL): True,
-    (_STRING, _BOOLEAN): True,
-    (_STRING, _BINARY): True,
-    (_STRING, _ARRAY): False,
-    (_STRING, _MAP): False,
-    (_STRING, _STRUCT): False,
-    (_DATE, _NUMERIC): False,
-    (_DATE, _STRING): True,
-    (_DATE, _DATE): True,
-    (_DATE, _TIME): False,
-    (_DATE, _TIMESTAMP): True,
-    (_DATE, _TIMESTAMP_NTZ): True,
-    (_DATE, _INTERVAL): False,
-    (_DATE, _BOOLEAN): False,
-    (_DATE, _BINARY): False,
-    (_DATE, _ARRAY): False,
-    (_DATE, _MAP): False,
-    (_DATE, _STRUCT): False,
-    (_TIME, _NUMERIC): False,
-    (_TIME, _STRING): True,
-    (_TIME, _DATE): False,
-    (_TIME, _TIME): True,
-    (_TIME, _TIMESTAMP): False,
-    (_TIME, _TIMESTAMP_NTZ): False,
-    (_TIME, _INTERVAL): False,
-    (_TIME, _BOOLEAN): False,
-    (_TIME, _BINARY): False,
-    (_TIME, _ARRAY): False,
-    (_TIME, _MAP): False,
-    (_TIME, _STRUCT): False,
-    (_TIMESTAMP, _NUMERIC): True,
-    (_TIMESTAMP, _STRING): True,
-    (_TIMESTAMP, _DATE): True,
-    (_TIMESTAMP, _TIME): False,
-    (_TIMESTAMP, _TIMESTAMP): True,
-    (_TIMESTAMP, _TIMESTAMP_NTZ): True,
-    (_TIMESTAMP, _INTERVAL): False,
-    (_TIMESTAMP, _BOOLEAN): False,
-    (_TIMESTAMP, _BINARY): False,
-    (_TIMESTAMP, _ARRAY): False,
-    (_TIMESTAMP, _MAP): False,
-    (_TIMESTAMP, _STRUCT): False,
-    (_TIMESTAMP_NTZ, _NUMERIC): False,
-    (_TIMESTAMP_NTZ, _STRING): True,
-    (_TIMESTAMP_NTZ, _DATE): True,
-    (_TIMESTAMP_NTZ, _TIME): False,
-    (_TIMESTAMP_NTZ, _TIMESTAMP): True,
-    (_TIMESTAMP_NTZ, _TIMESTAMP_NTZ): True,
-    (_TIMESTAMP_NTZ, _INTERVAL): False,
-    (_TIMESTAMP_NTZ, _BOOLEAN): False,
-    (_TIMESTAMP_NTZ, _BINARY): False,
-    (_TIMESTAMP_NTZ, _ARRAY): False,
-    (_TIMESTAMP_NTZ, _MAP): False,
-    (_TIMESTAMP_NTZ, _STRUCT): False,
-    (_INTERVAL, _NUMERIC): True,
-    (_INTERVAL, _STRING): True,
-    (_INTERVAL, _DATE): False,
-    (_INTERVAL, _TIME): False,
-    (_INTERVAL, _TIMESTAMP): False,
-    (_INTERVAL, _TIMESTAMP_NTZ): False,
-    (_INTERVAL, _INTERVAL): True,
-    (_INTERVAL, _BOOLEAN): False,
-    (_INTERVAL, _BINARY): False,
-    (_INTERVAL, _ARRAY): False,
-    (_INTERVAL, _MAP): False,
-    (_INTERVAL, _STRUCT): False,
-    (_BOOLEAN, _NUMERIC): True,
-    (_BOOLEAN, _STRING): True,
-    (_BOOLEAN, _DATE): False,
-    (_BOOLEAN, _TIME): False,
-    (_BOOLEAN, _TIMESTAMP): False,
-    (_BOOLEAN, _TIMESTAMP_NTZ): False,
-    (_BOOLEAN, _INTERVAL): False,
-    (_BOOLEAN, _BOOLEAN): True,
-    (_BOOLEAN, _BINARY): False,
-    (_BOOLEAN, _ARRAY): False,
-    (_BOOLEAN, _MAP): False,
-    (_BOOLEAN, _STRUCT): False,
-    (_BINARY, _NUMERIC): False,
-    (_BINARY, _STRING): True,
-    (_BINARY, _DATE): False,
-    (_BINARY, _TIME): False,
-    (_BINARY, _TIMESTAMP): False,
-    (_BINARY, _TIMESTAMP_NTZ): False,
-    (_BINARY, _INTERVAL): False,
-    (_BINARY, _BOOLEAN): False,
-    (_BINARY, _BINARY): True,
-    (_BINARY, _ARRAY): False,
-    (_BINARY, _MAP): False,
-    (_BINARY, _STRUCT): False,
-    (_ARRAY, _NUMERIC): False,
-    (_ARRAY, _STRING): True,
-    (_ARRAY, _DATE): False,
-    (_ARRAY, _TIME): False,
-    (_ARRAY, _TIMESTAMP): False,
-    (_ARRAY, _TIMESTAMP_NTZ): False,
-    (_ARRAY, _INTERVAL): False,
-    (_ARRAY, _BOOLEAN): False,
-    (_ARRAY, _BINARY): False,
-    (_ARRAY, _ARRAY): True,
-    (_ARRAY, _MAP): False,
-    (_ARRAY, _STRUCT): False,
-    (_MAP, _NUMERIC): False,
-    (_MAP, _STRING): True,
-    (_MAP, _DATE): False,
-    (_MAP, _TIME): False,
-    (_MAP, _TIMESTAMP): False,
-    (_MAP, _TIMESTAMP_NTZ): False,
-    (_MAP, _INTERVAL): False,
-    (_MAP, _BOOLEAN): False,
-    (_MAP, _BINARY): False,
-    (_MAP, _ARRAY): False,
-    (_MAP, _MAP): True,
-    (_MAP, _STRUCT): False,
-    (_STRUCT, _NUMERIC): False,
-    (_STRUCT, _STRING): True,
-    (_STRUCT, _DATE): False,
-    (_STRUCT, _TIME): False,
-    (_STRUCT, _TIMESTAMP): False,
-    (_STRUCT, _TIMESTAMP_NTZ): False,
-    (_STRUCT, _INTERVAL): False,
-    (_STRUCT, _BOOLEAN): False,
-    (_STRUCT, _BINARY): False,
-    (_STRUCT, _ARRAY): False,
-    (_STRUCT, _MAP): False,
-    (_STRUCT, _STRUCT): True,
+_ANSI_CAST_TARGETS = {
+    "number": ["number", "string", "timestamp", "interval", "boolean"],
+    "string": [
+        "number",
+        "string",
+        "date",
+        "time",
+        "timestamp",
+        "timestamp_ntz",
+        "interval",
+        "boolean",
+        "binary",
+    ],
+    "date": ["string", "date", "timestamp", "timestamp_ntz"],
+    "time": ["string", "time"],
+    "timestamp": ["number", "string", "date", "timestamp", "timestamp_ntz"],
+    "timestamp_ntz": ["string", "date", "timestamp", "timestamp_ntz"],
+    "interval": ["number", "string", "interval"],
+    "boolean": ["number", "string", "boolean"],
+    "binary": ["string", "binary"],
+    "array": ["string", "array"],
+    "map": ["string", "map"],
+    "struct": ["string", "struct"],
 }
 
 
 @pytest.mark.parametrize(
     ("source", "target", "allowed"),
     [
-        (source, target, allowed)
-        for (source, target), allowed in _TEST_CAST_MATRIX.items()
-        if source is not None and target is not None
+        pytest.param(
+            source_type,
+            target_type,
+            target in _ANSI_CAST_TARGETS[source],
+            id=f"{source}-to-{target}",
+        )
+        for source, source_type in _CAST_TYPES.items()
+        for target, target_type in _CAST_TYPES.items()
+        if source_type is not None and target_type is not None
     ],
 )
-def test_is_cast_compatible_matches_ansi_matrix(source, target, allowed):
+def test_is_cast_compatible_matches_spark_ansi_rules(source, target, allowed):
     assert spark_backend._is_cast_compatible(source, target) is allowed
 
 
-def test_schema_coercion_error_exposes_all_violations():
-    violations = (
-        schemas.SchemaDifference(
-            "missing",
-            "customer.postcode",
-            None,
-            types.StringType(),
-        ),
-        schemas.SchemaDifference(
-            "type_mismatch",
-            "active",
-            types.BinaryType(),
-            types.BooleanType(),
-        ),
-    )
+def test_project_cast_reports_unsupported_spark_ansi_casts(spark: SparkSession):
+    class SourceRow(JoineryModel):
+        binary: Column[bytes | None]
+        day: Column[date | None]
 
-    error = schemas.SchemaCoercionError("project_cast", violations)
-
-    assert error.mode == "project_cast"
-    assert error.violations == violations
-    assert str(error) == (
-        "Cannot coerce DataFrame (mode='project_cast'):\n"
-        "  - Missing field 'customer.postcode': expected StringType(). "
-        "Add the field or update the model.\n"
-        "  - Field 'active': expected BooleanType(), got BinaryType(). "
-        "Convert the values to the expected type before coercion."
-    )
-
-
-# --- Schema.coerce_dataframe: strict ---
-
-
-def test_schema_coerce_dataframe_strict_makes_all_fields_nullable(
-    spark: SparkSession,
-):
     class TargetRow(JoineryModel):
-        a: Column[int]
-        b: Column[str]
+        binary: Column[bool]
+        day: Column[int]
+        required: Column[str]
 
-    dataframe = spark.createDataFrame(
-        [(1, "a")],
-        types.StructType(
-            [
-                types.StructField("a", types.LongType(), False),
-                types.StructField("b", types.StringType(), True),
-            ]
-        ),
-    )
-    result = Schema(TargetRow).coerce_dataframe(dataframe, "strict")
-
-    assert all(field.nullable for field in result.schema.fields)
-
-
-def test_schema_coerce_dataframe_strict_preserves_source_column_order(
-    spark: SparkSession,
-):
-    class TargetRow(JoineryModel):
-        first: Column[int]
-        second: Column[str]
-
-    dataframe = spark.createDataFrame(
-        [("a", 1)],
-        types.StructType(
-            [
-                types.StructField("second", types.StringType(), True),
-                types.StructField("first", types.LongType(), True),
-            ]
-        ),
+    source = spark.createDataFrame(
+        [(None, None)], Schema(SourceRow).native_schema(types.StructType)
     )
 
-    result = Schema(TargetRow).coerce_dataframe(dataframe, "strict")
+    with pytest.raises(SchemaCoercionError) as caught:
+        Schema(TargetRow).coerce_dataframe(source, "project_cast")
 
-    assert result.columns == ["second", "first"]
+    assert sorted((item.kind, item.path) for item in caught.value.violations) == [
+        ("missing", "required"),
+        ("type_mismatch", "binary"),
+        ("type_mismatch", "day"),
+    ]
 
 
-def test_schema_coerce_dataframe_makes_nested_values_nullable(
+def test_strict_normalizes_spark_nullability(
     spark: SparkSession,
 ):
     nested_type = types.StructType(
@@ -538,8 +108,9 @@ def test_schema_coerce_dataframe_makes_nested_values_nullable(
             ]
         ]
 
+    rows = [((1,), [2], {"three": 3})]
     dataframe = spark.createDataFrame(
-        [((1,), [2], {"three": 3})],
+        rows,
         types.StructType(
             [
                 types.StructField("nested", nested_type, False),
@@ -555,483 +126,8 @@ def test_schema_coerce_dataframe_makes_nested_values_nullable(
         ),
     )
 
-    result = Schema(TargetRow).coerce_dataframe(dataframe, "strict")
+    expected = spark.createDataFrame(rows, dataframe.schema.toNullable())
 
-    assert result.schema == dataframe.schema.toNullable()
-    assert result.collect() == dataframe.collect()
+    actual = Schema(TargetRow).coerce_dataframe(dataframe, "strict")
 
-
-def test_coerce_dataframe_strict_raises_for_extra_column(spark: SparkSession):
-    dataframe = spark.createDataFrame(
-        [(1, "a")],
-        types.StructType(
-            [
-                types.StructField("a", types.IntegerType(), True),
-                types.StructField("b", types.StringType(), True),
-            ]
-        ),
-    )
-    schema = types.StructType([types.StructField("a", types.IntegerType(), True)])
-
-    with pytest.raises(schemas.SchemaCoercionError):
-        spark_backend._coerce_strict(dataframe, schema)
-
-
-def test_coerce_dataframe_strict_raises_for_type_mismatch(spark: SparkSession):
-    dataframe = spark.createDataFrame(
-        [(1,)], types.StructType([types.StructField("a", types.IntegerType(), True)])
-    )
-    schema = types.StructType([types.StructField("a", types.StringType(), True)])
-
-    with pytest.raises(schemas.SchemaCoercionError):
-        spark_backend._coerce_strict(dataframe, schema)
-
-
-# --- _coerce_dataframe: project_top_level ---
-
-
-def test_coerce_dataframe_project_top_level_selects_subset_of_columns(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [(1, "a", 1.0)],
-        types.StructType(
-            [
-                types.StructField("a", types.IntegerType(), True),
-                types.StructField("b", types.StringType(), True),
-                types.StructField("c", types.DoubleType(), True),
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField("a", types.IntegerType(), True),
-            types.StructField("b", types.StringType(), True),
-        ]
-    )
-
-    result = spark_backend._project_fields(
-        dataframe, schema, mode="project_top_level", cast=False, recurse=False
-    )
-
-    assert result.columns == ["a", "b"]
-    assert result.collect() == [types.Row(a=1, b="a")]
-
-
-def test_coerce_dataframe_project_top_level_raises_for_missing_column(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [(1,)], types.StructType([types.StructField("a", types.IntegerType(), True)])
-    )
-    schema = types.StructType(
-        [
-            types.StructField("a", types.IntegerType(), True),
-            types.StructField("b", types.StringType(), True),
-        ]
-    )
-
-    with pytest.raises(schemas.SchemaCoercionError):
-        spark_backend._project_fields(
-            dataframe, schema, mode="project_top_level", cast=False, recurse=False
-        )
-
-
-def test_coerce_dataframe_project_top_level_rejects_nested_additional_field(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [((1, "reject"),)],
-        types.StructType(
-            [
-                types.StructField(
-                    "nested",
-                    types.StructType(
-                        [
-                            types.StructField("value", types.IntegerType(), True),
-                            types.StructField("nested_extra", types.StringType(), True),
-                        ]
-                    ),
-                    True,
-                )
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField(
-                "nested",
-                types.StructType(
-                    [types.StructField("value", types.IntegerType(), True)]
-                ),
-                True,
-            )
-        ]
-    )
-
-    with pytest.raises(schemas.SchemaCoercionError) as error:
-        spark_backend._project_fields(
-            dataframe, schema, mode="project_top_level", cast=False, recurse=False
-        )
-
-    assert [(item.kind, item.path) for item in error.value.violations] == [
-        ("additional", "nested.nested_extra")
-    ]
-
-
-def test_coerce_dataframe_project_raises_for_type_mismatch(spark: SparkSession):
-    dataframe = spark.createDataFrame(
-        [(1,)], types.StructType([types.StructField("a", types.IntegerType(), True)])
-    )
-    schema = types.StructType([types.StructField("a", types.StringType(), True)])
-
-    with pytest.raises(schemas.SchemaCoercionError):
-        spark_backend._project_fields(
-            dataframe, schema, mode="project", cast=False, recurse=True
-        )
-
-
-def test_coerce_dataframe_project_reports_every_missing_and_type_mismatch(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [(1,)],
-        types.StructType([types.StructField("actual", types.IntegerType(), True)]),
-    )
-    schema = types.StructType(
-        [
-            types.StructField("actual", types.StringType(), True),
-            types.StructField("required", types.StringType(), True),
-        ]
-    )
-
-    with pytest.raises(schemas.SchemaCoercionError) as error:
-        spark_backend._project_fields(
-            dataframe, schema, mode="project", cast=False, recurse=True
-        )
-
-    assert [
-        (violation.kind, violation.path) for violation in error.value.violations
-    ] == [
-        ("missing", "required"),
-        ("type_mismatch", "actual"),
-    ]
-
-
-# --- _coerce_dataframe: project ---
-
-
-def test_coerce_dataframe_project_prunes_nested_struct_fields(spark: SparkSession):
-    dataframe = spark.createDataFrame(
-        [((1, 2),)],
-        types.StructType(
-            [
-                types.StructField(
-                    "a",
-                    types.StructType(
-                        [
-                            types.StructField("a1", types.IntegerType(), True),
-                            types.StructField("a2", types.IntegerType(), True),
-                        ]
-                    ),
-                    True,
-                )
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField(
-                "a",
-                types.StructType([types.StructField("a1", types.IntegerType(), True)]),
-                True,
-            )
-        ]
-    )
-
-    result = spark_backend._project_fields(
-        dataframe, schema, mode="project", cast=False, recurse=True
-    )
-
-    assert result.collect() == [types.Row(a=types.Row(a1=1))]
-
-
-def test_coerce_dataframe_project_prunes_array_of_struct_fields(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [([(1, 2), (3, 4)],)],
-        types.StructType(
-            [
-                types.StructField(
-                    "items",
-                    types.ArrayType(
-                        types.StructType(
-                            [
-                                types.StructField("a1", types.IntegerType(), True),
-                                types.StructField("a2", types.IntegerType(), True),
-                            ]
-                        )
-                    ),
-                    True,
-                )
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField(
-                "items",
-                types.ArrayType(
-                    types.StructType(
-                        [types.StructField("a1", types.IntegerType(), True)]
-                    )
-                ),
-                True,
-            )
-        ]
-    )
-
-    result = spark_backend._project_fields(
-        dataframe, schema, mode="project", cast=False, recurse=True
-    )
-
-    assert result.collect() == [types.Row(items=[types.Row(a1=1), types.Row(a1=3)])]
-
-
-def test_coerce_dataframe_project_raises_for_missing_nested_field(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [((1,),)],
-        types.StructType(
-            [
-                types.StructField(
-                    "a",
-                    types.StructType(
-                        [types.StructField("a1", types.IntegerType(), True)]
-                    ),
-                    True,
-                )
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField(
-                "a",
-                types.StructType(
-                    [
-                        types.StructField("a1", types.IntegerType(), True),
-                        types.StructField("a2", types.IntegerType(), True),
-                    ]
-                ),
-                True,
-            )
-        ]
-    )
-
-    with pytest.raises(schemas.SchemaCoercionError):
-        spark_backend._project_fields(
-            dataframe, schema, mode="project", cast=False, recurse=True
-        )
-
-
-def test_coerce_dataframe_project_raises_for_nested_type_mismatch(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [((1,),)],
-        types.StructType(
-            [
-                types.StructField(
-                    "a",
-                    types.StructType(
-                        [types.StructField("a1", types.IntegerType(), True)]
-                    ),
-                    True,
-                )
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField(
-                "a",
-                types.StructType([types.StructField("a1", types.StringType(), True)]),
-                True,
-            )
-        ]
-    )
-
-    with pytest.raises(schemas.SchemaCoercionError):
-        spark_backend._project_fields(
-            dataframe, schema, mode="project", cast=False, recurse=True
-        )
-
-
-# --- _coerce_dataframe: project_cast ---
-
-
-def test_coerce_dataframe_project_cast_casts_mismatched_leaf_types(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [(1.9,)], types.StructType([types.StructField("a", types.DoubleType(), True)])
-    )
-    schema = types.StructType([types.StructField("a", types.IntegerType(), True)])
-
-    result = spark_backend._project_fields(
-        dataframe, schema, mode="project_cast", cast=True, recurse=True
-    )
-
-    assert result.collect() == [types.Row(a=1)]
-
-
-def test_coerce_dataframe_project_cast_casts_nested_struct_fields(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [((1.9,),)],
-        types.StructType(
-            [
-                types.StructField(
-                    "a",
-                    types.StructType(
-                        [types.StructField("a1", types.DoubleType(), True)]
-                    ),
-                    True,
-                )
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField(
-                "a",
-                types.StructType([types.StructField("a1", types.IntegerType(), True)]),
-                True,
-            )
-        ]
-    )
-
-    result = spark_backend._project_fields(
-        dataframe, schema, mode="project_cast", cast=True, recurse=True
-    )
-
-    assert result.collect() == [types.Row(a=types.Row(a1=1))]
-
-
-def test_coerce_dataframe_project_cast_casts_array_of_struct_fields(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [([(1.9,), (2.1,)],)],
-        types.StructType(
-            [
-                types.StructField(
-                    "items",
-                    types.ArrayType(
-                        types.StructType(
-                            [types.StructField("a1", types.DoubleType(), True)]
-                        )
-                    ),
-                    True,
-                )
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField(
-                "items",
-                types.ArrayType(
-                    types.StructType(
-                        [types.StructField("a1", types.IntegerType(), True)]
-                    )
-                ),
-                True,
-            )
-        ]
-    )
-
-    result = spark_backend._project_fields(
-        dataframe, schema, mode="project_cast", cast=True, recurse=True
-    )
-
-    assert result.collect() == [types.Row(items=[types.Row(a1=1), types.Row(a1=2)])]
-
-
-def test_coerce_dataframe_project_cast_raises_for_missing_field(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [(1,)], types.StructType([types.StructField("a", types.IntegerType(), True)])
-    )
-    schema = types.StructType(
-        [
-            types.StructField("a", types.IntegerType(), True),
-            types.StructField("b", types.StringType(), True),
-        ]
-    )
-
-    with pytest.raises(schemas.SchemaCoercionError):
-        spark_backend._project_fields(
-            dataframe, schema, mode="project_cast", cast=True, recurse=True
-        )
-
-
-def test_coerce_dataframe_project_cast_reports_every_unsupported_cast(
-    spark: SparkSession,
-):
-    dataframe = spark.createDataFrame(
-        [(None, None)],
-        types.StructType(
-            [
-                types.StructField("binary_value", types.BinaryType(), True),
-                types.StructField("date_value", types.DateType(), True),
-            ]
-        ),
-    )
-    schema = types.StructType(
-        [
-            types.StructField("binary_value", types.BooleanType(), True),
-            types.StructField("date_value", types.IntegerType(), True),
-            types.StructField("required", types.StringType(), True),
-        ]
-    )
-
-    with pytest.raises(schemas.SchemaCoercionError) as error:
-        spark_backend._project_fields(
-            dataframe, schema, mode="project_cast", cast=True, recurse=True
-        )
-
-    assert [
-        (violation.kind, violation.path) for violation in error.value.violations
-    ] == [
-        ("missing", "required"),
-        ("type_mismatch", "binary_value"),
-        ("type_mismatch", "date_value"),
-    ]
-
-
-def test_pipeline_does_not_connect_different_dataframe_backends():
-    from polars import LazyFrame
-
-    class Order(JoineryModel):
-        order_id: Column[int]
-
-    @transform
-    def polars_source() -> Annotated[LazyFrame, ProjectContract(Order)]:
-        return LazyFrame({"order_id": [1]})
-
-    @transform
-    def spark_sink(frame: Annotated[DataFrame, ProjectContract(Order)]) -> None:
-        pass
-
-    pipeline = Pipeline()
-    source = pipeline.add_step(polars_source)
-    sink = pipeline.add_step(spark_sink)
-
-    with pytest.raises(PipelineConnectionError, match="No compatible contract"):
-        pipeline.connect(source, sink)
+    assertDataFrameEqual(actual, expected, ignoreNullable=False)

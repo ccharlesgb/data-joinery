@@ -45,6 +45,24 @@ def get_list_element_type(tp: Any) -> Any:
     return args[0]
 
 
+def unwrap_optional_type(python_type: Any) -> Any:
+    """Remove an outer optional wrapper while preserving the wrapped annotation.
+
+    Examples:
+        >>> unwrap_optional_type(Annotated[int, "description"] | None)
+        typing.Annotated[int, 'description']
+        >>> unwrap_optional_type(int | str | None) == (int | str | None)
+        True
+    """
+    if get_origin(python_type) in (Union, UnionType):
+        args = get_args(python_type)
+        non_none_args = [arg for arg in args if arg is not NoneType]
+        if len(non_none_args) == 1 and len(non_none_args) != len(args):
+            return non_none_args[0]
+
+    return python_type
+
+
 def normalize_python_type(python_type: Any) -> Any:
     """Expose the underlying type for inspection, ignoring metadata and nullability.
 
@@ -59,15 +77,11 @@ def normalize_python_type(python_type: Any) -> Any:
         >>> normalize_python_type(list[int | None]) == list[int | None]
         True
     """
-    origin = get_origin(python_type)
-    args = get_args(python_type)
+    if get_origin(python_type) is Annotated:
+        return normalize_python_type(get_args(python_type)[0])
 
-    if origin is Annotated and args:
-        return normalize_python_type(args[0])
-
-    if origin in (Union, UnionType) and args:
-        non_none_args = [arg for arg in args if arg is not NoneType]
-        if len(non_none_args) == 1 and len(non_none_args) != len(args):
-            return normalize_python_type(non_none_args[0])
+    unwrapped_type = unwrap_optional_type(python_type)
+    if unwrapped_type is not python_type:
+        return normalize_python_type(unwrapped_type)
 
     return python_type

@@ -937,3 +937,22 @@ def test_run_rejects_output_from_sink_override(spark: SparkSession):
             SparkContext(spark),
             transform_overrides={"write": replacement},
         )
+
+
+def test_pipeline_does_not_connect_different_dataframe_backends():
+    from polars import LazyFrame
+
+    @transform
+    def polars_source() -> Annotated[LazyFrame, Project(User)]:
+        return LazyFrame({"user_id": [1]})
+
+    @transform
+    def spark_sink(frame: Annotated[DataFrame, Project(User)]) -> None:
+        pass
+
+    pipeline = Pipeline()
+    source = pipeline.add_step(polars_source)
+    sink = pipeline.add_step(spark_sink)
+
+    with pytest.raises(PipelineConnectionError, match="No compatible contract"):
+        pipeline.connect(source, sink)

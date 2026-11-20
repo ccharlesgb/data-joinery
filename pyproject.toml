@@ -23,6 +23,7 @@ project-includes = [
 search-path = [
     "src",
     "docs_src",
+    ".",
 ]
 
 [project.optional-dependencies]

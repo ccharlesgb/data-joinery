@@ -36,13 +36,27 @@ class DataFrameBackend[FrameT, SchemaT](Protocol):
         schema: ModelSchema[Any],
         mode: CoercionMode,
     ) -> FrameT:
-        """Return a frame that satisfies the model, or raise on a mismatch.
+        """Validate or adapt a frame to a model schema.
 
-        ``strict`` checks fields and types without changing them. ``project``
-        removes extra fields, including nested fields; ``project_top_level``
-        removes only extra top-level fields. ``project_cast`` also casts types
-        when the native dataframe library permits it. All modes reject missing
-        fields. Raise ``SchemaCoercionError`` for schema mismatches.
+        ``strict`` requires matching fields and types and preserves the input's
+        values and column order. Projection modes return columns in model
+        order. ``project_top_level`` removes extra top-level columns and
+        requires matching nested fields. ``project`` also removes extra
+        nested fields. ``project_cast`` projects recursively and uses native
+        casting rules. Lazy frames may report value-dependent cast failures
+        when they execute.
+
+        Args:
+            dataframe: Input frame.
+            schema: Target model schema.
+            mode: Which validation and projection rules to apply.
+
+        Returns:
+            A frame of the same type as the input.
+
+        Raises:
+            SchemaCoercionError: The frame has schema violations for the mode.
+                All modes reject missing fields.
         """
         ...
 

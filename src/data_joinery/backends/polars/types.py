@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args, get_origin
 import polars as pl
 
 from ...schemas.model_schema import get_model_fields, is_schema_model
-from ...type_inspection import normalize_python_type
+from ...type_inspection import normalize_python_type, unwrap_optional_type
 
 POLARS_MAX_DECIMAL_PRECISION = 38
 DEFAULT_FRACTIONAL_DIGITS = 18
@@ -19,15 +19,17 @@ else:
 
 
 def _polars_type_from_annotated(python_type: Any) -> PolarsDataType | None:
+    python_type = unwrap_optional_type(python_type)
     if get_origin(python_type) is not Annotated:
         return None
 
-    for metadata in get_args(python_type)[1:]:
+    annotated_type, *metadata_items = get_args(python_type)
+    for metadata in metadata_items:
         if isinstance(metadata, pl.DataType):
             return metadata
         if isinstance(metadata, type) and issubclass(metadata, pl.DataType):
             return metadata
-    return None
+    return _polars_type_from_annotated(annotated_type)
 
 
 def _polars_type_from_literal(
@@ -52,11 +54,11 @@ def _get_polars_field_type(field_type: Any) -> PolarsDataType:
     if annotated_type is not None:
         return annotated_type
 
-    literal_type = _polars_type_from_literal(field_type)
+    normalized_type = normalize_python_type(field_type)
+    literal_type = _polars_type_from_literal(normalized_type)
     if literal_type is not None:
         return literal_type
 
-    normalized_type = normalize_python_type(field_type)
     if is_schema_model(normalized_type):
         return pl.Struct(
             [
