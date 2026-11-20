@@ -66,11 +66,20 @@ def _inspect_transform(f: Any) -> TransformSpec:
     context_parameters: dict[str, tuple[type, Context]] = {}
     transform_name = get_callable_name(f) or "<lambda>"
 
-    for parameter_name in signature.parameters:
+    for parameter_name, parameter in signature.parameters.items():
+        location = f"Transform '{transform_name}' parameter '{parameter_name}'"
+        if parameter.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            raise TypeError(
+                f"{location}: variadic parameters (*args and **kwargs) are not "
+                "supported. Declare each input as a separate parameter."
+            )
+
         if parameter_name not in type_hints:
             continue
 
-        location = f"Transform '{transform_name}' parameter '{parameter_name}'"
         parameter_type, marker = _parse_annotation(type_hints[parameter_name], location)
         if isinstance(marker, Context):
             context_parameters[parameter_name] = (parameter_type, marker)
@@ -104,6 +113,7 @@ def _wrap_transform[**P, R](
     spec: TransformSpec,
 ) -> Callable[P, R]:
     signature = inspect.signature(fn)
+    transform_name = get_callable_name(fn) or "<lambda>"
 
     @wraps(fn)
     def wrapper(*args: P.args, **kwds: P.kwargs) -> R:
@@ -118,7 +128,7 @@ def _wrap_transform[**P, R](
                 )
             except ContractTypeMismatch as e:
                 raise TypeError(
-                    f"Transform '{fn.__name__}' parameter '{parameter_name}' must be "
+                    f"Transform '{transform_name}' parameter '{parameter_name}' must be "
                     f"{e.expected_type}; got {type(value).__name__}."
                 ) from None
             except SchemaCoercionError as e:
@@ -126,13 +136,13 @@ def _wrap_transform[**P, R](
                     e.mode,
                     e.violations,
                     location=(
-                        f"Transform '{fn.__name__}' parameter '{parameter_name}'"
+                        f"Transform '{transform_name}' parameter '{parameter_name}'"
                         + (f", {e.location}" if e.location else "")
                     ),
                 ) from None
             except ValueError as e:
                 raise ValueError(
-                    f"Transform '{fn.__name__}' parameter '{parameter_name}': {e}"
+                    f"Transform '{transform_name}' parameter '{parameter_name}': {e}"
                 ) from None
 
         result = fn(*bound_arguments.args, **bound_arguments.kwargs)
@@ -141,7 +151,7 @@ def _wrap_transform[**P, R](
             result = cast(R, spec.output_contract.validate(result))
         except ContractTypeMismatch as e:
             raise TypeError(
-                f"Return value from '{fn.__name__}' must be {e.expected_type}; "
+                f"Return value from '{transform_name}' must be {e.expected_type}; "
                 f"got {type(result).__name__}."
             ) from None
         except SchemaCoercionError as e:
@@ -149,12 +159,14 @@ def _wrap_transform[**P, R](
                 e.mode,
                 e.violations,
                 location=(
-                    f"Transform '{fn.__name__}' return value"
+                    f"Transform '{transform_name}' return value"
                     + (f", {e.location}" if e.location else "")
                 ),
             ) from None
         except ValueError as e:
-            raise ValueError(f"Transform '{fn.__name__}' return value: {e}") from None
+            raise ValueError(
+                f"Transform '{transform_name}' return value: {e}"
+            ) from None
 
         return result
 
@@ -217,7 +229,8 @@ def transform[**P, R](
     ``Annotated`` control schema validation and coercion. Supported runtime
     classes are checked with ``isinstance`` when no contract or context marker
     applies. Each annotation can carry one recognized marker, and ``Context()``
-    is available for parameters. Unrecognized metadata has no effect.
+    is available for parameters. Unrecognized metadata has no effect. Declare each
+    input as a separate parameter. Variadic parameters are unsupported.
 
     Args:
         f: Function to decorate. Omit when using ``@transform()``.
@@ -227,7 +240,8 @@ def transform[**P, R](
         A callable transform that can also be added to a pipeline.
 
     Raises:
-        TypeError: An annotation has an unsupported type or invalid markers.
+        TypeError: The function has a variadic parameter, or an annotation has an
+            unsupported type or invalid markers.
     """
     if f is None:
         return lambda fn: Transform(fn, side_effect=side_effect)

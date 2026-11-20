@@ -142,6 +142,22 @@ def test_transform_passes_through_dataframe_with_descriptive_metadata():
     assert keep_frame(frame) is frame
 
 
+def test_transform_rejects_variadic_positional_parameter():
+    def consume_frames(*frames: Annotated[PolarsDataFrame, "inputs"]) -> None:
+        raise AssertionError
+
+    with pytest.raises(TypeError, match="parameter 'frames': variadic parameters"):
+        transform(consume_frames)
+
+
+def test_transform_rejects_unannotated_variadic_keyword_parameter():
+    def consume_frames(**frames) -> None:
+        raise AssertionError
+
+    with pytest.raises(TypeError, match="parameter 'frames': variadic parameters"):
+        transform(consume_frames)
+
+
 def test_transform_accepts_partial_with_copied_annotations():
     def add(left: int, right: int) -> int:
         return left + right
@@ -150,6 +166,34 @@ def test_transform_accepts_partial_with_copied_annotations():
     add_one.__annotations__ = add.__annotations__.copy()
 
     assert transform(add_one)(2) == 3
+
+
+def test_transform_partial_reports_invalid_input():
+    def consume(limit: int, frame: Annotated[PolarsDataFrame, "input"]) -> None:
+        raise AssertionError
+
+    consume_one = partial(consume, 1)
+    consume_one.__annotations__ = consume.__annotations__.copy()
+    consume_one_transform = transform(consume_one)
+
+    with pytest.raises(
+        TypeError, match="Transform 'partial' parameter 'frame' must be a DataFrame"
+    ):
+        consume_one_transform(42)
+
+
+def test_transform_partial_reports_invalid_return_value():
+    def produce(limit: int) -> Annotated[PolarsDataFrame, "output"]:
+        return limit  # type: ignore[return-value]
+
+    produce_one = partial(produce, 1)
+    produce_one.__annotations__ = produce.__annotations__.copy()
+    produce_one_transform = transform(produce_one)
+
+    with pytest.raises(
+        TypeError, match="Return value from 'partial' must be a DataFrame"
+    ):
+        produce_one_transform()
 
 
 def test_transform_retains_inspected_specification():
