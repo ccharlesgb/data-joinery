@@ -79,12 +79,15 @@ from data_joinery import Schema
 def test_filter_active_customers(spark):
     schema = Schema(Customer)
     source = schema.create_dataframe(
-        [Customer("1", "Alice", True), Customer("2", "Bob", False)],
+        [
+            Customer(customer_id="1", name="Alice", is_active=True),
+            Customer(customer_id="2", name="Bob", is_active=False),
+        ],
         DataFrame,
         session=spark,
     )
     expected = schema.create_dataframe(
-        [Customer("1", "Alice", True)],
+        [Customer(customer_id="1", name="Alice", is_active=True)],
         DataFrame,
         session=spark,
     )
