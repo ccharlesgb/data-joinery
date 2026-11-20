@@ -12,7 +12,6 @@ from typing import (
     overload,
 )
 
-from .backends import backend_for_frame_type
 from .context import Context
 from .contract import (
     Contract,
@@ -20,51 +19,37 @@ from .contract import (
     DataFrameContract,
     InstanceContract,
     VoidContract,
-    _UncheckedContract,
 )
 from .schemas.coercion_error import SchemaCoercionError
 from .utils import get_callable_name
 
 
-def _get_annotated_dataframe_contract(annotation: Any) -> DataFrameContract | None:
+def _parse_annotation(
+    annotation: Any, location: str
+) -> tuple[Any, DataFrameContract | Context | None]:
     if get_origin(annotation) is not Annotated:
-        return None
+        return annotation, None
 
-    annotated_args = get_args(annotation)
-    if len(annotated_args) < 2:
-        return None
-
-    base_type = annotated_args[0]
-    metadata = annotated_args[1:]
-    for metadata_value in metadata:
-        if isinstance(metadata_value, DataFrameContract):
-            return metadata_value.bind(base_type)
-
-    return None
+    base_type, *metadata = get_args(annotation)
+    markers = [
+        value for value in metadata if isinstance(value, (DataFrameContract, Context))
+    ]
+    if len(markers) > 1:
+        raise TypeError(
+            f"{location}: only one DataFrame contract or Context() marker is allowed."
+        )
+    return base_type, next(iter(markers), None)
 
 
-def _is_annotated_dataframe(annotation: Any) -> bool:
-    if get_origin(annotation) is not Annotated:
-        return False
-    base_type = get_args(annotation)[0]
-    return isinstance(base_type, type) and backend_for_frame_type(base_type) is not None
-
-
-def _get_context_marker(annotation: Any) -> tuple[type, Context] | None:
-    if get_origin(annotation) is not Annotated:
-        return None
-
-    annotated_args = get_args(annotation)
-    if len(annotated_args) < 2:
-        return None
-
-    base_type = annotated_args[0]
-    metadata = annotated_args[1:]
-    for metadata_value in metadata:
-        if isinstance(metadata_value, Context):
-            return base_type, metadata_value
-
-    return None
+def _make_contract(
+    base_type: type, marker: DataFrameContract | None, location: str
+) -> Contract:
+    try:
+        if marker is not None:
+            return marker.bind(base_type)
+        return InstanceContract(base_type)
+    except TypeError as error:
+        raise TypeError(f"{location}: {error}") from None
 
 
 @dataclass(frozen=True)
@@ -79,45 +64,33 @@ def _inspect_transform(f: Any) -> TransformSpec:
     type_hints = get_type_hints(f, include_extras=True)
     input_contracts: dict[str, Contract] = {}
     context_parameters: dict[str, tuple[type, Context]] = {}
+    transform_name = get_callable_name(f) or "<lambda>"
 
     for parameter_name in signature.parameters:
-        parameter_type = type_hints.get(parameter_name)
-        if parameter_type is None:
+        if parameter_name not in type_hints:
             continue
 
-        dataframe_contract = _get_annotated_dataframe_contract(parameter_type)
-        if dataframe_contract is not None:
-            input_contracts[parameter_name] = dataframe_contract
-            continue
-
-        context_marker = _get_context_marker(parameter_type)
-        if context_marker is not None:
-            context_parameters[parameter_name] = context_marker
-            continue
-
-        if not _is_annotated_dataframe(parameter_type):
-            try:
-                input_contracts[parameter_name] = InstanceContract(parameter_type)
-            except TypeError as error:
-                raise TypeError(
-                    f"Transform '{f.__name__}' parameter '{parameter_name}': {error}"
-                ) from None
-
-    output_contract: Contract = VoidContract()
-    return_type = type_hints.get("return")
-    if return_type is not None and return_type is not type(None):
-        dataframe_contract = _get_annotated_dataframe_contract(return_type)
-        if dataframe_contract is not None:
-            output_contract = dataframe_contract
-        elif _is_annotated_dataframe(return_type):
-            output_contract = _UncheckedContract()
+        location = f"Transform '{transform_name}' parameter '{parameter_name}'"
+        parameter_type, marker = _parse_annotation(type_hints[parameter_name], location)
+        if isinstance(marker, Context):
+            context_parameters[parameter_name] = (parameter_type, marker)
         else:
-            try:
-                output_contract = InstanceContract(return_type)
-            except TypeError as error:
-                raise TypeError(
-                    f"Transform '{f.__name__}' return annotation: {error}"
-                ) from None
+            input_contracts[parameter_name] = _make_contract(
+                parameter_type, marker, location
+            )
+
+    location = f"Transform '{transform_name}' return annotation"
+    return_type, marker = _parse_annotation(
+        type_hints.get("return", type(None)), location
+    )
+    if isinstance(marker, Context):
+        raise TypeError(f"{location}: Context() can only mark a parameter.")
+
+    output_contract: Contract
+    if return_type is type(None) and marker is None:
+        output_contract = VoidContract()
+    else:
+        output_contract = _make_contract(return_type, marker, location)
 
     return TransformSpec(
         input_contracts=input_contracts,
@@ -241,8 +214,10 @@ def transform[**P, R](
     Use as ``@transform``, ``@transform()``, or
     ``@transform(side_effect=True)``. A side-effect transform must explicitly
     return ``None`` and can be skipped by ``Pipeline.run``. DataFrame contracts in
-    ``Annotated`` control schema validation and coercion. Other supported
-    runtime classes are checked with ``isinstance``.
+    ``Annotated`` control schema validation and coercion. Supported runtime
+    classes are checked with ``isinstance`` when no contract or context marker
+    applies. Each annotation can carry one recognized marker, and ``Context()``
+    is available for parameters. Unrecognized metadata has no effect.
 
     Args:
         f: Function to decorate. Omit when using ``@transform()``.
@@ -250,6 +225,9 @@ def transform[**P, R](
 
     Returns:
         A callable transform that can also be added to a pipeline.
+
+    Raises:
+        TypeError: An annotation has an unsupported type or invalid markers.
     """
     if f is None:
         return lambda fn: Transform(fn, side_effect=side_effect)

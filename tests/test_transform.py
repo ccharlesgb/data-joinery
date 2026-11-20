@@ -1,8 +1,10 @@
 from collections.abc import Generator
 from dataclasses import dataclass
+from functools import partial
 from typing import Annotated
 
 import pytest
+from polars import DataFrame as PolarsDataFrame
 from pyspark.sql import DataFrame, SparkSession, types
 
 from data_joinery import (
@@ -45,7 +47,7 @@ def test_inspect_transform_collects_context_parameters():
     def read_orders(
         spark: Annotated[SparkSession, Context()],
         path: Annotated[PathConfig, Context()],
-    ) -> Annotated[DataFrame, Order]:
+    ) -> DataFrame:
         raise AssertionError
 
     spec = _inspect_transform(read_orders)
@@ -58,9 +60,9 @@ def test_inspect_transform_collects_context_parameters():
 
 def test_inspect_transform_context_parameter_not_treated_as_dataframe_input():
     def filter_orders(
-        orders: Annotated[DataFrame, Project(Order)],
+        orders: Annotated[DataFrame, "orders to filter", Project(Order)],
         path: Annotated[PathConfig, Context()],
-    ) -> Annotated[DataFrame, Order]:
+    ) -> DataFrame:
         raise AssertionError
 
     spec = _inspect_transform(filter_orders)
@@ -74,7 +76,7 @@ def test_inspect_transform_context_parameter_not_treated_as_dataframe_input():
 def test_inspect_transform_collects_spark_as_context_parameter():
     def read_orders(
         spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Order]:
+    ) -> DataFrame:
         raise AssertionError
 
     spec = _inspect_transform(read_orders)
@@ -85,26 +87,69 @@ def test_inspect_transform_collects_spark_as_context_parameter():
     assert isinstance(marker, Context)
 
 
-def test_transform_accepts_matching_input_and_output_schemas(spark: SparkSession):
-    class InputRow(JoineryModel):
-        field1: Column[int]
-        field2: Column[str]
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        pytest.param(Strict(Order), Context(), id="strict-then-context"),
+        pytest.param(Context(), Strict(Order), id="context-then-strict"),
+        pytest.param(Strict(Order), Project(Order), id="two-dataframe-contracts"),
+        pytest.param(Context(), Context(), id="two-context-markers"),
+    ],
+)
+def test_transform_rejects_multiple_markers_on_one_parameter(
+    first: DataFrameContract | Context, second: DataFrameContract | Context
+):
+    def consume_orders(orders: Annotated[DataFrame, first, second]) -> None:
+        raise AssertionError
 
-    class OutputRow(JoineryModel):
-        field1: Column[int]
+    with pytest.raises(
+        TypeError,
+        match="parameter 'orders': only one DataFrame contract or Context",
+    ):
+        transform(consume_orders)
 
-    input_schema = Schema(InputRow).native_schema(types.StructType)
-    output_schema = Schema(OutputRow).native_schema(types.StructType)
-    input_df = spark.createDataFrame([(1, "a")], input_schema)
 
+def test_transform_rejects_multiple_markers_on_return():
+    def read_orders() -> Annotated[DataFrame, Strict(Order), Project(Order)]:
+        raise AssertionError
+
+    with pytest.raises(
+        TypeError,
+        match="return annotation: only one DataFrame contract or Context",
+    ):
+        transform(read_orders)
+
+
+def test_transform_rejects_context_marker_on_return():
+    def get_path() -> Annotated[PathConfig, Context()]:
+        raise AssertionError
+
+    with pytest.raises(
+        TypeError, match=r"return annotation: Context\(\) can only mark a parameter"
+    ):
+        transform(get_path)
+
+
+def test_transform_passes_through_dataframe_with_descriptive_metadata():
     @transform
-    def my_function(
-        input1: Annotated[DataFrame, InputRow],
-    ) -> Annotated[DataFrame, OutputRow]:
-        return input1.select("field1")
+    def keep_frame(
+        frame: Annotated[PolarsDataFrame, "input description"],
+    ) -> Annotated[PolarsDataFrame, "output description"]:
+        return frame
 
-    result = my_function(input_df)
-    assert result.schema == output_schema
+    frame = PolarsDataFrame({"field": [1]})
+
+    assert keep_frame(frame) is frame
+
+
+def test_transform_accepts_partial_with_copied_annotations():
+    def add(left: int, right: int) -> int:
+        return left + right
+
+    add_one = partial(add, 1)
+    add_one.__annotations__ = add.__annotations__.copy()
+
+    assert transform(add_one)(2) == 3
 
 
 def test_transform_retains_inspected_specification():
@@ -313,7 +358,7 @@ def test_transform_raises_for_output_schema_mismatch(spark: SparkSession):
 
     @transform
     def my_function(
-        input1: Annotated[DataFrame, InputRow],
+        input1: DataFrame,
     ) -> Annotated[DataFrame, Strict(OutputRow)]:
         return input1
 
@@ -325,24 +370,27 @@ def test_transform_raises_for_output_schema_mismatch(spark: SparkSession):
     ] == [("additional", "field2")]
 
 
-def test_transform_can_disable_output_validation(spark: SparkSession):
-    class InputRow(JoineryModel):
-        field1: Column[int]
-
-    class OutputRow(JoineryModel):
-        field1: Column[int]
-
-    input_df = Schema(InputRow).create_dataframe(
-        [InputRow(field1=1)], DataFrame, session=spark
-    )
-
+def test_transform_rejects_invalid_input_with_descriptive_metadata():
     @transform
-    def my_function(
-        input1: Annotated[DataFrame, InputRow],
-    ) -> Annotated[DataFrame, OutputRow]:
-        return "not a dataframe"  # type: ignore
+    def consume_frame(frame: Annotated[DataFrame, "input description"]) -> None:
+        raise AssertionError("Invalid input should be rejected before the call")
 
-    assert my_function(input_df) == "not a dataframe"
+    with pytest.raises(
+        TypeError, match="parameter 'frame' must be a DataFrame; got int"
+    ):
+        consume_frame(7)  # type: ignore[arg-type]
+
+
+def test_transform_rejects_invalid_output_with_descriptive_metadata():
+    @transform
+    def produce_frame() -> Annotated[DataFrame, "output description"]:
+        return 42  # type: ignore[return-value]
+
+    with pytest.raises(
+        TypeError,
+        match="Return value from 'produce_frame' must be a DataFrame; got int",
+    ):
+        produce_frame()
 
 
 def test_transform_project_drops_extra_output_columns(

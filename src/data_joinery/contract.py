@@ -35,8 +35,6 @@ def describe_contract(contract: Contract) -> str:
         return contract.value_type.__name__
     if isinstance(contract, VoidContract):
         return "None"
-    if isinstance(contract, _UncheckedContract):
-        return "unvalidated DataFrame"
     return type(contract).__name__
 
 
@@ -50,15 +48,6 @@ class VoidContract:
     def validate(self, value: object) -> None:
         if value is not None:
             raise ContractTypeMismatch("None")
-
-
-@dataclass(frozen=True)
-class _UncheckedContract:
-    def accepts(self, produced: Contract) -> bool:
-        return True
-
-    def validate(self, value: object) -> object:
-        return value
 
 
 @dataclass(frozen=True)
