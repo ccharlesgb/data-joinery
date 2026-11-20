@@ -89,8 +89,8 @@ Schema inheritance is appropriate when an output genuinely extends an input reco
 Keep transformation logic and runtime configuration out of this module.
 ### `transform.py`
 
-Define the pipeline’s executable units with `@transform`. Use `@side_effect` for terminal writers,
-metric loggers, or printers that a pipeline should be able to skip; these declare `-> None`.
+Define the pipeline’s executable units with `@transform`. See **Skip Side Effects** in
+`data-joinery-pipelines` for terminal writers, metric loggers, or printers.
 Each transform should:
 
 - Perform one coherent read, transformation, model, write, or reporting operation.
@@ -140,13 +140,9 @@ Do not start sessions, read data, or execute a pipeline during import.
 
 ### `tests/`
 
-Test transforms directly wherever possible. Construct small schema-valid inputs and compare
-complete outputs with expected values. For DataFrames, build the expected frame and use
-`polars.testing.assert_frame_equal` or `pyspark.testing.assertDataFrameEqual` instead of checking
-rows, columns, and counts separately. For other values, compare complete objects when equality is
-meaningful. Prefer one meaningful assertion per test; separate distinct behaviors into separate
-tests, while keeping separate assertions when they check genuinely different behavior.
-Use temporary paths for read/write tests so test runs do not alter repository data or generated output.
+Test transforms directly with small schema-valid inputs. See **Unit Test One Transform** in
+`data-joinery-transformations` for fixtures and assertions. Use temporary paths for read/write
+tests so test runs do not alter repository data or generated output.
 Add a pipeline-level test when it provides value beyond transform tests, including:
 
 - Verifying graph wiring

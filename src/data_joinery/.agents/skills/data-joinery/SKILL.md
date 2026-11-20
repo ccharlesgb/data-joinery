@@ -49,7 +49,7 @@ skills.
 - A **transform** is a function decorated with `@transform` or `@side_effect`; contracts are
   enforced when it runs.
 - A **side-effect transform** uses `@side_effect` to mark a terminal action that a pipeline can
-  skip. It still runs when called directly.
+  skip. See **Skip Side Effects** in `data-joinery-pipelines`.
 - A **step** is one named use of a transform in a pipeline. The same transform can be added more
   than once as distinct steps.
 - **Context** is typed runtime configuration or a dependency injected into transforms marked with

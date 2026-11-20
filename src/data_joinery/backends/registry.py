@@ -97,30 +97,30 @@ def get_backend(name: str) -> DataFrameBackend[Any, Any]:
 
 def backend_for_frame_type(frame_type: type) -> DataFrameBackend[Any, Any] | None:
     """Find the backend owning a frame class or subclass, or return None."""
-    if not isinstance(frame_type, type):
-        return None
-    backend = _find_backend_for_type(frame_type)
-    if backend is not None:
-        return backend
-    _load_builtin_backends()
-    return _find_backend_for_type(frame_type)
+    return _backend_for_type(frame_type, schema=False)
 
 
 def backend_for_schema_type(schema_type: type) -> DataFrameBackend[Any, Any] | None:
     """Find the backend owning a native schema class or subclass, or return None."""
-    if not isinstance(schema_type, type):
+    return _backend_for_type(schema_type, schema=True)
+
+
+def _backend_for_type(
+    requested_type: type, *, schema: bool
+) -> DataFrameBackend[Any, Any] | None:
+    if not isinstance(requested_type, type):
         return None
-    backend = _find_backend_for_type(schema_type, schema=True)
+    backend = _find_backend_for_type(requested_type, schema=schema)
     if backend is not None:
         return backend
     _load_builtin_backends()
-    return _find_backend_for_type(schema_type, schema=True)
+    return _find_backend_for_type(requested_type, schema=schema)
 
 
 def _find_backend_for_type(
     requested_type: type,
     *,
-    schema: bool = False,
+    schema: bool,
 ) -> DataFrameBackend[Any, Any] | None:
     matches = [
         backend

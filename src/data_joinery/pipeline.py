@@ -206,11 +206,8 @@ class Pipeline[ContextT]:
         return step
 
     def _validate_transform_context(self, transform: Transform) -> None:
-        for parameter_name, (
-            param_type,
-            marker,
-        ) in transform.__transform_spec__.context_parameters.items():
-            dependency_type = marker.type or param_type
+        context_parameters = transform.__transform_spec__.context_parameters
+        for parameter_name, dependency_type in context_parameters.items():
             if dependency_type not in self._context_fields:
                 transform_name = transform.default_name or repr(transform)
                 context_name = (
@@ -453,15 +450,9 @@ class Pipeline[ContextT]:
                 "Change the replacement's return annotation."
             )
 
-        original_context_types = {
-            marker.type or param_type
-            for param_type, marker in original.context_parameters.values()
-        }
-        override_context_types = {
-            marker.type or param_type
-            for param_type, marker in override.context_parameters.values()
-        }
-        added_context_types = override_context_types - original_context_types
+        added_context_types = set(override.context_parameters.values()) - set(
+            original.context_parameters.values()
+        )
         if added_context_types:
             added = ", ".join(
                 sorted(context_type.__name__ for context_type in added_context_types)
@@ -594,11 +585,7 @@ class Pipeline[ContextT]:
                 upstream_step = self._dag[upstream_index]
                 arguments[parameter_name] = outputs[upstream_step.name]
                 sources[parameter_name] = upstream_step
-            for parameter_name, (
-                param_type,
-                marker,
-            ) in spec.context_parameters.items():
-                dependency_type = marker.type or param_type
+            for parameter_name, dependency_type in spec.context_parameters.items():
                 context_field = self._context_fields[dependency_type]
                 arguments[parameter_name] = getattr(context, context_field)
                 sources[parameter_name] = ContextSource(context_field)

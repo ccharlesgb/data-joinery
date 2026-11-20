@@ -10,22 +10,24 @@ connections, while the backend's explain API shows how a DataFrame will be evalu
 
 ## Obtain the plan without writing outputs
 
-Run the pipeline with `include_side_effects=False`, then retrieve the last model step's
-output with `result.get_output("step_name", FrameType)` or a retained `Step`. A skipped
-`@side_effect` writer has no invocation to inspect. An unmarked transform that constructs
-and returns a lazy sink still runs, so its output can be inspected as a `pl.LazyFrame`.
+Run the pipeline once, then use the example for its backend to retrieve the last model step's
+output. Pass the step name or a retained `Step` to `result.get_output`.
 
-This option skips only marked side effects. Reader validation or other unmarked transforms
-may already execute actions, so inspect them before using large or external inputs. Use a
-safe context or reader overrides when needed; keep representative schemas and data sizes
-for performance comparisons.
+```python
+result = pipeline.run(context, include_side_effects=False)
+```
+
+See **Skip Side Effects** in `data-joinery-pipelines` for which steps run. An unmarked transform
+that returns a lazy sink still makes its plan available as a `pl.LazyFrame`. Reader validation
+or other unmarked transforms may already execute actions, so inspect them before using large
+or external inputs. Use a safe context or reader overrides when needed. Keep representative
+schemas and data sizes for performance comparisons.
 
 ## PySpark
 
 ```python
 from pyspark.sql import DataFrame
 
-result = pipeline.run(context, include_side_effects=False)
 frame = result.get_output("build_report", DataFrame)
 frame.explain(mode="extended")   # parsed, analyzed, optimized, and physical plans
 frame.explain(mode="formatted")  # readable physical plan
@@ -42,7 +44,6 @@ task metrics. A `count()` may have a different plan from a write.
 ```python
 import polars as pl
 
-result = pipeline.run(context, include_side_effects=False)
 frame = result.get_output("build_report", pl.LazyFrame)
 print(frame.explain())
 ```

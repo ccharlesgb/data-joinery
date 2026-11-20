@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, get_args
 
 CoercionMode = Literal["project_cast", "project", "project_top_level", "strict"]
 DifferenceKind = Literal["additional", "missing", "type_mismatch"]
@@ -18,6 +19,43 @@ class SchemaDiff:
     additional: tuple[SchemaDifference, ...]
     missing: tuple[SchemaDifference, ...]
     type_mismatches: tuple[SchemaDifference, ...]
+
+
+def _check_coercion_mode(mode: CoercionMode) -> None:
+    if mode not in get_args(CoercionMode):
+        raise ValueError(
+            f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
+            "'project_top_level', or 'project_cast'."
+        )
+
+
+def _validate_coercion(
+    diff: SchemaDiff,
+    mode: CoercionMode,
+    can_cast: Callable[[object | None, object | None], bool],
+) -> None:
+    additional = ()
+    mismatches = diff.type_mismatches
+    match mode:
+        case "strict":
+            additional = diff.additional
+        case "project_top_level":
+            # Literal column names containing these markers also match this rule.
+            additional = tuple(
+                item
+                for item in diff.additional
+                if "." in item.path or "[]" in item.path
+            )
+        case "project":
+            pass
+        case "project_cast":
+            mismatches = tuple(
+                item for item in mismatches if not can_cast(item.given, item.expected)
+            )
+
+    violations = (*diff.missing, *additional, *mismatches)
+    if violations:
+        raise SchemaCoercionError(mode, violations)
 
 
 def _format_schema_difference(difference: SchemaDifference, mode: CoercionMode) -> str:

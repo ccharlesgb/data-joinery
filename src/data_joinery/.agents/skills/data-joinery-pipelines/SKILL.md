@@ -186,11 +186,12 @@ does not start them. Manage the lifetime of services created by the factory your
 does not close them after a run.
 
 `run` executes marked side effects unless `--skip-side-effects` is passed. In the example,
-skipping prevents `print_report` from running while `make_report` still runs. Mark only terminal
-steps that should be skipped with `@side_effect`; an unmarked `-> None` step still runs. Install
-the `vis` extra to use `visualize`. It opens a Matplotlib window by default, or saves an SVG or
-PNG when passed `--output report.svg` or `--output report.png`. See the Pipeline CLI guide
-in the project documentation for a runnable version of this example.
+skipping prevents `print_report` from running while `make_report` still runs. See
+**Skip Side Effects** for which steps the flag skips.
+
+Install the `vis` extra to use `visualize`. It opens a Matplotlib window by default and saves
+an image when passed `--output report.svg` or `--output report.png`. See the Pipeline CLI
+guide in the project documentation for a runnable version of this example.
 
 ## Pass Ordinary Instance Values
 
@@ -228,11 +229,5 @@ A practical end-to-end test usually:
 3. runs the production graph with a complete context object;
 4. compares the writer input or selected step output with the expected result from `PipelineResult`.
 
-Use explicit names for every overridable step. Build an expected object and compare the complete
-value when equality is meaningful. For a DataFrame, construct an expected DataFrame and compare
-the whole frame with `polars.testing.assert_frame_equal` or
-`pyspark.testing.assertDataFrameEqual`. Collect a lazy Polars result before comparing it with an
-expected frame. Avoid separate checks of rows, columns, and counts. Prefer one meaningful
-assertion per test; split distinct behaviors into
-separate tests. Keep separate assertions when they check genuinely different behavior, and do not
-combine unrelated checks into a tuple merely to reduce the assertion count.
+Use explicit names for every overridable step. Follow **Unit Test One Transform** in
+`data-joinery-transformations` when comparing selected outputs with expected values.

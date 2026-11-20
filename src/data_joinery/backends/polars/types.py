@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args, get_origin
 import polars as pl
 
 from ...schemas.model_schema import get_model_fields, is_schema_model
-from ...type_inspection import normalize_python_type, unwrap_optional_type
+from ...type_inspection import (
+    _resolve_literal,
+    get_list_element_type,
+    is_list,
+    normalize_python_type,
+    unwrap_optional_type,
+)
 
 POLARS_MAX_DECIMAL_PRECISION = 38
 DEFAULT_FRACTIONAL_DIGITS = 18
@@ -32,32 +38,14 @@ def _polars_type_from_annotated(python_type: Any) -> PolarsDataType | None:
     return _polars_type_from_annotated(annotated_type)
 
 
-def _polars_type_from_literal(
-    python_type: Any,
-) -> PolarsDataType | None:
-    if get_origin(python_type) is not Literal:
-        return None
-
-    values = get_args(python_type)
-    if not values:
-        raise ValueError("Literal type must include at least one value")
-    polars_types = {_get_polars_field_type(type(value)) for value in values}
-    if len(polars_types) != 1:
-        raise ValueError(
-            f"Literal values must resolve to a single Polars type: {python_type}"
-        )
-    return next(iter(polars_types))
-
-
 def _get_polars_field_type(field_type: Any) -> PolarsDataType:
     annotated_type = _polars_type_from_annotated(field_type)
     if annotated_type is not None:
         return annotated_type
 
     normalized_type = normalize_python_type(field_type)
-    literal_type = _polars_type_from_literal(normalized_type)
-    if literal_type is not None:
-        return literal_type
+    if get_origin(normalized_type) is Literal:
+        return _resolve_literal(normalized_type, _get_polars_field_type, "Polars")
 
     if is_schema_model(normalized_type):
         return pl.Struct(
@@ -67,13 +55,9 @@ def _get_polars_field_type(field_type: Any) -> PolarsDataType:
             ]
         )
 
-    if get_origin(normalized_type) is list:
-        args = get_args(normalized_type)
-        if len(args) != 1:
-            raise ValueError(
-                f"List type {normalized_type} should have exactly one type argument"
-            )
-        return pl.List(_get_polars_field_type(args[0]))
+    if is_list(normalized_type):
+        element_type = get_list_element_type(normalized_type)
+        return pl.List(_get_polars_field_type(element_type))
 
     if normalized_type is int:
         return pl.Int64

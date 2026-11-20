@@ -8,6 +8,7 @@ from pyspark.sql import types
 
 from ...schemas.model_schema import get_model_fields, is_schema_model
 from ...type_inspection import (
+    _resolve_literal,
     get_list_element_type,
     is_list,
     normalize_python_type,
@@ -31,35 +32,14 @@ def _spark_type_from_annotated(python_type: Any) -> types.DataType | None:
     return None
 
 
-def _spark_type_from_literal(python_type: Any) -> types.DataType | None:
-    if get_origin(python_type) is not Literal:
-        return None
-
-    literal_values = get_args(python_type)
-    if not literal_values:
-        raise ValueError("Literal type must include at least one value")
-
-    spark_types = {
-        _get_spark_field_type(type(literal_value)) for literal_value in literal_values
-    }
-
-    if len(spark_types) != 1:
-        raise ValueError(
-            f"Literal values must resolve to a single Spark type: {python_type}"
-        )
-
-    return next(iter(spark_types))
-
-
 def _get_spark_field_type(field_type: Any) -> types.DataType:
     annotated_spark_type = _spark_type_from_annotated(field_type)
     if annotated_spark_type is not None:
         return annotated_spark_type
 
     normalized_type = normalize_python_type(field_type)
-    literal_spark_type = _spark_type_from_literal(normalized_type)
-    if literal_spark_type is not None:
-        return literal_spark_type
+    if get_origin(normalized_type) is Literal:
+        return _resolve_literal(normalized_type, _get_spark_field_type, "Spark")
 
     if is_schema_model(normalized_type):
         return types.StructType(

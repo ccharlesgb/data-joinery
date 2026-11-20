@@ -52,10 +52,8 @@ def test_inspect_transform_collects_context_parameters():
 
     spec = _inspect_transform(read_orders)
 
-    assert set(spec.context_parameters) == {"spark", "path"}
-    declared_type, marker = spec.context_parameters["path"]
-    assert declared_type is PathConfig
-    assert isinstance(marker, Context)
+    expected = {"spark": SparkSession, "path": PathConfig}
+    assert spec.context_parameters == expected
 
 
 def test_inspect_transform_context_parameter_not_treated_as_dataframe_input():
@@ -73,18 +71,13 @@ def test_inspect_transform_context_parameter_not_treated_as_dataframe_input():
     assert set(spec.context_parameters) == {"path"}
 
 
-def test_inspect_transform_collects_spark_as_context_parameter():
-    def read_orders(
-        spark: Annotated[SparkSession, Context()],
-    ) -> DataFrame:
+def test_inspect_transform_resolves_explicit_context_type():
+    def read_path(path: Annotated[object, Context(PathConfig)]) -> None:
         raise AssertionError
 
-    spec = _inspect_transform(read_orders)
+    spec = _inspect_transform(read_path)
 
-    assert set(spec.context_parameters) == {"spark"}
-    declared_type, marker = spec.context_parameters["spark"]
-    assert declared_type is SparkSession
-    assert isinstance(marker, Context)
+    assert spec.context_parameters == {"path": PathConfig}
 
 
 @pytest.mark.parametrize(

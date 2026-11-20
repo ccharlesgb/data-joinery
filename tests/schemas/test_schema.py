@@ -102,9 +102,9 @@ def test_default_coercion_rejects_extra_columns[FrameT](
         Schema(Item).coerce_dataframe(source)
 
 
-_MISSING_FIELDS = {("missing", "customer.postcode"), ("missing", "required")}
-_TYPE_MISMATCHES = {("type_mismatch", "customer.name"), ("type_mismatch", "items[]")}
-_NESTED_EXTRA = {("additional", "customer.legacy")}
+_MISSING_FIELDS = [("missing", "customer.postcode"), ("missing", "required")]
+_TYPE_MISMATCHES = [("type_mismatch", "customer.name"), ("type_mismatch", "items[]")]
+_NESTED_EXTRA = [("additional", "customer.legacy")]
 
 
 @pytest.mark.parametrize(
@@ -112,20 +112,22 @@ _NESTED_EXTRA = {("additional", "customer.legacy")}
     [
         (
             "strict",
-            _MISSING_FIELDS
-            | _TYPE_MISMATCHES
-            | _NESTED_EXTRA
-            | {("additional", "extra")},
+            [
+                *_MISSING_FIELDS,
+                ("additional", "extra"),
+                *_NESTED_EXTRA,
+                *_TYPE_MISMATCHES,
+            ],
         ),
-        ("project_top_level", _MISSING_FIELDS | _TYPE_MISMATCHES | _NESTED_EXTRA),
-        ("project", _MISSING_FIELDS | _TYPE_MISMATCHES),
+        ("project_top_level", [*_MISSING_FIELDS, *_NESTED_EXTRA, *_TYPE_MISMATCHES]),
+        ("project", [*_MISSING_FIELDS, *_TYPE_MISMATCHES]),
         ("project_cast", _MISSING_FIELDS),
     ],
 )
 def test_coercion_reports_all_schema_violations[FrameT](
     dataframe_backend: BackendHelper[FrameT],
     mode: CoercionMode,
-    expected: set[tuple[DifferenceKind, str]],
+    expected: list[tuple[DifferenceKind, str]],
 ) -> None:
     class SourceCustomer(JoineryModel):
         name: Column[int]
@@ -155,9 +157,26 @@ def test_coercion_reports_all_schema_violations[FrameT](
     with pytest.raises(SchemaCoercionError) as caught:
         Schema(TargetRow).coerce_dataframe(source, mode)
 
-    assert sorted((item.kind, item.path) for item in caught.value.violations) == sorted(
-        expected
+    assert [(item.kind, item.path) for item in caught.value.violations] == expected
+
+
+@pytest.mark.parametrize("column_name", ["legacy.field", "legacy[]"])
+def test_project_top_level_rejects_extra_columns_with_path_markers[FrameT](
+    dataframe_backend: BackendHelper[FrameT], column_name: str
+) -> None:
+    class ItemWithLegacyField(Item):
+        legacy: Column[int] = column(name=column_name)
+
+    source = dataframe_backend.create(
+        Schema(ItemWithLegacyField), ItemWithLegacyField(value=1, legacy=2)
     )
+
+    with pytest.raises(SchemaCoercionError) as caught:
+        Schema(Item).coerce_dataframe(source, "project_top_level")
+
+    assert [(item.kind, item.path) for item in caught.value.violations] == [
+        ("additional", column_name)
+    ]
 
 
 def test_project_top_level_selects_model_columns_in_order[FrameT](

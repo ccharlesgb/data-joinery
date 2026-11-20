@@ -7,12 +7,13 @@ import polars as pl
 
 from data_joinery.schemas.coercion_error import (
     CoercionMode,
-    DifferenceKind,
     SchemaCoercionError,
     SchemaDiff,
-    SchemaDifference,
+    _check_coercion_mode,
+    _validate_coercion,
 )
 
+from .._schema import _compare_schema, _compile_fields
 from ..protocol import DataFrameBackend
 from ..registry import register_backend
 from .types import _get_polars_field_type
@@ -25,76 +26,23 @@ else:
     PolarsDataType = Any
 
 
+def _struct_fields(dtype: PolarsDataType) -> list[tuple[str, PolarsDataType]] | None:
+    if isinstance(dtype, pl.Struct):
+        return [(field.name, field.dtype) for field in dtype.fields]
+    return None
+
+
+def _list_element(dtype: PolarsDataType) -> PolarsDataType | None:
+    return dtype.inner if isinstance(dtype, pl.List) else None
+
+
 def _schema_diff(given: pl.Schema, expected: pl.Schema) -> SchemaDiff:
-    additional: list[SchemaDifference] = []
-    missing: list[SchemaDifference] = []
-    type_mismatches: list[SchemaDifference] = []
-
-    def add_difference(
-        kind: DifferenceKind,
-        path: str,
-        given_type: object | None,
-        expected_type: object | None,
-    ) -> None:
-        difference = SchemaDifference(kind, path, given_type, expected_type)
-        match kind:
-            case "additional":
-                additional.append(difference)
-            case "missing":
-                missing.append(difference)
-            case "type_mismatch":
-                type_mismatches.append(difference)
-
-    def walk_types(
-        given_type: PolarsDataType,
-        expected_type: PolarsDataType,
-        path: str,
-    ) -> None:
-        if isinstance(given_type, pl.Struct) and isinstance(expected_type, pl.Struct):
-            walk_fields(given_type.fields, expected_type.fields, path)
-            return
-        if isinstance(given_type, pl.List) and isinstance(expected_type, pl.List):
-            walk_types(given_type.inner, expected_type.inner, f"{path}[]")
-            return
-        if given_type != expected_type:
-            add_difference("type_mismatch", path, given_type, expected_type)
-
-    def walk_fields(
-        given_fields: Sequence[pl.Field],
-        expected_fields: Sequence[pl.Field],
-        parent_path: str,
-    ) -> None:
-        given_by_name = {field.name: field for field in given_fields}
-        expected_by_name = {field.name: field for field in expected_fields}
-
-        for given_field in given_fields:
-            path = (
-                given_field.name
-                if not parent_path
-                else f"{parent_path}.{given_field.name}"
-            )
-            expected_field = expected_by_name.get(given_field.name)
-            if expected_field is None:
-                add_difference("additional", path, given_field.dtype, None)
-            else:
-                walk_types(given_field.dtype, expected_field.dtype, path)
-
-        for expected_field in expected_fields:
-            if expected_field.name in given_by_name:
-                continue
-            path = (
-                expected_field.name
-                if not parent_path
-                else f"{parent_path}.{expected_field.name}"
-            )
-            add_difference("missing", path, None, expected_field.dtype)
-
-    walk_fields(
-        [pl.Field(name, dtype) for name, dtype in given.items()],
-        [pl.Field(name, dtype) for name, dtype in expected.items()],
-        "",
+    return _compare_schema(
+        list(given.items()),
+        list(expected.items()),
+        struct_fields=_struct_fields,
+        list_element=_list_element,
     )
-    return SchemaDiff(tuple(additional), tuple(missing), tuple(type_mismatches))
 
 
 def _is_cast_compatible(given: object | None, expected: object | None) -> bool:
@@ -154,37 +102,13 @@ def _project_fields(
     dataframe: pl.DataFrame | pl.LazyFrame,
     given_schema: pl.Schema,
     expected_schema: pl.Schema,
-    *,
     mode: CoercionMode,
-    cast: bool,
-    recurse: bool,
+    diff: SchemaDiff,
 ) -> pl.DataFrame | pl.LazyFrame:
-    diff = _schema_diff(given_schema, expected_schema)
-    type_mismatches = (
-        tuple(
-            difference
-            for difference in diff.type_mismatches
-            if not _is_cast_compatible(difference.given, difference.expected)
-        )
-        if cast
-        else diff.type_mismatches
-    )
-    nested_additional = (
-        tuple(
-            difference
-            for difference in diff.additional
-            if "." in difference.path or "[]" in difference.path
-        )
-        if not recurse
-        else ()
-    )
-    violations = (*diff.missing, *nested_additional, *type_mismatches)
-    if violations:
-        raise SchemaCoercionError(mode, violations)
-
-    if not recurse:
+    if mode == "project_top_level":
         return dataframe.select(expected_schema.names())
 
+    cast = mode == "project_cast"
     expressions = [
         _build_projected_expression(
             pl.col(name), given_schema[name], target_type, cast=cast
@@ -211,17 +135,10 @@ class PolarsBackend(DataFrameBackend[pl.DataFrame | pl.LazyFrame, pl.Schema]):
     schema_type = pl.Schema
 
     def compile_schema(self, schema: ModelSchema[Any]) -> pl.Schema:
-        fields: dict[str, PolarsDataType] = {}
-        for field in schema.fields:
-            try:
-                fields[field.name] = _get_polars_field_type(field.annotation)
-            except ValueError as error:
-                raise ValueError(
-                    f"Schema '{schema.model.__name__}' field '{field.name}' "
-                    f"({field.annotation!r}): {error}. Use a supported Python "
-                    "type or an Annotated Polars type."
-                ) from error
-        return pl.Schema(fields)
+        """Compile a model schema into native Polars field types."""
+        return pl.Schema(
+            dict(_compile_fields(schema, _get_polars_field_type, "Polars"))
+        )
 
     def create_dataframe(
         self,
@@ -256,28 +173,12 @@ class PolarsBackend(DataFrameBackend[pl.DataFrame | pl.LazyFrame, pl.Schema]):
             else dataframe.schema
         )
         expected = self.compile_schema(schema)
+        _check_coercion_mode(mode)
+        diff = _schema_diff(given, expected)
+        _validate_coercion(diff, mode, _is_cast_compatible)
         if mode == "strict":
-            diff = _schema_diff(given, expected)
-            violations = (*diff.missing, *diff.additional, *diff.type_mismatches)
-            if violations:
-                raise SchemaCoercionError(mode, violations)
             return dataframe
-        if mode == "project_top_level":
-            return _project_fields(
-                dataframe, given, expected, mode=mode, cast=False, recurse=False
-            )
-        if mode == "project":
-            return _project_fields(
-                dataframe, given, expected, mode=mode, cast=False, recurse=True
-            )
-        if mode == "project_cast":
-            return _project_fields(
-                dataframe, given, expected, mode=mode, cast=True, recurse=True
-            )
-        raise ValueError(
-            f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
-            "'project_top_level', or 'project_cast'."
-        )
+        return _project_fields(dataframe, given, expected, mode, diff)
 
 
 POLARS_BACKEND = PolarsBackend()

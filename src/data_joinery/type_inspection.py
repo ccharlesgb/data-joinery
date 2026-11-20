@@ -1,5 +1,6 @@
 """Inspect Python annotations without loading a dataframe backend."""
 
+from collections.abc import Callable
 from types import UnionType
 from typing import Annotated, Any, Union, get_args, get_origin
 
@@ -85,3 +86,18 @@ def normalize_python_type(python_type: Any) -> Any:
         return normalize_python_type(unwrapped_type)
 
     return python_type
+
+
+def _resolve_literal[NativeType](
+    annotation: Any, resolve: Callable[[type], NativeType], backend_name: str
+) -> NativeType:
+    values = get_args(annotation)
+    if not values:
+        raise ValueError("Literal type must include at least one value")
+
+    resolved = {resolve(type(value)) for value in values}
+    if len(resolved) != 1:
+        raise ValueError(
+            f"Literal values must resolve to a single {backend_name} type: {annotation}"
+        )
+    return next(iter(resolved))

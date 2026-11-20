@@ -10,12 +10,12 @@ from pyspark.sql import functions as F
 
 from data_joinery.schemas.coercion_error import (
     CoercionMode,
-    DifferenceKind,
-    SchemaCoercionError,
     SchemaDiff,
-    SchemaDifference,
+    _check_coercion_mode,
+    _validate_coercion,
 )
 
+from .._schema import _compare_schema, _compile_fields
 from ..protocol import DataFrameBackend
 from ..registry import register_backend
 from .types import _get_spark_field_type
@@ -29,99 +29,24 @@ class SparkContext:
     spark: SparkSession
 
 
+def _field_types(schema: types.StructType) -> list[tuple[str, types.DataType]]:
+    return [(field.name, field.dataType) for field in schema.fields]
+
+
+def _struct_fields(dtype: types.DataType) -> list[tuple[str, types.DataType]] | None:
+    return _field_types(dtype) if isinstance(dtype, types.StructType) else None
+
+
+def _list_element(dtype: types.DataType) -> types.DataType | None:
+    return dtype.elementType if isinstance(dtype, types.ArrayType) else None
+
+
 def _schema_diff(given: types.StructType, expected: types.StructType) -> SchemaDiff:
-    additional: list[SchemaDifference] = []
-    missing: list[SchemaDifference] = []
-    type_mismatches: list[SchemaDifference] = []
-
-    def add_difference(
-        kind: DifferenceKind,
-        path: str,
-        given_type: types.DataType | None,
-        expected_type: types.DataType | None,
-    ) -> None:
-        difference = SchemaDifference(kind, path, given_type, expected_type)
-        match kind:
-            case "additional":
-                additional.append(difference)
-            case "missing":
-                missing.append(difference)
-            case "type_mismatch":
-                type_mismatches.append(difference)
-
-    def walk_types(
-        given_type: types.DataType,
-        expected_type: types.DataType,
-        path: str,
-    ) -> None:
-        if isinstance(given_type, types.StructType) and isinstance(
-            expected_type, types.StructType
-        ):
-            walk_structs(given_type, expected_type, path)
-            return
-
-        if isinstance(given_type, types.ArrayType) and isinstance(
-            expected_type, types.ArrayType
-        ):
-            walk_types(
-                given_type.elementType,
-                expected_type.elementType,
-                f"{path}[]",
-            )
-            return
-
-        if given_type != expected_type:
-            add_difference("type_mismatch", path, given_type, expected_type)
-
-    def walk_structs(
-        given_struct: types.StructType,
-        expected_struct: types.StructType,
-        parent_path: str,
-    ) -> None:
-        given_fields = {field.name: field for field in given_struct.fields}
-        expected_fields = {field.name: field for field in expected_struct.fields}
-
-        for given_field in given_struct.fields:
-            path = (
-                given_field.name
-                if not parent_path
-                else f"{parent_path}.{given_field.name}"
-            )
-            expected_field = expected_fields.get(given_field.name)
-            if expected_field is None:
-                add_difference(
-                    "additional",
-                    path,
-                    given_field.dataType,
-                    None,
-                )
-                continue
-            walk_types(
-                given_field.dataType,
-                expected_field.dataType,
-                path,
-            )
-
-        for expected_field in expected_struct.fields:
-            path = (
-                expected_field.name
-                if not parent_path
-                else f"{parent_path}.{expected_field.name}"
-            )
-            if expected_field.name in given_fields:
-                continue
-            add_difference(
-                "missing",
-                path,
-                None,
-                expected_field.dataType,
-            )
-
-    walk_structs(given, expected, "")
-    return SchemaDiff(
-        tuple(additional),
-        tuple(missing),
-        tuple(type_mismatches),
+    return _compare_schema(
+        _field_types(given),
+        _field_types(expected),
+        struct_fields=_struct_fields,
+        list_element=_list_element,
     )
 
 
@@ -320,10 +245,10 @@ def _cast_matrix_type(data_type: types.DataType) -> types.DataType | None:
     return None
 
 
-def _is_cast_compatible(
-    given: types.DataType | None, expected: types.DataType | None
-) -> bool:
-    if given is None or expected is None:
+def _is_cast_compatible(given: object | None, expected: object | None) -> bool:
+    if not isinstance(given, types.DataType) or not isinstance(
+        expected, types.DataType
+    ):
         return False
     if given == expected:
         return True
@@ -333,17 +258,6 @@ def _is_cast_compatible(
     if given_category is None or expected_category is None:
         return False
     return CAST_MATRIX.get((given_category, expected_category), False)
-
-
-def _coerce_strict(
-    dataframe: DataFrame,
-    schema: types.StructType,
-) -> DataFrame:
-    diff = _schema_diff(dataframe.schema, schema)
-    violations = (*diff.missing, *diff.additional, *diff.type_mismatches)
-    if violations:
-        raise SchemaCoercionError("strict", violations)
-    return dataframe
 
 
 def _make_column_nullable(column: Column, data_type: types.DataType) -> Column:
@@ -438,39 +352,13 @@ def _build_projected_column(
 
 def _project_fields(
     dataframe: DataFrame,
-    schema: types.StructType,
-    *,
+    given_schema: types.StructType,
+    expected_schema: types.StructType,
     mode: CoercionMode,
-    cast: bool,
-    recurse: bool,
 ) -> DataFrame:
-    diff = _schema_diff(dataframe.schema, schema)
-    type_mismatches = (
-        tuple(
-            difference
-            for difference in diff.type_mismatches
-            if not _is_cast_compatible(
-                type_cast(types.DataType | None, difference.given),
-                type_cast(types.DataType | None, difference.expected),
-            )
-        )
-        if cast
-        else diff.type_mismatches
-    )
-    nested_additional = (
-        tuple(
-            difference
-            for difference in diff.additional
-            if "." in difference.path or "[]" in difference.path
-        )
-        if not recurse
-        else ()
-    )
-    violations = (*diff.missing, *nested_additional, *type_mismatches)
-    if violations:
-        raise SchemaCoercionError(mode, violations)
-
-    source_fields = {field.name: field.dataType for field in dataframe.schema.fields}
+    cast = mode == "project_cast"
+    recurse = mode != "project_top_level"
+    source_fields = dict(_field_types(given_schema))
 
     columns = [
         _build_projected_column(
@@ -480,7 +368,7 @@ def _project_fields(
             cast=cast,
             recurse=recurse,
         ).alias(field.name)
-        for field in schema.fields
+        for field in expected_schema.fields
     ]
     return dataframe.select(*columns)
 
@@ -502,18 +390,15 @@ class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
     schema_type = types.StructType
 
     def compile_schema(self, schema: ModelSchema[Any]) -> types.StructType:
-        fields = []
-        for field in schema.fields:
-            try:
-                field_type = _get_spark_field_type(field.annotation)
-            except ValueError as error:
-                raise ValueError(
-                    f"Schema '{schema.model.__name__}' field '{field.name}' "
-                    f"({field.annotation!r}): {error}. Use a supported Python "
-                    "type or an Annotated Spark type."
-                ) from error
-            fields.append(types.StructField(field.name, field_type, True))
-        return types.StructType(fields)
+        """Compile a model schema into nullable Spark fields."""
+        return types.StructType(
+            [
+                types.StructField(name, dtype, True)
+                for name, dtype in _compile_fields(
+                    schema, _get_spark_field_type, "Spark"
+                )
+            ]
+        )
 
     def create_dataframe(
         self,
@@ -538,25 +423,14 @@ class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
                 f"got {type(dataframe).__name__}."
             )
         expected = self.compile_schema(schema)
-        if mode == "strict":
-            result = _coerce_strict(dataframe, expected)
-        elif mode == "project_top_level":
-            result = _project_fields(
-                dataframe, expected, mode=mode, cast=False, recurse=False
-            )
-        elif mode == "project":
-            result = _project_fields(
-                dataframe, expected, mode=mode, cast=False, recurse=True
-            )
-        elif mode == "project_cast":
-            result = _project_fields(
-                dataframe, expected, mode=mode, cast=True, recurse=True
-            )
-        else:
-            raise ValueError(
-                f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
-                "'project_top_level', or 'project_cast'."
-            )
+        _check_coercion_mode(mode)
+        given = dataframe.schema
+        _validate_coercion(_schema_diff(given, expected), mode, _is_cast_compatible)
+        result = (
+            dataframe
+            if mode == "strict"
+            else _project_fields(dataframe, given, expected, mode)
+        )
         return _make_dataframe_nullable(result)
 
 

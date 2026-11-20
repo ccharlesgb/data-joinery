@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from ..backends import (
     DataFrameBackend,
@@ -28,6 +28,23 @@ def _require_backend(
             "Use a supported type or register a backend for it."
         )
     return backend
+
+
+def _check_backend_result[ResultT](
+    result: object,
+    expected_type: type[ResultT],
+    backend: DataFrameBackend[Any, Any],
+    *,
+    kind: str,
+    operation: str,
+) -> ResultT:
+    if not isinstance(result, expected_type):
+        raise TypeError(
+            f"Backend '{backend.name}' returned {kind} type "
+            f"{type(result).__name__}; expected {expected_type.__name__}. "
+            f"Fix the backend's {operation}() result."
+        )
+    return result
 
 
 class Schema[T]:
@@ -61,13 +78,13 @@ class Schema[T]:
             backend_for_schema_type(schema_type), schema_type, kind="schema"
         )
         native_schema = backend.compile_schema(self._model_schema)
-        if not isinstance(native_schema, schema_type):
-            raise TypeError(
-                f"Backend '{backend.name}' returned schema type "
-                f"{type(native_schema).__name__}; expected {schema_type.__name__}. "
-                "Fix the backend's compile_schema() result."
-            )
-        return native_schema
+        return _check_backend_result(
+            native_schema,
+            schema_type,
+            backend,
+            kind="schema",
+            operation="compile_schema",
+        )
 
     def create_dataframe[FrameT](
         self,
@@ -89,13 +106,9 @@ class Schema[T]:
             backend_for_frame_type(frame_type), frame_type, kind="dataframe"
         )
         frame = backend.create_dataframe(rows, self._model_schema, frame_type, **kwargs)
-        if not isinstance(frame, frame_type):
-            raise TypeError(
-                f"Backend '{backend.name}' returned DataFrame type "
-                f"{type(frame).__name__}; expected {frame_type.__name__}. "
-                "Fix the backend's create_dataframe() result."
-            )
-        return frame
+        return _check_backend_result(
+            frame, frame_type, backend, kind="DataFrame", operation="create_dataframe"
+        )
 
     def coerce_dataframe(
         self, dataframe: FrameT, mode: CoercionMode = "strict"
@@ -128,13 +141,13 @@ class Schema[T]:
                 error.violations,
                 location=f"Schema '{self.model.__name__}'",
             ) from None
-        if not isinstance(frame, type(dataframe)):
-            raise TypeError(
-                f"Backend '{backend.name}' returned DataFrame type "
-                f"{type(frame).__name__}; expected {type(dataframe).__name__}. "
-                "Fix the backend's coerce_dataframe() result."
-            )
-        return cast(FrameT, frame)
+        return _check_backend_result(
+            frame,
+            type(dataframe),
+            backend,
+            kind="DataFrame",
+            operation="coerce_dataframe",
+        )
 
     def __repr__(self) -> str:
         return f"Schema(model={self.model.__name__})"

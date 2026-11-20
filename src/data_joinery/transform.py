@@ -54,16 +54,18 @@ def _make_contract(
 
 @dataclass(frozen=True)
 class TransformSpec:
+    """Store inspected contracts and resolved context dependency types."""
+
     input_contracts: dict[str, Contract]
     output_contract: Contract
-    context_parameters: dict[str, tuple[type, Context]]
+    context_parameters: dict[str, type]
 
 
 def _inspect_transform(f: Any) -> TransformSpec:
     signature = inspect.signature(f)
     type_hints = get_type_hints(f, include_extras=True)
     input_contracts: dict[str, Contract] = {}
-    context_parameters: dict[str, tuple[type, Context]] = {}
+    context_parameters: dict[str, type] = {}
     transform_name = get_callable_name(f) or "<lambda>"
 
     for parameter_name, parameter in signature.parameters.items():
@@ -82,7 +84,7 @@ def _inspect_transform(f: Any) -> TransformSpec:
 
         parameter_type, marker = _parse_annotation(type_hints[parameter_name], location)
         if isinstance(marker, Context):
-            context_parameters[parameter_name] = (parameter_type, marker)
+            context_parameters[parameter_name] = marker.type or parameter_type
         else:
             input_contracts[parameter_name] = _make_contract(
                 parameter_type, marker, location
@@ -108,6 +110,37 @@ def _inspect_transform(f: Any) -> TransformSpec:
     )
 
 
+def _validate_boundary(
+    contract: Contract,
+    value: object,
+    transform_name: str,
+    *,
+    parameter_name: str | None = None,
+) -> object:
+    transform_location = f"Transform '{transform_name}'"
+    if parameter_name is None:
+        location = f"{transform_location} return value"
+        type_subject = f"Return value from '{transform_name}'"
+    else:
+        location = f"{transform_location} parameter '{parameter_name}'"
+        type_subject = location
+
+    try:
+        return contract.validate(value)
+    except ContractTypeMismatch as error:
+        raise TypeError(
+            f"{type_subject} must be {error.expected_type}; got {type(value).__name__}."
+        ) from None
+    except SchemaCoercionError as error:
+        if error.location:
+            location = f"{location}, {error.location}"
+        raise SchemaCoercionError(
+            error.mode, error.violations, location=location
+        ) from None
+    except ValueError as error:
+        raise ValueError(f"{location}: {error}") from None
+
+
 def _wrap_transform[**P, R](
     fn: Callable[P, R],
     spec: TransformSpec,
@@ -121,54 +154,15 @@ def _wrap_transform[**P, R](
         bound_arguments.apply_defaults()
 
         for parameter_name, expected_contract in spec.input_contracts.items():
-            value = bound_arguments.arguments.get(parameter_name)
-            try:
-                bound_arguments.arguments[parameter_name] = expected_contract.validate(
-                    value
-                )
-            except ContractTypeMismatch as e:
-                raise TypeError(
-                    f"Transform '{transform_name}' parameter '{parameter_name}' must be "
-                    f"{e.expected_type}; got {type(value).__name__}."
-                ) from None
-            except SchemaCoercionError as e:
-                raise SchemaCoercionError(
-                    e.mode,
-                    e.violations,
-                    location=(
-                        f"Transform '{transform_name}' parameter '{parameter_name}'"
-                        + (f", {e.location}" if e.location else "")
-                    ),
-                ) from None
-            except ValueError as e:
-                raise ValueError(
-                    f"Transform '{transform_name}' parameter '{parameter_name}': {e}"
-                ) from None
+            bound_arguments.arguments[parameter_name] = _validate_boundary(
+                expected_contract,
+                bound_arguments.arguments.get(parameter_name),
+                transform_name,
+                parameter_name=parameter_name,
+            )
 
         result = fn(*bound_arguments.args, **bound_arguments.kwargs)
-
-        try:
-            result = cast(R, spec.output_contract.validate(result))
-        except ContractTypeMismatch as e:
-            raise TypeError(
-                f"Return value from '{transform_name}' must be {e.expected_type}; "
-                f"got {type(result).__name__}."
-            ) from None
-        except SchemaCoercionError as e:
-            raise SchemaCoercionError(
-                e.mode,
-                e.violations,
-                location=(
-                    f"Transform '{transform_name}' return value"
-                    + (f", {e.location}" if e.location else "")
-                ),
-            ) from None
-        except ValueError as e:
-            raise ValueError(
-                f"Transform '{transform_name}' return value: {e}"
-            ) from None
-
-        return result
+        return cast(R, _validate_boundary(spec.output_contract, result, transform_name))
 
     return wrapper
 
