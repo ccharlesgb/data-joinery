@@ -9,10 +9,7 @@ from polars.testing import assert_frame_equal
 from pyspark.sql import types
 
 from data_joinery import Column, JoineryModel, Schema, column
-
-
-class Item(JoineryModel):
-    value: Column[int]
+from tests.models import Item
 
 
 class PortableRow(JoineryModel):

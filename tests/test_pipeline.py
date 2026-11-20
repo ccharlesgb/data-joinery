@@ -1,4 +1,3 @@
-from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -14,6 +13,7 @@ from data_joinery import (
     transform,
 )
 from data_joinery.backends.spark import SparkContext
+from data_joinery.contract import DataFrameContract
 from data_joinery.pipeline import (
     Pipeline,
     PipelineConnectionError,
@@ -21,24 +21,16 @@ from data_joinery.pipeline import (
     PipelineExecutionError,
     PipelineOverrideError,
 )
+from tests.models import Department, PathConfig
 
 
 class User(JoineryModel):
     user_id: Column[int]
 
 
-class Department(JoineryModel):
-    department_id: Column[int]
-
-
 class UserWithDepartment(JoineryModel):
     user_id: Column[int]
     department_id: Column[int]
-
-
-@dataclass(frozen=True)
-class PathConfig:
-    value: str
 
 
 @dataclass(frozen=True)
@@ -57,29 +49,45 @@ class FittedModel:
     coefficient: float
 
 
-@pytest.fixture(scope="session")
-def spark() -> Generator[SparkSession, None, None]:
-    spark = SparkSession.builder.master("local[*]").getOrCreate()
-    yield spark
-    spark.stop()
+@transform
+def _read_users_int(
+    spark: Annotated[SparkSession, Context()],
+) -> Annotated[DataFrame, Project(User)]:
+    return spark.createDataFrame([(1,)], "user_id INT")
+
+
+@transform
+def _read_users_bigint(
+    spark: Annotated[SparkSession, Context()],
+) -> Annotated[DataFrame, Project(User)]:
+    return spark.createDataFrame([(1,)], "user_id BIGINT")
+
+
+@transform
+def _fail_if_users_are_read(
+    spark: Annotated[SparkSession, Context()],
+) -> Annotated[DataFrame, Project(User)]:
+    raise AssertionError
+
+
+@transform
+def _pass_through_users(
+    users: Annotated[DataFrame, Project(User)],
+) -> Annotated[DataFrame, Project(User)]:
+    return users
+
+
+@transform
+def _read_departments_int(
+    spark: Annotated[SparkSession, Context()],
+) -> Annotated[DataFrame, Project(Department)]:
+    return spark.createDataFrame([(1,)], "department_id INT")
 
 
 def test_duplicate_edges_are_idempotent():
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
-    @transform
-    def filter_users(
-        users: Annotated[DataFrame, Project(User)],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return users
-
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
-    filtered = pipeline.add_step(filter_users, "filtered")
+    users = pipeline.add_step(_read_users_int, "users")
+    filtered = pipeline.add_step(_pass_through_users, "filtered")
     pipeline.connect(users, filtered)
     pipeline.connect(users, filtered)
 
@@ -87,35 +95,17 @@ def test_duplicate_edges_are_idempotent():
 
 
 def test_step_right_shift_connects_steps_and_returns_downstream():
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
-    @transform
-    def filter_users(
-        users: Annotated[DataFrame, Project(User)],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return users
-
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
-    filtered = pipeline.add_step(filter_users, "filtered")
+    users = pipeline.add_step(_read_users_int, "users")
+    filtered = pipeline.add_step(_pass_through_users, "filtered")
 
     assert users >> filtered is filtered
     assert pipeline.get_upstream_steps(filtered) == {users}
 
 
 def test_step_right_shift_rejects_non_step_operand():
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
+    users = pipeline.add_step(_read_users_int, "users")
 
     with pytest.raises(TypeError, match="only connect Step instances"):
         users >> "filtered"  # type: ignore[operator]
@@ -290,14 +280,8 @@ def test_grouped_connections_leave_no_edges_when_a_later_edge_creates_a_cycle(
 
 
 def test_connect_many_rejects_empty_sources():
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
+    users = pipeline.add_step(_read_users_int, "users")
 
     with pytest.raises(ValueError, match="at least one"):
         pipeline.connect_many([], users)
@@ -336,12 +320,6 @@ def test_pipeline_rejects_wrong_context_type():
 
 
 def test_pipeline_allows_write_step_without_output_schema(spark: SparkSession):
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id BIGINT")
-
     written: list[DataFrame] = []
 
     @transform
@@ -349,7 +327,7 @@ def test_pipeline_allows_write_step_without_output_schema(spark: SparkSession):
         written.append(users)
 
     pipeline = Pipeline(SparkContext)
-    read_step = pipeline.add_step(read_users, "users")
+    read_step = pipeline.add_step(_read_users_bigint, "users")
     write_step = pipeline.add_step(write_users, "write_users")
     pipeline.connect(read_step, write_step)
 
@@ -364,19 +342,13 @@ def test_pipeline_allows_write_step_without_output_schema(spark: SparkSession):
 
 def test_pipeline_rejects_missing_dataframe_match():
     @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
-    @transform
     def join_departments(
         departments: Annotated[DataFrame, Project(Department)],
     ) -> Annotated[DataFrame, Project(Department)]:
         return departments
 
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
+    users = pipeline.add_step(_read_users_int, "users")
     join = pipeline.add_step(join_departments, "join")
     with pytest.raises(
         PipelineConnectionError,
@@ -386,28 +358,10 @@ def test_pipeline_rejects_missing_dataframe_match():
 
 
 def test_pipeline_rejects_extra_upstream_output():
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
-    @transform
-    def read_departments(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(Department)]:
-        return spark.createDataFrame([(1,)], "department_id INT")
-
-    @transform
-    def accept_users(
-        users: Annotated[DataFrame, Project(User)],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return users
-
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
-    departments = pipeline.add_step(read_departments, "departments")
-    accepted = pipeline.add_step(accept_users, "accepted")
+    users = pipeline.add_step(_read_users_int, "users")
+    departments = pipeline.add_step(_read_departments_int, "departments")
+    accepted = pipeline.add_step(_pass_through_users, "accepted")
     with pytest.raises(
         PipelineConnectionError,
         match="No compatible contract between steps 'departments' and 'accepted'",
@@ -416,22 +370,10 @@ def test_pipeline_rejects_extra_upstream_output():
 
 
 def test_pipeline_rejects_ambiguous_duplicate_schema_outputs():
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
-    @transform
-    def accept_users(
-        users: Annotated[DataFrame, Project(User)],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return users
-
     pipeline = Pipeline(SparkContext)
-    users_a = pipeline.add_step(read_users, "users_a")
-    users_b = pipeline.add_step(read_users, "users_b")
-    accepted = pipeline.add_step(accept_users, "accepted")
+    users_a = pipeline.add_step(_read_users_int, "users_a")
+    users_b = pipeline.add_step(_read_users_int, "users_b")
+    accepted = pipeline.add_step(_pass_through_users, "accepted")
     with pytest.raises(
         PipelineConnectionError,
         match="Step 'users_a' is already connected to 'accepted'",
@@ -462,18 +404,6 @@ def test_pipeline_rejects_cycles():
 
 def test_pipeline_supports_multiple_dataframe_inputs():
     @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id INT")
-
-    @transform
-    def read_departments(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(Department)]:
-        return spark.createDataFrame([(1,)], "department_id INT")
-
-    @transform
     def join(
         users: Annotated[DataFrame, Project(User)],
         departments: Annotated[DataFrame, Project(Department)],
@@ -481,8 +411,8 @@ def test_pipeline_supports_multiple_dataframe_inputs():
         return users.join(departments)
 
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
-    departments = pipeline.add_step(read_departments, "departments")
+    users = pipeline.add_step(_read_users_int, "users")
+    departments = pipeline.add_step(_read_departments_int, "departments")
     joined = pipeline.add_step(join, "joined")
     pipeline.connect_many([users, departments], joined)
 
@@ -518,12 +448,6 @@ def test_executable_pipeline_runs_sources_and_downstream_steps(
 
 def test_executable_pipeline_passes_instance_outputs(spark: SparkSession):
     @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id BIGINT")
-
-    @transform
     def fit_model(users: Annotated[DataFrame, Project(User)]) -> FittedModel:
         return FittedModel(coefficient=float(users.count()))
 
@@ -534,7 +458,7 @@ def test_executable_pipeline_passes_instance_outputs(spark: SparkSession):
         printed.append(model)
 
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
+    users = pipeline.add_step(_read_users_bigint, "users")
     model = pipeline.add_step(fit_model, "model")
     printer = pipeline.add_step(print_coefficients, "printer")
     pipeline.connect(users, model)
@@ -550,12 +474,6 @@ def test_executable_pipeline_runs_fan_in_and_independent_components(
     spark: SparkSession,
 ):
     @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id BIGINT")
-
-    @transform
     def read_departments(
         spark: Annotated[SparkSession, Context()],
     ) -> Annotated[DataFrame, Project(Department)]:
@@ -569,7 +487,7 @@ def test_executable_pipeline_runs_fan_in_and_independent_components(
         return users.selectExpr("user_id", "cast(2 as BIGINT) as department_id")
 
     pipeline = Pipeline(SparkContext)
-    users = pipeline.add_step(read_users, "users")
+    users = pipeline.add_step(_read_users_bigint, "users")
     departments = pipeline.add_step(read_departments, "departments")
     joined = pipeline.add_step(join, "joined")
     pipeline.connect_many([users, departments], joined)
@@ -581,14 +499,8 @@ def test_executable_pipeline_runs_fan_in_and_independent_components(
 
 
 def test_executable_pipeline_requires_context_for_spark():
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        raise AssertionError
-
     pipeline = Pipeline(SparkContext)
-    pipeline.add_step(read_users, "users")
+    pipeline.add_step(_fail_if_users_are_read, "users")
 
     with pytest.raises(TypeError, match=r"Pipeline\[SparkContext\] requires a context"):
         pipeline.run()  # type: ignore[call-overload]
@@ -709,12 +621,6 @@ def test_run_uses_named_transform_overrides_without_mutating_pipeline(
 
 def test_run_overrides_write_step(spark: SparkSession):
     @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        return spark.createDataFrame([(1,)], "user_id BIGINT")
-
-    @transform
     def write_users(users: Annotated[DataFrame, Project(User)]) -> None:
         raise AssertionError("production writer must not run")
 
@@ -725,7 +631,7 @@ def test_run_overrides_write_step(spark: SparkSession):
         written_ids.extend(row.user_id for row in users.collect())
 
     pipeline = Pipeline(SparkContext)
-    read = pipeline.add_step(read_users, "read")
+    read = pipeline.add_step(_read_users_bigint, "read")
     write = pipeline.add_step(write_users, "write")
     read >> write
 
@@ -766,17 +672,11 @@ def test_run_validates_all_override_names_before_execution(spark: SparkSession):
 
 
 def test_run_requires_override_to_be_a_transform(spark: SparkSession):
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        raise AssertionError
-
     def replacement() -> Annotated[DataFrame, Project(User)]:
         raise AssertionError
 
     pipeline = Pipeline(SparkContext)
-    pipeline.add_step(read_users, "read")
+    pipeline.add_step(_fail_if_users_are_read, "read")
 
     with pytest.raises(PipelineOverrideError, match="decorated with @transform"):
         pipeline.run(  # type: ignore[no-matching-overload]
@@ -786,12 +686,6 @@ def test_run_requires_override_to_be_a_transform(spark: SparkSession):
 
 
 def test_run_rejects_override_with_different_input_boundary(spark: SparkSession):
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        raise AssertionError
-
     @transform
     def filter_users(
         users: Annotated[DataFrame, Project(User)],
@@ -803,7 +697,7 @@ def test_run_rejects_override_with_different_input_boundary(spark: SparkSession)
         raise AssertionError
 
     pipeline = Pipeline(SparkContext)
-    read = pipeline.add_step(read_users, "read")
+    read = pipeline.add_step(_fail_if_users_are_read, "read")
     filtered = pipeline.add_step(filter_users, "filter")
     read >> filtered
 
@@ -814,19 +708,22 @@ def test_run_rejects_override_with_different_input_boundary(spark: SparkSession)
         )
 
 
-def test_run_rejects_override_with_incompatible_output(spark: SparkSession):
+@pytest.mark.parametrize(
+    "output_contract",
+    [
+        pytest.param(Project(Department), id="different-model"),
+        pytest.param(Strict(User), id="different-coercion-mode"),
+    ],
+)
+def test_run_rejects_override_with_incompatible_output(
+    spark: SparkSession, output_contract: DataFrameContract
+):
     @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        raise AssertionError
-
-    @transform
-    def replacement() -> Annotated[DataFrame, Project(Department)]:
+    def replacement() -> Annotated[DataFrame, output_contract]:
         raise AssertionError
 
     pipeline = Pipeline(SparkContext)
-    pipeline.add_step(read_users, "read")
+    pipeline.add_step(_fail_if_users_are_read, "read")
 
     with pytest.raises(PipelineOverrideError, match="same output contract"):
         pipeline.run(
@@ -839,12 +736,6 @@ def test_run_rejects_override_that_introduces_context_dependency(
     spark: SparkSession,
 ):
     @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        raise AssertionError
-
-    @transform
     def replacement(
         spark: Annotated[SparkSession, Context()],
         path: Annotated[PathConfig, Context()],
@@ -852,7 +743,7 @@ def test_run_rejects_override_that_introduces_context_dependency(
         raise AssertionError
 
     pipeline = Pipeline(SparkContext)
-    pipeline.add_step(read_users, "read")
+    pipeline.add_step(_fail_if_users_are_read, "read")
 
     with pytest.raises(
         PipelineOverrideError,
@@ -889,36 +780,7 @@ def test_run_compares_override_context_by_lookup_type(spark: SparkSession):
     assert result.get_output(read).count() == 1
 
 
-def test_run_rejects_override_with_different_output_coercion_mode(
-    spark: SparkSession,
-):
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        raise AssertionError
-
-    @transform
-    def replacement() -> Annotated[DataFrame, Strict(User)]:
-        raise AssertionError
-
-    pipeline = Pipeline(SparkContext)
-    pipeline.add_step(read_users, "read")
-
-    with pytest.raises(PipelineOverrideError, match="same output contract"):
-        pipeline.run(
-            SparkContext(spark),
-            transform_overrides={"read": replacement},
-        )
-
-
 def test_run_rejects_output_from_sink_override(spark: SparkSession):
-    @transform
-    def read_users(
-        spark: Annotated[SparkSession, Context()],
-    ) -> Annotated[DataFrame, Project(User)]:
-        raise AssertionError
-
     @transform
     def write_users(users: Annotated[DataFrame, Project(User)]) -> None:
         raise AssertionError
@@ -928,7 +790,7 @@ def test_run_rejects_output_from_sink_override(spark: SparkSession):
         raise AssertionError
 
     pipeline = Pipeline(SparkContext)
-    read = pipeline.add_step(read_users, "read")
+    read = pipeline.add_step(_fail_if_users_are_read, "read")
     write = pipeline.add_step(write_users, "write")
     read >> write
 

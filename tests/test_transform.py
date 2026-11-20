@@ -1,5 +1,3 @@
-from collections.abc import Generator
-from dataclasses import dataclass
 from functools import partial
 from typing import Annotated
 
@@ -25,22 +23,7 @@ from data_joinery.transform import (
     side_effect,
     transform,
 )
-
-
-class Order(JoineryModel):
-    order_id: Column[int]
-
-
-@dataclass(frozen=True)
-class PathConfig:
-    value: str
-
-
-@pytest.fixture(scope="session")
-def spark() -> Generator[SparkSession, None, None]:
-    spark = SparkSession.builder.master("local[*]").getOrCreate()
-    yield spark
-    spark.stop()
+from tests.models import Order, PathConfig
 
 
 def test_inspect_transform_collects_context_parameters():
@@ -359,48 +342,59 @@ def test_transform_validates_returned_instances_through_contract_interface():
         get_path()
 
 
-def test_transform_raises_for_input_schema_mismatch(spark: SparkSession):
-    class InputRow(JoineryModel):
-        field1: Column[int]
-        field2: Column[str]
+class SingleFieldRow(JoineryModel):
+    """A row containing one integer field."""
 
-    bad_input_df = spark.createDataFrame(
+    field1: Column[int]
+
+
+class RowWithExtraField(SingleFieldRow):
+    """A row with a second field that projection can remove."""
+
+    field2: Column[str]
+
+
+@pytest.fixture
+def non_nullable_frame(spark: SparkSession) -> DataFrame:
+    """Provide an integer column that Spark marks as non-nullable."""
+
+    return spark.createDataFrame(
         [(1,)],
         types.StructType([types.StructField("field1", types.LongType(), False)]),
     )
 
+
+@pytest.fixture
+def frame_with_extra_field(spark: SparkSession) -> DataFrame:
+    """Provide a frame matching the model with two fields."""
+
+    return Schema(RowWithExtraField).create_dataframe(
+        [RowWithExtraField(field1=1, field2="a")], DataFrame, session=spark
+    )
+
+
+def test_transform_raises_for_input_schema_mismatch(non_nullable_frame: DataFrame):
     @transform
-    def my_function(input1: Annotated[DataFrame, Project(InputRow)]):
+    def my_function(input1: Annotated[DataFrame, Project(RowWithExtraField)]):
         return input1
 
     with pytest.raises(schemas.SchemaCoercionError) as error:
-        my_function(bad_input_df)
+        my_function(non_nullable_frame)
 
     assert [
         (violation.kind, violation.path) for violation in error.value.violations
     ] == [("missing", "field2")]
 
 
-def test_transform_raises_for_output_schema_mismatch(spark: SparkSession):
-    class InputRow(JoineryModel):
-        field1: Column[int]
-        field2: Column[str]
-
-    class OutputRow(JoineryModel):
-        field1: Column[int]
-
-    input_df = Schema(InputRow).create_dataframe(
-        [InputRow(field1=1, field2="a")], DataFrame, session=spark
-    )
-
+def test_transform_raises_for_output_schema_mismatch(frame_with_extra_field: DataFrame):
     @transform
     def my_function(
         input1: DataFrame,
-    ) -> Annotated[DataFrame, Strict(OutputRow)]:
+    ) -> Annotated[DataFrame, Strict(SingleFieldRow)]:
         return input1
 
     with pytest.raises(schemas.SchemaCoercionError) as error:
-        my_function(input_df)
+        my_function(frame_with_extra_field)
 
     assert [
         (violation.kind, violation.path) for violation in error.value.violations
@@ -431,50 +425,28 @@ def test_transform_rejects_invalid_output_with_descriptive_metadata():
 
 
 def test_transform_project_drops_extra_output_columns(
-    spark: SparkSession,
+    frame_with_extra_field: DataFrame,
 ):
-    class InputRow(JoineryModel):
-        field1: Column[int]
-        field2: Column[str]
-
-    class OutputRow(JoineryModel):
-        field1: Column[int]
-
-    input_df = Schema(InputRow).create_dataframe(
-        [InputRow(field1=1, field2="a")], DataFrame, session=spark
-    )
-
     @transform
     def my_function(
-        input1: Annotated[DataFrame, Project(InputRow)],
-    ) -> Annotated[DataFrame, Project(OutputRow)]:
+        input1: Annotated[DataFrame, Project(RowWithExtraField)],
+    ) -> Annotated[DataFrame, Project(SingleFieldRow)]:
         return input1
 
-    result = my_function(input_df)
+    result = my_function(frame_with_extra_field)
     assert result.columns == ["field1"]
 
 
-def test_transform_strict_makes_input_nullable(spark: SparkSession):
-    class InputRow(JoineryModel):
-        field1: Column[int]
-
-    bad_input_df = spark.createDataFrame(
-        [(1,)],
-        types.StructType([types.StructField("field1", types.LongType(), False)]),
-    )
-
+def test_transform_strict_makes_input_nullable(non_nullable_frame: DataFrame):
     @transform
-    def my_function(input1: Annotated[DataFrame, Strict(InputRow)]) -> DataFrame:
+    def my_function(input1: Annotated[DataFrame, Strict(SingleFieldRow)]) -> DataFrame:
         assert input1.schema["field1"].nullable
         return input1
 
-    assert my_function(bad_input_df).schema["field1"].nullable
+    assert my_function(non_nullable_frame).schema["field1"].nullable
 
 
 def test_transform_project_cast_mode_casts_input_dataframe(spark: SparkSession):
-    class InputRow(JoineryModel):
-        field1: Column[int]
-
     input_df = spark.createDataFrame(
         [(1.9,)],
         types.StructType([types.StructField("field1", types.DoubleType(), True)]),
@@ -482,8 +454,8 @@ def test_transform_project_cast_mode_casts_input_dataframe(spark: SparkSession):
 
     @transform
     def my_function(
-        input1: Annotated[DataFrame, ProjectCast(InputRow)],
-    ) -> Annotated[DataFrame, Project(InputRow)]:
+        input1: Annotated[DataFrame, ProjectCast(SingleFieldRow)],
+    ) -> Annotated[DataFrame, Project(SingleFieldRow)]:
         return input1
 
     result = my_function(input_df)

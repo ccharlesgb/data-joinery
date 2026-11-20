@@ -1,18 +1,8 @@
-from dataclasses import dataclass
-
 import pytest
 
-from data_joinery import Column, JoineryModel, Project, Strict
+from data_joinery import Project, Strict
 from data_joinery.contract import InstanceContract, VoidContract
-
-
-class Order(JoineryModel):
-    order_id: Column[int]
-
-
-@dataclass(frozen=True)
-class PathConfig:
-    value: str
+from tests.models import Order, PathConfig
 
 
 def test_contract_implementations_determine_compatibility():

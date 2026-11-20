@@ -8,29 +8,12 @@ from pyspark.sql import types
 from data_joinery import Schema, Strict, transform
 from data_joinery.schemas.joinery_model import Column, JoineryModel, column
 from data_joinery.schemas.model_schema import ModelField, ModelSchema
-
-
-class JoineryDetail(JoineryModel):
-    day: Column[date] = column(name="Event Day")
+from tests.models import JoineryDetail
 
 
 class JoineryRow(JoineryModel):
     detail: Column[JoineryDetail] = column(name="Current Detail")
     history: Column[list[JoineryDetail]]
-
-
-def test_serialize_rows_returns_nested_dictionaries_with_python_values():
-    class Detail(JoineryModel):
-        day: Column[date]
-
-    class Row(JoineryModel):
-        details: Column[list[Detail]]
-
-    row = Row(details=[Detail(day=date(2026, 1, 1))])
-    actual = ModelSchema.from_model(Row).serialize_rows([row])
-    expected = [{"details": [{"day": date(2026, 1, 1)}]}]
-
-    assert actual == expected
 
 
 def test_joinery_fields_use_column_names_and_preserve_annotations():

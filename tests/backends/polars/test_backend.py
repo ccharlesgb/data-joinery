@@ -4,11 +4,8 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from data_joinery import Column, JoineryModel, Schema, SchemaCoercionError
-
-
-class Row(JoineryModel):
-    value: Column[int]
+from data_joinery import Schema, SchemaCoercionError
+from tests.models import Row
 
 
 def test_eager_project_cast_reports_invalid_values_during_coercion():

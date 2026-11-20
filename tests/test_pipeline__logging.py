@@ -88,12 +88,15 @@ def test_run_logs_override_and_step_invocation(caplog: pytest.LogCaptureFixture)
     )
 
 
-def test_run_logs_all_result_step_invocations(caplog: pytest.LogCaptureFixture):
+@pytest.fixture
+def read_and_write() -> Pipeline[None]:
+    """Provide a source connected to a terminal side effect."""
+
     @transform
     def read() -> int:
         return 1
 
-    @transform
+    @transform(side_effect=True)
     def write(value: int) -> None:
         pass
 
@@ -101,9 +104,14 @@ def test_run_logs_all_result_step_invocations(caplog: pytest.LogCaptureFixture):
     source = pipeline.add_step(read)
     sink = pipeline.add_step(write)
     source >> sink
+    return pipeline
 
+
+def test_run_logs_all_result_step_invocations(
+    caplog: pytest.LogCaptureFixture, read_and_write: Pipeline[None]
+):
     with caplog.at_level(logging.DEBUG, logger="data_joinery"):
-        pipeline.run()
+        read_and_write.run()
 
     assert_logs_produced(
         caplog,
@@ -130,23 +138,10 @@ def test_run_logs_all_result_step_invocations(caplog: pytest.LogCaptureFixture):
 
 
 def test_run_logs_only_executed_steps_when_side_effects_are_skipped(
-    caplog: pytest.LogCaptureFixture,
+    caplog: pytest.LogCaptureFixture, read_and_write: Pipeline[None]
 ):
-    @transform
-    def read() -> int:
-        return 1
-
-    @transform(side_effect=True)
-    def write(value: int) -> None:
-        pass
-
-    pipeline = Pipeline()
-    source = pipeline.add_step(read)
-    sink = pipeline.add_step(write)
-    source >> sink
-
     with caplog.at_level(logging.DEBUG, logger="data_joinery"):
-        pipeline.run(include_side_effects=False)
+        read_and_write.run(include_side_effects=False)
 
     assert_logs_produced(
         caplog,

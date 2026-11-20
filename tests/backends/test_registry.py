@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 import pytest
 
-from data_joinery import Column, JoineryModel, Project, Schema, Strict, transform
+from data_joinery import Project, Schema, Strict, transform
 from data_joinery.backends import (
     DataFrameBackend,
     backend_for_frame_type,
@@ -13,6 +13,7 @@ from data_joinery.backends import (
 )
 from data_joinery.schemas.coercion_error import CoercionMode
 from data_joinery.schemas.model_schema import ModelSchema
+from tests.models import Order
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ class FakeBackend(
     ) -> FakeDataFrame | OtherFakeDataFrame:
         if not isinstance(dataframe, self.dataframe_types):
             raise TypeError
-        expected = tuple(field.name for field in schema.fields)
+        expected = self.compile_schema(schema)
         if mode == "strict" and set(dataframe.columns) != set(expected):
             raise ValueError("schema mismatch")
         return type(dataframe)(expected)
@@ -58,15 +59,11 @@ class FakeBackend(
         if kwargs:
             raise TypeError
         schema.serialize_rows(rows)
-        return frame_type(tuple(field.name for field in schema.fields))
+        return frame_type(self.compile_schema(schema))
 
 
 FAKE_BACKEND = FakeBackend()
 register_backend(FAKE_BACKEND)
-
-
-class Order(JoineryModel):
-    order_id: Column[int]
 
 
 def test_schema_compiles_with_a_registered_backend():
@@ -75,12 +72,17 @@ def test_schema_compiles_with_a_registered_backend():
     assert schema.native_schema(tuple) == ("order_id",)
 
 
-def test_schema_creates_a_registered_dataframe_type():
-    schema = Schema(Order)
+@pytest.mark.parametrize(
+    "frame_type",
+    [
+        pytest.param(FakeDataFrame, id="first-frame-type"),
+        pytest.param(OtherFakeDataFrame, id="second-frame-type"),
+    ],
+)
+def test_schema_creates_the_requested_registered_dataframe_type(frame_type):
+    expected = frame_type(("order_id",))
 
-    assert schema.create_dataframe([Order(order_id=1)], FakeDataFrame) == FakeDataFrame(
-        ("order_id",)
-    )
+    assert Schema(Order).create_dataframe([Order(order_id=1)], frame_type) == expected
 
 
 def test_backend_is_discovered_from_its_native_schema_type():
@@ -89,15 +91,6 @@ def test_backend_is_discovered_from_its_native_schema_type():
 
 def test_backend_is_discovered_from_its_second_dataframe_type():
     assert backend_for_frame_type(OtherFakeDataFrame) is FAKE_BACKEND
-
-
-def test_schema_creates_the_requested_second_dataframe_type():
-    expected = OtherFakeDataFrame(("order_id",))
-
-    assert (
-        Schema(Order).create_dataframe([Order(order_id=1)], OtherFakeDataFrame)
-        == expected
-    )
 
 
 def test_unbound_contract_accepts_the_second_dataframe_type():
@@ -175,25 +168,20 @@ def test_registration_rejects_an_ambiguous_schema_type():
         register_backend(AmbiguousBackend())
 
 
-def test_transform_binds_dataframe_contract_to_annotation_backend():
-    @transform
-    def select_order(
-        frame: Annotated[FakeDataFrame, Project(Order)],
-    ) -> Annotated[FakeDataFrame, Strict(Order)]:
-        return frame
+@transform
+def _select_order(
+    frame: Annotated[FakeDataFrame, Project(Order)],
+) -> Annotated[FakeDataFrame, Strict(Order)]:
+    return frame
 
-    contract = select_order.__transform_spec__.input_contracts["frame"]
+
+def test_transform_binds_dataframe_contract_to_annotation_backend():
+    contract = _select_order.__transform_spec__.input_contracts["frame"]
 
     assert contract.backend_name == "fake"  # type: ignore[attr-defined]
 
 
 def test_transform_coerces_with_a_registered_backend():
-    @transform
-    def select_order(
-        frame: Annotated[FakeDataFrame, Project(Order)],
-    ) -> Annotated[FakeDataFrame, Strict(Order)]:
-        return frame
-
-    assert select_order(FakeDataFrame(("extra", "order_id"))) == FakeDataFrame(
+    assert _select_order(FakeDataFrame(("extra", "order_id"))) == FakeDataFrame(
         ("order_id",)
     )
