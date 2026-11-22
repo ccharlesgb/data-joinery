@@ -15,7 +15,7 @@ from data_joinery.schemas.coercion_error import (
     _validate_coercion,
 )
 
-from .._schema import _compare_schema, _compile_fields
+from .._schema import compare_schema, compile_fields
 from ..protocol import DataFrameBackend
 from ..registry import register_backend
 from .types import _get_spark_field_type
@@ -42,7 +42,7 @@ def _list_element(dtype: types.DataType) -> types.DataType | None:
 
 
 def _schema_diff(given: types.StructType, expected: types.StructType) -> SchemaDiff:
-    return _compare_schema(
+    return compare_schema(
         _field_types(given),
         _field_types(expected),
         struct_fields=_struct_fields,
@@ -394,7 +394,7 @@ class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
         return types.StructType(
             [
                 types.StructField(name, dtype, True)
-                for name, dtype in _compile_fields(
+                for name, dtype in compile_fields(
                     schema, _get_spark_field_type, "Spark"
                 )
             ]

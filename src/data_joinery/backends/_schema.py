@@ -7,13 +7,24 @@ from ..schemas.coercion_error import SchemaDiff, SchemaDifference
 from ..schemas.model_schema import ModelSchema
 
 
-def _compare_schema[NativeType](
+def compare_schema[NativeType](
     given: Sequence[tuple[str, NativeType]],
     expected: Sequence[tuple[str, NativeType]],
     *,
     struct_fields: Callable[[NativeType], Sequence[tuple[str, NativeType]] | None],
     list_element: Callable[[NativeType], NativeType | None],
 ) -> SchemaDiff:
+    """Compare schemas recursively through struct fields and list elements.
+
+    Args:
+        given: Input field names and native types.
+        expected: Target field names and native types.
+        struct_fields: Function returning a struct's fields, or None.
+        list_element: Function returning a list's element type, or None.
+
+    Returns:
+        Additional, missing, and mismatched fields in traversal order.
+    """
     additional: list[SchemaDifference] = []
     missing: list[SchemaDifference] = []
     mismatches: list[SchemaDifference] = []
@@ -58,11 +69,24 @@ def _compare_schema[NativeType](
     return SchemaDiff(tuple(additional), tuple(missing), tuple(mismatches))
 
 
-def _compile_fields[NativeType](
+def compile_fields[NativeType](
     schema: ModelSchema[Any],
     resolve: Callable[[Any], NativeType],
     backend_name: str,
 ) -> Iterator[tuple[str, NativeType]]:
+    """Compile model fields into native backend types.
+
+    Args:
+        schema: Model fields to compile.
+        resolve: Function converting an annotation to a native type.
+        backend_name: Backend name to include in compilation errors.
+
+    Yields:
+        Each field's column name and compiled native type.
+
+    Raises:
+        ValueError: If a field annotation cannot be compiled.
+    """
     for field in schema.fields:
         try:
             field_type = resolve(field.annotation)

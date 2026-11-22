@@ -13,7 +13,7 @@ from data_joinery.schemas.coercion_error import (
     _validate_coercion,
 )
 
-from .._schema import _compare_schema, _compile_fields
+from .._schema import compare_schema, compile_fields
 from ..protocol import DataFrameBackend
 from ..registry import register_backend
 from .types import _get_polars_field_type
@@ -37,7 +37,7 @@ def _list_element(dtype: PolarsDataType) -> PolarsDataType | None:
 
 
 def _schema_diff(given: pl.Schema, expected: pl.Schema) -> SchemaDiff:
-    return _compare_schema(
+    return compare_schema(
         list(given.items()),
         list(expected.items()),
         struct_fields=_struct_fields,
@@ -136,9 +136,7 @@ class PolarsBackend(DataFrameBackend[pl.DataFrame | pl.LazyFrame, pl.Schema]):
 
     def compile_schema(self, schema: ModelSchema[Any]) -> pl.Schema:
         """Compile a model schema into native Polars field types."""
-        return pl.Schema(
-            dict(_compile_fields(schema, _get_polars_field_type, "Polars"))
-        )
+        return pl.Schema(dict(compile_fields(schema, _get_polars_field_type, "Polars")))
 
     def create_dataframe(
         self,
