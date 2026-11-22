@@ -3,8 +3,8 @@
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any
 
-from ..schemas.coercion_error import SchemaDiff, SchemaDifference
 from ..schemas.model_schema import ModelSchema
+from ..schemas.schema_diff import SchemaDiff, SchemaDifference
 
 
 def compare_schema[NativeType](

@@ -4,12 +4,10 @@ from typing import Any
 
 from data_joinery import Column, JoineryModel, Schema
 from data_joinery.backends import DataFrameBackend, register_backend
-from data_joinery.schemas.coercion_error import (
-    CoercionMode,
-    SchemaCoercionError,
-    SchemaDifference,
-)
+from data_joinery.schemas.coercion import CoercionMode
+from data_joinery.schemas.coercion_error import SchemaCoercionError
 from data_joinery.schemas.model_schema import ModelSchema
+from data_joinery.schemas.schema_diff import SchemaDifference
 
 
 @dataclass(frozen=True)

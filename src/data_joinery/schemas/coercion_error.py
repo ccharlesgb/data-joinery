@@ -1,61 +1,7 @@
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Literal, get_args
+"""Exceptions and readable messages for schema coercion failures."""
 
-CoercionMode = Literal["project_cast", "project", "project_top_level", "strict"]
-DifferenceKind = Literal["additional", "missing", "type_mismatch"]
-
-
-@dataclass(frozen=True)
-class SchemaDifference:
-    kind: DifferenceKind
-    path: str
-    given: object | None
-    expected: object | None
-
-
-@dataclass(frozen=True)
-class SchemaDiff:
-    additional: tuple[SchemaDifference, ...]
-    missing: tuple[SchemaDifference, ...]
-    type_mismatches: tuple[SchemaDifference, ...]
-
-
-def _check_coercion_mode(mode: CoercionMode) -> None:
-    if mode not in get_args(CoercionMode):
-        raise ValueError(
-            f"Unsupported coercion mode {mode!r}. Choose 'strict', 'project', "
-            "'project_top_level', or 'project_cast'."
-        )
-
-
-def _validate_coercion(
-    diff: SchemaDiff,
-    mode: CoercionMode,
-    can_cast: Callable[[object | None, object | None], bool],
-) -> None:
-    additional = ()
-    mismatches = diff.type_mismatches
-    match mode:
-        case "strict":
-            additional = diff.additional
-        case "project_top_level":
-            # Literal column names containing these markers also match this rule.
-            additional = tuple(
-                item
-                for item in diff.additional
-                if "." in item.path or "[]" in item.path
-            )
-        case "project":
-            pass
-        case "project_cast":
-            mismatches = tuple(
-                item for item in mismatches if not can_cast(item.given, item.expected)
-            )
-
-    violations = (*diff.missing, *additional, *mismatches)
-    if violations:
-        raise SchemaCoercionError(mode, violations)
+from .coercion import CoercionMode
+from .schema_diff import SchemaDifference
 
 
 def _format_schema_difference(difference: SchemaDifference, mode: CoercionMode) -> str:
@@ -99,6 +45,14 @@ def _format_schema_coercion_error(
 
 
 class SchemaCoercionError(Exception):
+    """Report schema differences that violate a coercion mode.
+
+    Attributes:
+        mode: Coercion mode that rejected the input schema.
+        violations: Schema differences that caused the failure.
+        location: Optional context identifying where coercion failed.
+    """
+
     def __init__(
         self,
         mode: CoercionMode,
@@ -106,6 +60,13 @@ class SchemaCoercionError(Exception):
         *,
         location: str | None = None,
     ) -> None:
+        """Build an error describing the schema violations.
+
+        Args:
+            mode: Coercion mode that rejected the input schema.
+            violations: Differences that violate the mode's rules.
+            location: Optional context included before the error message.
+        """
         self.mode = mode
         self.violations = violations
         self.location = location

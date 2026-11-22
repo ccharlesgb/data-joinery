@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from data_joinery.schemas.coercion_error import (
+from data_joinery.schemas.coercion import (
     CoercionMode,
-    SchemaCoercionError,
-    SchemaDiff,
-    _check_coercion_mode,
-    _validate_coercion,
+    check_coercion_mode,
+    find_coercion_violations,
 )
+from data_joinery.schemas.coercion_error import SchemaCoercionError
+from data_joinery.schemas.schema_diff import SchemaDiff
 
 from .._schema import compare_schema, compile_fields
 from ..protocol import DataFrameBackend
@@ -171,9 +171,11 @@ class PolarsBackend(DataFrameBackend[pl.DataFrame | pl.LazyFrame, pl.Schema]):
             else dataframe.schema
         )
         expected = self.compile_schema(schema)
-        _check_coercion_mode(mode)
+        check_coercion_mode(mode)
         diff = _schema_diff(given, expected)
-        _validate_coercion(diff, mode, _is_cast_compatible)
+        violations = find_coercion_violations(diff, mode, _is_cast_compatible)
+        if violations:
+            raise SchemaCoercionError(mode, violations)
         if mode == "strict":
             return dataframe
         return _project_fields(dataframe, given, expected, mode, diff)

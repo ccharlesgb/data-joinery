@@ -1,14 +1,14 @@
 """Schema definitions, model adaptation, and coercion diagnostics."""
 
-from .coercion_error import (
-    CoercionMode,
+from .coercion import CoercionMode
+from .coercion_error import SchemaCoercionError
+from .joinery_model import Column, JoineryModel, column
+from .schema import Schema
+from .schema_diff import (
     DifferenceKind,
-    SchemaCoercionError,
     SchemaDiff,
     SchemaDifference,
 )
-from .joinery_model import Column, JoineryModel, column
-from .schema import Schema
 
 __all__ = [
     "CoercionMode",

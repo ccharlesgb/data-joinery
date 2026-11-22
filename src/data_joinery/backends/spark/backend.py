@@ -8,12 +8,13 @@ from typing import cast as type_cast
 from pyspark.sql import Column, DataFrame, SparkSession, types
 from pyspark.sql import functions as F
 
-from data_joinery.schemas.coercion_error import (
+from data_joinery.schemas.coercion import (
     CoercionMode,
-    SchemaDiff,
-    _check_coercion_mode,
-    _validate_coercion,
+    check_coercion_mode,
+    find_coercion_violations,
 )
+from data_joinery.schemas.coercion_error import SchemaCoercionError
+from data_joinery.schemas.schema_diff import SchemaDiff
 
 from .._schema import compare_schema, compile_fields
 from ..protocol import DataFrameBackend
@@ -423,9 +424,13 @@ class SparkBackend(DataFrameBackend[DataFrame, types.StructType]):
                 f"got {type(dataframe).__name__}."
             )
         expected = self.compile_schema(schema)
-        _check_coercion_mode(mode)
+        check_coercion_mode(mode)
         given = dataframe.schema
-        _validate_coercion(_schema_diff(given, expected), mode, _is_cast_compatible)
+        violations = find_coercion_violations(
+            _schema_diff(given, expected), mode, _is_cast_compatible
+        )
+        if violations:
+            raise SchemaCoercionError(mode, violations)
         result = (
             dataframe
             if mode == "strict"

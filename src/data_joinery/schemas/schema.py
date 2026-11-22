@@ -7,10 +7,8 @@ from ..backends import (
     backend_for_schema_type,
     backend_for_value,
 )
-from .coercion_error import (
-    CoercionMode,
-    SchemaCoercionError,
-)
+from .coercion import CoercionMode
+from .coercion_error import SchemaCoercionError
 from .model_schema import ModelSchema
 
 FrameT = TypeVar("FrameT")
