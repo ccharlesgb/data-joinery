@@ -46,11 +46,7 @@ def find_coercion_violations(
         case "strict":
             additional = diff.additional
         case "project_top_level":
-            additional = tuple(
-                item
-                for item in diff.additional
-                if "." in item.path or "[]" in item.path
-            )
+            additional = tuple(item for item in diff.additional if len(item.path) > 1)
         case "project":
             pass
         case "project_cast":

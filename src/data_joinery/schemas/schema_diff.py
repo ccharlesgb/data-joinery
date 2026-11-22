@@ -7,6 +7,26 @@ DifferenceKind = Literal["additional", "missing", "type_mismatch"]
 
 
 @dataclass(frozen=True)
+class Field:
+    """Identify a field by its literal name.
+
+    Attributes:
+        name: Field name, with punctuation preserved as part of the name.
+    """
+
+    name: str
+
+
+@dataclass(frozen=True)
+class ListElement:
+    """Identify traversal into one layer of list elements."""
+
+
+type PathSegment = Field | ListElement
+type SchemaPath = tuple[PathSegment, ...]
+
+
+@dataclass(frozen=True)
 class SchemaDifference:
     """Describe one difference between an input and target schema.
 
@@ -18,7 +38,7 @@ class SchemaDifference:
     """
 
     kind: DifferenceKind
-    path: str
+    path: SchemaPath
     given: object | None
     expected: object | None
 

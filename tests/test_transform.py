@@ -16,6 +16,7 @@ from data_joinery import (
 )
 from data_joinery.context import Context
 from data_joinery.contract import DataFrameContract, InstanceContract, VoidContract
+from data_joinery.schemas.schema_diff import Field
 from data_joinery.transform import (
     Transform,
     TransformSpec,
@@ -383,7 +384,7 @@ def test_transform_raises_for_input_schema_mismatch(non_nullable_frame: DataFram
 
     assert [
         (violation.kind, violation.path) for violation in error.value.violations
-    ] == [("missing", "field2")]
+    ] == [("missing", (Field("field2"),))]
 
 
 def test_transform_raises_for_output_schema_mismatch(frame_with_extra_field: DataFrame):
@@ -398,7 +399,7 @@ def test_transform_raises_for_output_schema_mismatch(frame_with_extra_field: Dat
 
     assert [
         (violation.kind, violation.path) for violation in error.value.violations
-    ] == [("additional", "field2")]
+    ] == [("additional", (Field("field2"),))]
 
 
 def test_transform_rejects_invalid_input_with_descriptive_metadata():

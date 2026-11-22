@@ -4,7 +4,13 @@ from collections.abc import Callable, Iterator, Sequence
 from typing import Any
 
 from ..schemas.model_schema import ModelSchema
-from ..schemas.schema_diff import SchemaDiff, SchemaDifference
+from ..schemas.schema_diff import (
+    Field,
+    ListElement,
+    SchemaDiff,
+    SchemaDifference,
+    SchemaPath,
+)
 
 
 def compare_schema[NativeType](
@@ -29,7 +35,7 @@ def compare_schema[NativeType](
     missing: list[SchemaDifference] = []
     mismatches: list[SchemaDifference] = []
 
-    def walk_types(source: NativeType, target: NativeType, path: str) -> None:
+    def walk_types(source: NativeType, target: NativeType, path: SchemaPath) -> None:
         source_fields = struct_fields(source)
         target_fields = struct_fields(target)
         if source_fields is not None and target_fields is not None:
@@ -39,21 +45,20 @@ def compare_schema[NativeType](
         source_element = list_element(source)
         target_element = list_element(target)
         if source_element is not None and target_element is not None:
-            walk_types(source_element, target_element, f"{path}[]")
+            walk_types(source_element, target_element, (*path, ListElement()))
         elif source != target:
             mismatches.append(SchemaDifference("type_mismatch", path, source, target))
 
     def walk_fields(
         source_fields: Sequence[tuple[str, NativeType]],
         target_fields: Sequence[tuple[str, NativeType]],
-        parent_path: str,
+        parent_path: SchemaPath,
     ) -> None:
         source_names = {name for name, _ in source_fields}
         target_by_name = dict(target_fields)
-        prefix = f"{parent_path}." if parent_path else ""
 
         for name, source in source_fields:
-            path = f"{prefix}{name}"
+            path = (*parent_path, Field(name))
             if name in target_by_name:
                 walk_types(source, target_by_name[name], path)
             else:
@@ -62,10 +67,12 @@ def compare_schema[NativeType](
         for name, target in target_fields:
             if name not in source_names:
                 missing.append(
-                    SchemaDifference("missing", f"{prefix}{name}", None, target)
+                    SchemaDifference(
+                        "missing", (*parent_path, Field(name)), None, target
+                    )
                 )
 
-    walk_fields(given, expected, "")
+    walk_fields(given, expected, ())
     return SchemaDiff(tuple(additional), tuple(missing), tuple(mismatches))
 
 

@@ -2,6 +2,7 @@ import pytest
 
 from data_joinery import Column, JoineryModel, Schema, column
 from data_joinery.schemas import CoercionMode, DifferenceKind, SchemaCoercionError
+from data_joinery.schemas.schema_diff import Field, ListElement, SchemaPath
 from tests.conftest import BackendHelper
 from tests.models import Item
 
@@ -99,9 +100,15 @@ def test_default_coercion_rejects_extra_columns[FrameT](
         Schema(Item).coerce_dataframe(source)
 
 
-_MISSING_FIELDS = [("missing", "customer.postcode"), ("missing", "required")]
-_TYPE_MISMATCHES = [("type_mismatch", "customer.name"), ("type_mismatch", "items[]")]
-_NESTED_EXTRA = [("additional", "customer.legacy")]
+_MISSING_FIELDS = [
+    ("missing", (Field("customer"), Field("postcode"))),
+    ("missing", (Field("required"),)),
+]
+_TYPE_MISMATCHES = [
+    ("type_mismatch", (Field("customer"), Field("name"))),
+    ("type_mismatch", (Field("items"), ListElement())),
+]
+_NESTED_EXTRA = [("additional", (Field("customer"), Field("legacy")))]
 
 
 @pytest.mark.parametrize(
@@ -111,7 +118,7 @@ _NESTED_EXTRA = [("additional", "customer.legacy")]
             "strict",
             [
                 *_MISSING_FIELDS,
-                ("additional", "extra"),
+                ("additional", (Field("extra"),)),
                 *_NESTED_EXTRA,
                 *_TYPE_MISMATCHES,
             ],
@@ -124,7 +131,7 @@ _NESTED_EXTRA = [("additional", "customer.legacy")]
 def test_coercion_reports_all_schema_violations[FrameT](
     dataframe_backend: BackendHelper[FrameT],
     mode: CoercionMode,
-    expected: list[tuple[DifferenceKind, str]],
+    expected: list[tuple[DifferenceKind, SchemaPath]],
 ) -> None:
     class SourceCustomer(JoineryModel):
         name: Column[int]
@@ -157,8 +164,8 @@ def test_coercion_reports_all_schema_violations[FrameT](
     assert [(item.kind, item.path) for item in caught.value.violations] == expected
 
 
-@pytest.mark.parametrize("column_name", ["legacy.field", "legacy[]"])
-def test_project_top_level_rejects_extra_columns_with_path_markers[FrameT](
+@pytest.mark.parametrize("column_name", ["legacy.field", "legacy[]", "[]"])
+def test_project_top_level_drops_extra_columns_with_path_markers[FrameT](
     dataframe_backend: BackendHelper[FrameT], column_name: str
 ) -> None:
     class ItemWithLegacyField(Item):
@@ -168,12 +175,41 @@ def test_project_top_level_rejects_extra_columns_with_path_markers[FrameT](
         Schema(ItemWithLegacyField), ItemWithLegacyField(value=1, legacy=2)
     )
 
-    with pytest.raises(SchemaCoercionError) as caught:
-        Schema(Item).coerce_dataframe(source, "project_top_level")
+    schema = Schema(Item)
+    expected = dataframe_backend.create(schema, Item(value=1))
 
-    assert [(item.kind, item.path) for item in caught.value.violations] == [
-        ("additional", column_name)
+    actual = schema.coerce_dataframe(source, "project_top_level")
+
+    dataframe_backend.assert_equal(actual, expected)
+
+
+@pytest.mark.parametrize("column_name", ["legacy.field", "legacy[]", "[]"])
+def test_project_top_level_rejects_nested_extra_fields_with_path_markers[FrameT](
+    dataframe_backend: BackendHelper[FrameT], column_name: str
+) -> None:
+    class ItemWithLegacyField(Item):
+        legacy: Column[int] = column(name=column_name)
+
+    class SourceRow(JoineryModel):
+        items: Column[list[list[ItemWithLegacyField]]] = column(name="items[]")
+
+    class TargetRow(JoineryModel):
+        items: Column[list[list[Item]]] = column(name="items[]")
+
+    source = dataframe_backend.create(
+        Schema(SourceRow), SourceRow(items=[[ItemWithLegacyField(value=1, legacy=2)]])
+    )
+    expected = [
+        (
+            "additional",
+            (Field("items[]"), ListElement(), ListElement(), Field(column_name)),
+        )
     ]
+
+    with pytest.raises(SchemaCoercionError) as caught:
+        Schema(TargetRow).coerce_dataframe(source, "project_top_level")
+
+    assert [(item.kind, item.path) for item in caught.value.violations] == expected
 
 
 def test_project_top_level_selects_model_columns_in_order[FrameT](

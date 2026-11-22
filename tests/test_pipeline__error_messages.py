@@ -21,6 +21,7 @@ from data_joinery.pipeline import (
     PipelineExecutionError,
     PipelineOverrideError,
 )
+from data_joinery.schemas.schema_diff import Field
 from tests.models import Department
 
 
@@ -58,7 +59,7 @@ def test_transform_schema_error_names_parameter_and_keeps_violations():
 
     assert "Transform 'accept' parameter 'users', Schema 'User'" in str(caught.value)
     assert "Missing field 'name'" in str(caught.value)
-    assert caught.value.violations[0].path == "name"
+    assert caught.value.violations[0].path == (Field("name"),)
 
 
 def test_pipeline_connection_error_describes_both_contracts():

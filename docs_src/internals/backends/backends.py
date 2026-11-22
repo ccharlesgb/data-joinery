@@ -7,7 +7,7 @@ from data_joinery.backends import DataFrameBackend, register_backend
 from data_joinery.schemas.coercion import CoercionMode
 from data_joinery.schemas.coercion_error import SchemaCoercionError
 from data_joinery.schemas.model_schema import ModelSchema
-from data_joinery.schemas.schema_diff import SchemaDifference
+from data_joinery.schemas.schema_diff import Field, SchemaDifference
 
 
 @dataclass(frozen=True)
@@ -31,12 +31,12 @@ class ExampleBackend(DataFrameBackend[ExampleDataFrame, tuple[str, ...]]):
     ) -> ExampleDataFrame:
         expected = self.compile_schema(schema)
         missing = tuple(
-            SchemaDifference("missing", name, None, name)
+            SchemaDifference("missing", (Field(name),), None, name)
             for name in expected
             if name not in dataframe.columns
         )
         additional = tuple(
-            SchemaDifference("additional", name, name, None)
+            SchemaDifference("additional", (Field(name),), name, None)
             for name in dataframe.columns
             if name not in expected
         )

@@ -7,6 +7,7 @@ from pyspark.testing import assertDataFrameEqual
 
 from data_joinery import Column, JoineryModel, Schema, SchemaCoercionError
 from data_joinery.backends.spark import backend as spark_backend
+from data_joinery.schemas.schema_diff import Field
 
 _TIME_TYPE = getattr(types, "TimeType", None)
 _CAST_TYPES = {
@@ -85,10 +86,10 @@ def test_project_cast_reports_unsupported_spark_ansi_casts(spark: SparkSession):
     with pytest.raises(SchemaCoercionError) as caught:
         Schema(TargetRow).coerce_dataframe(source, "project_cast")
 
-    assert sorted((item.kind, item.path) for item in caught.value.violations) == [
-        ("missing", "required"),
-        ("type_mismatch", "binary"),
-        ("type_mismatch", "day"),
+    assert [(item.kind, item.path) for item in caught.value.violations] == [
+        ("missing", (Field("required"),)),
+        ("type_mismatch", (Field("binary"),)),
+        ("type_mismatch", (Field("day"),)),
     ]
 
 

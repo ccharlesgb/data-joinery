@@ -1,11 +1,13 @@
 from data_joinery.schemas.coercion import find_coercion_violations
-from data_joinery.schemas.schema_diff import SchemaDiff, SchemaDifference
+from data_joinery.schemas.schema_diff import Field, SchemaDiff, SchemaDifference
 
 
 def test_find_coercion_violations_returns_differences_without_raising() -> None:
-    missing = SchemaDifference("missing", "name", None, "String")
-    additional = SchemaDifference("additional", "legacy", "String", None)
-    mismatch = SchemaDifference("type_mismatch", "active", "Binary", "Boolean")
+    missing = SchemaDifference("missing", (Field("name"),), None, "String")
+    additional = SchemaDifference("additional", (Field("legacy"),), "String", None)
+    mismatch = SchemaDifference(
+        "type_mismatch", (Field("active"),), "Binary", "Boolean"
+    )
     diff = SchemaDiff(
         additional=(additional,),
         missing=(missing,),
@@ -22,9 +24,13 @@ def test_find_coercion_violations_returns_empty_when_differences_are_permitted()
     None
 ):
     diff = SchemaDiff(
-        additional=(SchemaDifference("additional", "legacy", "String", None),),
+        additional=(
+            SchemaDifference("additional", (Field("legacy"),), "String", None),
+        ),
         missing=(),
-        type_mismatches=(SchemaDifference("type_mismatch", "value", "Int32", "Int64"),),
+        type_mismatches=(
+            SchemaDifference("type_mismatch", (Field("value"),), "Int32", "Int64"),
+        ),
     )
 
     actual = find_coercion_violations(diff, "project_cast", lambda given, target: True)

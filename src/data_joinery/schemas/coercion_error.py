@@ -1,13 +1,29 @@
 """Exceptions and readable messages for schema coercion failures."""
 
+import json
+
 from .coercion import CoercionMode
-from .schema_diff import SchemaDifference
+from .schema_diff import Field, ListElement, SchemaDifference, SchemaPath
+
+
+def _format_schema_path(path: SchemaPath) -> str:
+    result = ""
+    for segment in path:
+        match segment:
+            case Field(name) if name.isidentifier():
+                result += f".{name}" if result else name
+            case Field(name):
+                result += f"[{json.dumps(name, ensure_ascii=False)}]"
+            case ListElement():
+                result += "[]"
+    return result
 
 
 def _format_schema_difference(difference: SchemaDifference, mode: CoercionMode) -> str:
+    path = _format_schema_path(difference.path)
     if difference.kind == "missing":
         return (
-            f"Missing field '{difference.path}': expected {difference.expected}. "
+            f"Missing field '{path}': expected {difference.expected}. "
             "Add the field or update the model."
         )
     if difference.kind == "additional":
@@ -16,14 +32,14 @@ def _format_schema_difference(difference: SchemaDifference, mode: CoercionMode) 
             if mode == "strict"
             else "Remove it or use 'project' to drop nested extra fields."
         )
-        return f"Additional field '{difference.path}': got {difference.given}. {action}"
+        return f"Additional field '{path}': got {difference.given}. {action}"
     action = (
         "Convert the values to the expected type before coercion."
         if mode == "project_cast"
         else "Change the field type or use 'project_cast' if a cast is valid."
     )
     return (
-        f"Field '{difference.path}': expected {difference.expected}, "
+        f"Field '{path}': expected {difference.expected}, "
         f"got {difference.given}. {action}"
     )
 
