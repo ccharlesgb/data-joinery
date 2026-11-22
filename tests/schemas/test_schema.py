@@ -212,6 +212,60 @@ def test_project_top_level_rejects_nested_extra_fields_with_path_markers[FrameT]
     assert [(item.kind, item.path) for item in caught.value.violations] == expected
 
 
+@pytest.mark.parametrize("column_name", ["*", "^.*$", "customer.name", "a`b"])
+@pytest.mark.parametrize("mode", ["project_top_level", "project", "project_cast"])
+def test_projection_preserves_literal_column_names[FrameT](
+    dataframe_backend: BackendHelper[FrameT],
+    column_name: str,
+    mode: CoercionMode,
+) -> None:
+    class Customer(JoineryModel):
+        name: Column[str]
+
+    class SourceRow(JoineryModel):
+        legacy: Column[int] = column(name="legacy.field")
+        customer: Column[Customer]
+        literal: Column[str] = column(name=column_name)
+
+    class TargetRow(JoineryModel):
+        literal: Column[str] = column(name=column_name)
+        customer: Column[Customer]
+
+    customer = Customer(name="nested")
+    source = dataframe_backend.create(
+        Schema(SourceRow), SourceRow(legacy=99, customer=customer, literal="literal")
+    )
+    schema = Schema(TargetRow)
+    expected = dataframe_backend.create(
+        schema, TargetRow(literal="literal", customer=customer)
+    )
+
+    actual = schema.coerce_dataframe(source, mode)
+
+    dataframe_backend.assert_equal(actual, expected)
+
+
+@pytest.mark.parametrize("column_name", ["*", "customer.name", "a`b"])
+def test_strict_preserves_literal_column_names[FrameT](
+    dataframe_backend: BackendHelper[FrameT], column_name: str
+) -> None:
+    class Customer(JoineryModel):
+        name: Column[str]
+
+    class TargetRow(JoineryModel):
+        literal: Column[str] = column(name=column_name)
+        customer: Column[Customer]
+
+    schema = Schema(TargetRow)
+    expected = dataframe_backend.create(
+        schema, TargetRow(literal="literal", customer=Customer(name="nested"))
+    )
+
+    actual = schema.coerce_dataframe(expected, "strict")
+
+    dataframe_backend.assert_equal(actual, expected)
+
+
 def test_project_top_level_selects_model_columns_in_order[FrameT](
     dataframe_backend: BackendHelper[FrameT],
 ) -> None:

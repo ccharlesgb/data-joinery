@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
+import polars.selectors as cs
 
 from data_joinery.schemas.coercion import (
     CoercionMode,
@@ -106,12 +107,12 @@ def _project_fields(
     diff: SchemaDiff,
 ) -> pl.DataFrame | pl.LazyFrame:
     if mode == "project_top_level":
-        return dataframe.select(expected_schema.names())
+        return dataframe.select(cs.by_name(expected_schema.names()))
 
     cast = mode == "project_cast"
     expressions = [
         _build_projected_expression(
-            pl.col(name), given_schema[name], target_type, cast=cast
+            cs.by_name(name).as_expr(), given_schema[name], target_type, cast=cast
         ).alias(name)
         for name, target_type in expected_schema.items()
     ]

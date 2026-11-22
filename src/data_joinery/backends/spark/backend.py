@@ -289,12 +289,16 @@ def _make_column_nullable(column: Column, data_type: types.DataType) -> Column:
     return F.when(column.isNull(), F.lit(None)).otherwise(value)
 
 
+def _quote_identifier(name: str) -> str:
+    return "`" + name.replace("`", "``") + "`"
+
+
 def _make_dataframe_nullable(dataframe: DataFrame) -> DataFrame:
     return dataframe.select(
         *(
-            _make_column_nullable(dataframe[field.name], field.dataType).alias(
-                field.name, metadata=field.metadata
-            )
+            _make_column_nullable(
+                dataframe[_quote_identifier(field.name)], field.dataType
+            ).alias(field.name, metadata=field.metadata)
             for field in dataframe.schema.fields
         )
     )
@@ -363,7 +367,7 @@ def _project_fields(
 
     columns = [
         _build_projected_column(
-            F.col(field.name),
+            F.col(_quote_identifier(field.name)),
             source_fields[field.name],
             field.dataType,
             cast=cast,
