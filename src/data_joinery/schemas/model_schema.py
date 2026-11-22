@@ -189,7 +189,7 @@ def get_model_fields(klass: type[Any]) -> list[tuple[str, Any]]:
     if is_pydantic_model(klass):
         model_fields = klass.model_fields
         return [
-            (name, field_info.annotation)
+            (name, field_info.rebuild_annotation())
             for name, field_info in model_fields.items()
             if field_info.annotation is not None
         ]

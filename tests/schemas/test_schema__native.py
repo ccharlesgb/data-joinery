@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
+from pydantic import BaseModel
 from pyspark.sql import types
 
 from data_joinery import Column, JoineryModel, Schema, column
@@ -139,26 +140,32 @@ def test_native_schema_honors_native_annotations(
 @pytest.mark.parametrize(
     "annotation",
     [
-        pytest.param(Annotated[Literal[1, 2], pl.UInt32] | None, id="inner-override"),
+        pytest.param(Annotated[Literal[300], pl.UInt32] | None, id="inner-override"),
         pytest.param(
-            Annotated[Annotated[Literal[1, 2], pl.Int64] | None, pl.UInt32],
+            Annotated[Annotated[Literal[300], pl.UInt8] | None, pl.UInt32],
             id="outer-override-takes-precedence",
         ),
         pytest.param(
-            Annotated[Annotated[Literal[1, 2], pl.UInt32] | None, "description"],
+            Annotated[Annotated[Literal[300], pl.UInt32] | None, "description"],
             id="outer-metadata-without-override",
         ),
     ],
 )
+@pytest.mark.parametrize("model_kind", ["joinery", "pydantic"])
 def test_polars_strict_coercion_honors_optional_literal_override(
     annotation: object,
+    model_kind: str,
 ) -> None:
     class Row(JoineryModel):
         value: Column[annotation]  # type: ignore[invalid-type-form]
 
-    expected = pl.DataFrame({"value": [1, None]}, schema={"value": pl.UInt32})
+    class PydanticRow(BaseModel):
+        value: annotation  # type: ignore[invalid-type-form]
 
-    actual = Schema(Row).coerce_dataframe(expected.clone(), "strict")
+    model = PydanticRow if model_kind == "pydantic" else Row
+    expected = pl.DataFrame({"value": [300, None]}, schema={"value": pl.UInt32})
+
+    actual = Schema(model).coerce_dataframe(expected.clone(), "strict")
 
     assert_frame_equal(actual, expected)
 
