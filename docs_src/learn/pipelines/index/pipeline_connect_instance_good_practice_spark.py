@@ -3,8 +3,7 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
-from data_joinery.backends.spark import SparkContext
+from data_joinery import Column, JoineryModel, Pipeline, Strict, transform
 
 
 class InputDataset(JoineryModel):
@@ -19,9 +18,8 @@ class CollectedStats:
 
 
 @transform
-def read_data(
-    spark: Annotated[SparkSession, Context()],
-) -> Annotated[DataFrame, Strict(InputDataset)]:
+def read_data() -> Annotated[DataFrame, Strict(InputDataset)]:
+    spark = SparkSession.builder.getOrCreate()
     return spark.createDataFrame(
         [
             InputDataset(a="a1", b="b1"),
@@ -46,7 +44,7 @@ def print_result(collected_stats: CollectedStats) -> None:
     print(collected_stats)
 
 
-housing_price_model = Pipeline(SparkContext)
+housing_price_model = Pipeline()
 read_data_step = housing_price_model.add_step(read_data)
 collect_stats_step = housing_price_model.add_step(collect_stats)
 print_result_step = housing_price_model.add_step(print_result)
@@ -54,4 +52,4 @@ print_result_step = housing_price_model.add_step(print_result)
 housing_price_model.connect(read_data_step, collect_stats_step)
 housing_price_model.connect(collect_stats_step, print_result_step)
 
-housing_price_model.run(SparkContext(SparkSession.builder.getOrCreate()))
+housing_price_model.run()

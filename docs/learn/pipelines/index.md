@@ -170,10 +170,7 @@ generic containers. An unsupported annotation fails when the transform is define
 ```
 
 Wrap structured values in a named class when their internal types are important to the
-pipeline contract.
-
-Similarly to best practice with [context](context.md), you should avoid primitive types such as
-`int`, `datetime`, etc and prefer either wrapper types or classes to be explicit on input/outputs:
+pipeline contract. In this example, `CollectedStats` gives each of the two counts a name.
 
 === "Polars"
 
@@ -228,7 +225,7 @@ Install the `vis` extra and call `pipeline.visualize()` after connecting the ste
 The figure places steps from left to right in flow order. Each card shows its step name,
 transformation, inputs, and output type. Arrows point to the parameter that receives the
 data. Teal marks DataFrames, purple marks instance values, and grey marks steps without
-an output. Context dependencies appear inside the relevant step card.
+an output.
 
 This example splits the orders into two branches, combines them, then passes both
 DataFrames and a fitted model into later steps:

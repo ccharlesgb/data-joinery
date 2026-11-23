@@ -5,8 +5,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from sklearn.linear_model import LinearRegression
 
-from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
-from data_joinery.backends.spark import SparkContext
+from data_joinery import Column, JoineryModel, Pipeline, Strict, transform
 
 
 class CustomerActivity(JoineryModel):
@@ -23,9 +22,8 @@ class CustomerFeatures(JoineryModel):
 
 
 @transform
-def read_activity(
-    spark: Annotated[SparkSession, Context()],
-) -> Annotated[DataFrame, Strict(CustomerActivity)]:
+def read_activity() -> Annotated[DataFrame, Strict(CustomerActivity)]:
+    spark = SparkSession.builder.getOrCreate()
     return spark.createDataFrame(
         [
             CustomerActivity(customer_id=1, minutes=10, annual_spend=2_700.0),
@@ -78,7 +76,7 @@ def print_coefficients(model: LinearRegression) -> None:
     print(f"coefficients: {model.coef_.round(2).tolist()}")
 
 
-pipeline = Pipeline(SparkContext)
+pipeline = Pipeline()
 read_activity_step = pipeline.add_step(read_activity)
 aggregate_features_step = pipeline.add_step(aggregate_features)
 collect_features_step = pipeline.add_step(collect_features)
@@ -88,4 +86,4 @@ print_coefficients_step = pipeline.add_step(print_coefficients)
 read_activity_step >> aggregate_features_step >> collect_features_step
 collect_features_step >> train_model_step >> print_coefficients_step
 
-pipeline.run(SparkContext(SparkSession.builder.getOrCreate()))
+pipeline.run()

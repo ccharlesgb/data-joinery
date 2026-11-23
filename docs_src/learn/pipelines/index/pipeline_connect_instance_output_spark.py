@@ -5,8 +5,7 @@ from pyspark.ml.linalg import VectorUDT
 from pyspark.ml.regression import LinearRegression, LinearRegressionModel
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
-from data_joinery.backends.spark import SparkContext
+from data_joinery import Column, JoineryModel, Pipeline, Strict, transform
 
 
 class Housing(JoineryModel):
@@ -23,9 +22,8 @@ class PreparedHousing(JoineryModel):
 
 
 @transform
-def read_data(
-    spark: Annotated[SparkSession, Context()],
-) -> Annotated[DataFrame, Strict(Housing)]:
+def read_data() -> Annotated[DataFrame, Strict(Housing)]:
+    spark = SparkSession.builder.getOrCreate()
     return spark.createDataFrame(
         [
             Housing(number_of_bedrooms=1, square_footage=650, price=180_000.0),
@@ -63,7 +61,7 @@ def print_coefficients(model: LinearRegressionModel) -> None:
     print(f"intercept: {model.intercept}")
 
 
-housing_price_model = Pipeline(SparkContext)
+housing_price_model = Pipeline()
 read_data_step = housing_price_model.add_step(read_data)
 prepare_features_step = housing_price_model.add_step(prepare_features)
 fit_model_step = housing_price_model.add_step(fit_model)
@@ -73,4 +71,4 @@ housing_price_model.connect(read_data_step, prepare_features_step)
 housing_price_model.connect(prepare_features_step, fit_model_step)
 housing_price_model.connect(fit_model_step, print_coefficients_step)
 
-housing_price_model.run(SparkContext(SparkSession.builder.getOrCreate()))
+housing_price_model.run()

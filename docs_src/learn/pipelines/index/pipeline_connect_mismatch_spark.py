@@ -3,8 +3,7 @@ from typing import Annotated
 
 from pyspark.sql import DataFrame, SparkSession
 
-from data_joinery import Column, Context, JoineryModel, Pipeline, Strict, transform
-from data_joinery.backends.spark import SparkContext
+from data_joinery import Column, JoineryModel, Pipeline, Strict, transform
 from data_joinery.pipeline import PipelineConnectionError
 
 
@@ -21,9 +20,8 @@ class C(JoineryModel):
 
 
 @transform
-def read_data(
-    spark: Annotated[SparkSession, Context()],
-) -> Annotated[DataFrame, Strict(A)]:
+def read_data() -> Annotated[DataFrame, Strict(A)]:
+    spark = SparkSession.builder.getOrCreate()
     return spark.createDataFrame([{A.a: "value"}])
 
 
@@ -41,7 +39,7 @@ def write_data(
     b.show()
 
 
-order_metrics = Pipeline(SparkContext)
+order_metrics = Pipeline()
 read_data_step = order_metrics.add_step(read_data)
 transform_data_step = order_metrics.add_step(transform_data)
 write_data_step = order_metrics.add_step(write_data)

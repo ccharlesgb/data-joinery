@@ -35,15 +35,14 @@ You can define an input contract by annotating any input parameters with a valid
 schema. The example above accepts a projected input and checks its output strictly. The contract
 lets the transformation accept input with extra fields while keeping its output precise.
 
-For read steps of wide/nested tables you might want to use `Project` as the output coercion mode
-instead of writing out the full schema explicitly. This can be especially useful if you only
-want to select a few fields of highly nested data:
+When reading a wide or nested table, use `Project` on the return type to keep
+only the fields declared in your schema. This reader returns the fields in `Event`.
 
 ``` python
 @transform
 def read_nested_event_data(
-    spark: Annotated[SparkSession, Context()],
-    path: str
+    spark: SparkSession,
+    path: str,
 ) -> Annotated[DataFrame, Project(Event)]:
     return spark.read.parquet(path)
 ```
