@@ -73,6 +73,6 @@ def build_pipeline() -> Pipeline[PipelineContext]:
 
 
 def model(dbt: Dbt, session: SparkSession) -> DataFrame:
-    dbt.config(packages=["data-joinery==0.1.0"])
+    dbt.config(packages=["data-joinery==0.6.0"])
     outputs = build_pipeline().run(PipelineContext(spark=session, dbt=dbt))
     return outputs["enrich_orders"]
