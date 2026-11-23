@@ -11,8 +11,9 @@ To inspect outputs and writer inputs from a completed run, see
 
 Pass overrides to `Pipeline.run()` as a mapping from step name to another transformation. Overrides
 apply only to that run. Give steps you plan to replace explicit names with `add_step(..., name="...")`.
-This example replaces the reader and writer, then checks the
-DataFrame passed to the writer:
+The production writer uses `@side_effect` so runs with `include_side_effects=False` skip it.
+This test keeps the write step enabled and replaces it with a function that does nothing.
+The pipeline records the DataFrame passed to that function so the test can check it.
 
 === "Polars"
 

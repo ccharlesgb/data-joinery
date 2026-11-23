@@ -4,7 +4,15 @@ from typing import Annotated
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from data_joinery import Column, Context, JoineryModel, Pipeline, Project, transform
+from data_joinery import (
+    Column,
+    Context,
+    JoineryModel,
+    Pipeline,
+    Project,
+    side_effect,
+    transform,
+)
 
 
 @dataclass(frozen=True)
@@ -44,7 +52,7 @@ def calculate_totals(
     )
 
 
-@transform
+@side_effect
 def write_totals(
     totals: Annotated[pl.LazyFrame, Project(OrderTotal)],
     storage: Annotated[Storage, Context()],

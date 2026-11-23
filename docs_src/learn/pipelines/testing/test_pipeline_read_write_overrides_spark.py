@@ -5,7 +5,15 @@ import pytest
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.testing import assertDataFrameEqual
 
-from data_joinery import Column, Context, JoineryModel, Pipeline, Project, transform
+from data_joinery import (
+    Column,
+    Context,
+    JoineryModel,
+    Pipeline,
+    Project,
+    side_effect,
+    transform,
+)
 
 
 @dataclass(frozen=True)
@@ -47,7 +55,7 @@ def calculate_totals(
     )
 
 
-@transform
+@side_effect
 def write_totals(
     totals: Annotated[DataFrame, Project(OrderTotal)],
     storage: Annotated[Storage, Context()],
