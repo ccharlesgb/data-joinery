@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from matplotlib.backends.backend_agg import RendererAgg
     from matplotlib.figure import Figure
 
+    from data_joinery.pipeline import Step
+
 
 # Layout dimensions and font sizes are in typographic points.
 _LAYOUT_SWEEPS = 6
@@ -103,7 +105,7 @@ def topological_layout(dag: rx.PyDiGraph) -> dict[int, tuple[float, float]]:
     }
 
 
-def _layout_vertices(dag: rx.PyDAG) -> dict[_Vertex, tuple[float, float]]:
+def _layout_vertices(dag: rx.PyDiGraph) -> dict[_Vertex, tuple[float, float]]:
     generations = [list(group) for group in rx.topological_generations(dag)]
     layer = {index: depth for depth, group in enumerate(generations) for index in group}
     columns: list[list[_Vertex]] = [
@@ -204,7 +206,7 @@ def _type_names(value_types: Sequence[type]) -> dict[type, str]:
     return names
 
 
-def _output_colours(dag: rx.PyDAG) -> dict[int, str]:
+def _output_colours(dag: rx.PyDiGraph[Step, str]) -> dict[int, str]:
     registry: list[object] = []
     colours = {}
     for node in dag.node_indices():
@@ -261,7 +263,7 @@ class _Card:
 
 
 def _cards(
-    dag: rx.PyDAG,
+    dag: rx.PyDiGraph[Step, str],
     positions: Mapping[int, tuple[float, float]],
     measure: Callable[[str, float, bool], float],
 ) -> dict[int, _Card]:
@@ -273,10 +275,7 @@ def _cards(
             for contract in (spec.output_contract, *spec.input_contracts.values())
             if (value_type := _contract_type(contract)) is not None
         )
-        value_types.extend(
-            marker.type or param_type
-            for param_type, marker in spec.context_parameters.values()
-        )
+        value_types.extend(spec.context_parameters.values())
     names = _type_names(value_types)
     incoming: dict[int, list[tuple[int, str]]] = defaultdict(list)
     for source, target, parameter in dag.weighted_edge_list():
@@ -293,8 +292,8 @@ def _cards(
             for source, param in edges
         ]
         inputs.extend(
-            (None, param, f"{names[marker.type or param_type]} · Ctx")
-            for param, (param_type, marker) in spec.context_parameters.items()
+            (None, param, f"{names[dependency_type]} · Ctx")
+            for param, dependency_type in spec.context_parameters.items()
         )
         output = _contract_label(spec.output_contract, names)
         subtitle = step.transform.default_name or type(step.transform).__name__
@@ -691,7 +690,7 @@ def _draw_card_details(
             )
 
 
-def draw_pipeline(dag: rx.PyDAG) -> Figure:
+def draw_pipeline(dag: rx.PyDiGraph[Step, str]) -> Figure:
     """Return a figure showing named inputs and outputs joined by schema ribbons.
 
     Args:
