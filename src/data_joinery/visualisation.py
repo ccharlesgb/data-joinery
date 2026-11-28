@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from itertools import pairwise
-from textwrap import shorten
+from math import hypot
 from typing import TYPE_CHECKING
 
 import rustworkx as rx
@@ -13,7 +15,78 @@ import rustworkx as rx
 from data_joinery.contract import DataFrameContract, InstanceContract, VoidContract
 
 if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.backends.backend_agg import RendererAgg
     from matplotlib.figure import Figure
+
+    from data_joinery.pipeline import Step
+
+
+# Layout dimensions and font sizes are in typographic points.
+_LAYOUT_SWEEPS = 6
+_POINTS_PER_INCH = 72
+_EMPTY_FIGURE_SIZE = (7, 3)
+_FIGURE_MARGIN = 18
+_FIGURE_TOP_MARGIN = 62
+_MIN_CONTENT_WIDTH = 370
+_DIAGRAM_TITLE_OFFSET = 23
+_GAP = 70.0
+_ROW_GAP = 36
+
+_CARD_MIN_WIDTH = 160
+_CARD_PADDING = 16
+_HEADER_HEIGHT = 40
+_HEADER_WITH_SUBTITLE_HEIGHT = 54
+_TITLE_OFFSET = 20
+_SUBTITLE_OFFSET = 37
+_INPUT_WIDTH_PADDING = 40
+_OUTPUT_WIDTH_PADDING = 44
+_INPUT_ROW_HEIGHT = 48
+_BODY_PADDING = 22
+_FIRST_ROW_OFFSET = 44
+_SECTION_LABEL_OFFSET = 12
+_DIVIDER_TOP_PADDING = 8
+_DIVIDER_BOTTOM_PADDING = 10
+_INPUT_LABEL_PADDING = 20
+_OUTPUT_LABEL_PADDING = 22
+_PARAMETER_LABEL_OFFSET = 7
+_CONTRACT_LABEL_OFFSET = 5
+_CARD_CORNER_RADIUS = 7
+_BORDER_WIDTH = 0.7
+
+_TITLE_FONT_SIZE = 12
+_CONTRACT_FONT_SIZE = 10
+_DETAIL_FONT_SIZE = 8
+_SMALL_FONT_SIZE = 7
+_DIAGRAM_TITLE_FONT_SIZE = 11
+
+_BADGE_TITLE_SPACE = 86
+_BADGE_RIGHT_OFFSET = 90
+_BADGE_TOP_OFFSET = 27
+_BADGE_WIDTH = 74
+_BADGE_HEIGHT = 14
+_BADGE_CORNER_RADIUS = 3
+_BADGE_TEXT_RIGHT_OFFSET = 84
+
+_BAND = 30.0
+_NECK = 5.0
+_BAND_DIVIDER_GAP = 10
+_RIBBON_CARD_OVERLAP = 18
+_RIBBON_SAMPLES = 120
+_RIBBON_MAX_TAPER = 38.0
+_RIBBON_TAPER_FRACTION = 0.4
+_PALE_WHITE_WEIGHT = 0.84
+_PALE_COLOUR_WEIGHT = 0.16
+_RGB_CHANNEL_MAX = 255
+
+_CARD_ZORDER = 2
+_RIBBON_ZORDER = 3
+_DECORATION_ZORDER = 4
+_LABEL_ZORDER = 5
+
+# Colours are assigned in node order and deliberately cycle for large diagrams.
+_PALETTE = ("#087f78", "#ba5718", "#7050b0", "#326ba8", "#a34270", "#657b2d")
+_CONTEXT_COLOUR = "#505050"
 
 
 @dataclass(frozen=True)
@@ -25,6 +98,14 @@ class _Vertex:
 
 def topological_layout(dag: rx.PyDiGraph) -> dict[int, tuple[float, float]]:
     """Place steps in layers and order branches to reduce crossing lines."""
+    return {
+        vertex.node: position
+        for vertex, position in _layout_vertices(dag).items()
+        if vertex.node is not None
+    }
+
+
+def _layout_vertices(dag: rx.PyDiGraph) -> dict[_Vertex, tuple[float, float]]:
     generations = [list(group) for group in rx.topological_generations(dag)]
     layer = {index: depth for depth, group in enumerate(generations) for index in group}
     columns: list[list[_Vertex]] = [
@@ -48,14 +129,13 @@ def topological_layout(dag: rx.PyDiGraph) -> dict[int, tuple[float, float]]:
             neighbours[right].append(left)
 
     # Reorder each column using adjacent columns. Stable ties retain insertion order.
-    for _ in range(6):
+    for _ in range(_LAYOUT_SWEEPS):
         for depths in (range(1, len(columns)), range(len(columns) - 2, -1, -1)):
             for depth in depths:
                 adjacent = depth - 1 if depths.start == 1 else depth + 1
                 adjacent_positions = {
                     vertex: i for i, vertex in enumerate(columns[adjacent])
                 }
-                previous_order = {vertex: i for i, vertex in enumerate(columns[depth])}
                 columns[depth].sort(
                     key=lambda vertex: (
                         sum(
@@ -65,8 +145,7 @@ def topological_layout(dag: rx.PyDiGraph) -> dict[int, tuple[float, float]]:
                         )
                         / max(
                             1, sum(n in adjacent_positions for n in neighbours[vertex])
-                        ),
-                        previous_order[vertex],
+                        )
                     )
                 )
 
@@ -75,37 +154,559 @@ def topological_layout(dag: rx.PyDiGraph) -> dict[int, tuple[float, float]]:
         count = len(column)
         for row, vertex in enumerate(column):
             positions[vertex] = (float(depth), (count - 1) / 2 - row)
-    return {
-        vertex.node: position
-        for vertex, position in positions.items()
-        if vertex.node is not None
-    }
+    return positions
 
 
-def _contract_label(contract: object) -> tuple[str, str]:
-    if isinstance(contract, DataFrameContract):
+def _same_colour_contract(left: object, right: object) -> bool:
+    if isinstance(left, DataFrameContract) and isinstance(right, DataFrameContract):
         return (
-            f"{contract.schema.model.__name__} · {contract.backend_name or 'DataFrame'}",
-            "frame",
+            left.schema == right.schema
+            and left.backend_name == right.backend_name
+            and left.dataframe_type is right.dataframe_type
         )
+    if isinstance(left, InstanceContract) and isinstance(right, InstanceContract):
+        return left.value_type is right.value_type
+    return type(left) is type(right)
+
+
+def _contract_type(contract: object) -> type | None:
+    if isinstance(contract, DataFrameContract):
+        return contract.schema.model
     if isinstance(contract, InstanceContract):
-        return contract.value_type.__name__, "value"
+        return contract.value_type
+    return None
+
+
+def _contract_label(contract: object, names: dict[type, str]) -> str:
+    value_type = _contract_type(contract)
+    name = names[value_type] if value_type else ""
+    if isinstance(contract, DataFrameContract):
+        return f"{name} · {contract.backend_name or 'DF'}"
+    if isinstance(contract, InstanceContract):
+        return f"{name} · Instance"
     if isinstance(contract, VoidContract):
-        return "No output", "void"
-    return "DataFrame", "frame"
+        return "No Output"
+    return "Unvalidated · DF"
 
 
-def draw_pipeline(dag: rx.PyDiGraph) -> Figure:
-    """Return a figure with labeled steps, data types, and input connections."""
-    from matplotlib import pyplot as plt
-    from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
+def _type_names(value_types: Sequence[type]) -> dict[type, str]:
+    groups: dict[str, list[type]] = defaultdict(list)
+    for cls in value_types:
+        if cls not in groups[cls.__name__]:
+            groups[cls.__name__].append(cls)
+    names = {}
+    for short, classes in groups.items():
+        for index, cls in enumerate(classes):
+            name = (
+                short if len(classes) == 1 else f"{cls.__module__}.{cls.__qualname__}"
+            )
+            if name in names.values():
+                name += f" [{index + 1}]"
+            names[cls] = name
+    return names
+
+
+def _output_colours(dag: rx.PyDiGraph[Step, str]) -> dict[int, str]:
+    registry: list[object] = []
+    colours = {}
+    for node in dag.node_indices():
+        contract = dag[node].transform.__transform_spec__.output_contract
+        if isinstance(contract, VoidContract):
+            continue
+        match = next(
+            (
+                i
+                for i, known in enumerate(registry)
+                if _same_colour_contract(contract, known)
+            ),
+            len(registry),
+        )
+        if match == len(registry):
+            registry.append(contract)
+        colours[node] = _PALETTE[match % len(_PALETTE)]
+    return colours
+
+
+@dataclass(frozen=True)
+class _Input:
+    source: int | None
+    parameter: str
+    label: str
+    y: float
+
+
+@dataclass(frozen=True)
+class _Card:
+    node: int
+    x: float
+    top: float
+    width: float
+    height: float
+    split: float
+    title: str
+    subtitle: str
+    side_effect: bool
+    inputs: tuple[_Input, ...]
+    output: str
+    output_y: float
+    has_output: bool
+
+    @property
+    def right(self) -> float:
+        """Return the right edge of the card."""
+        return self.x + self.width
+
+    @property
+    def bottom(self) -> float:
+        """Return the bottom edge of the card."""
+        return self.top - self.height
+
+
+def _cards(
+    dag: rx.PyDiGraph[Step, str],
+    positions: Mapping[int, tuple[float, float]],
+    measure: Callable[[str, float, bool], float],
+) -> dict[int, _Card]:
+    value_types: list[type] = []
+    for node in dag.node_indices():
+        spec = dag[node].transform.__transform_spec__
+        value_types.extend(
+            value_type
+            for contract in (spec.output_contract, *spec.input_contracts.values())
+            if (value_type := _contract_type(contract)) is not None
+        )
+        value_types.extend(spec.context_parameters.values())
+    names = _type_names(value_types)
+    incoming: dict[int, list[tuple[int, str]]] = defaultdict(list)
+    for source, target, parameter in dag.weighted_edge_list():
+        incoming[target].append((source, parameter))
+    sizes = {}
+    for node in dag.node_indices():
+        step = dag[node]
+        spec = step.transform.__transform_spec__
+        edges = sorted(
+            incoming[node], key=lambda pair: (-positions[pair[0]][1], pair[1])
+        )
+        inputs: list[tuple[int | None, str, str]] = [
+            (source, param, _contract_label(spec.input_contracts[param], names))
+            for source, param in edges
+        ]
+        inputs.extend(
+            (None, param, f"{names[dependency_type]} · Ctx")
+            for param, dependency_type in spec.context_parameters.items()
+        )
+        output = _contract_label(spec.output_contract, names)
+        subtitle = step.transform.default_name or type(step.transform).__name__
+        subtitle = subtitle if subtitle != step.name else ""
+        input_width = max(
+            (
+                max(
+                    measure(label, _CONTRACT_FONT_SIZE, True),
+                    measure(param, _DETAIL_FONT_SIZE, False),
+                )
+                + _INPUT_WIDTH_PADDING
+                for _, param, label in inputs
+            ),
+            default=0,
+        )
+        output_width = (
+            measure(output, _CONTRACT_FONT_SIZE, True) + _OUTPUT_WIDTH_PADDING
+        )
+        header_width = (
+            max(
+                measure(step.name, _TITLE_FONT_SIZE, True)
+                + (_BADGE_TITLE_SPACE if step.transform.side_effect else 0),
+                measure(subtitle, _DETAIL_FONT_SIZE, False),
+            )
+            + 2 * _CARD_PADDING
+        )
+        width = max(_CARD_MIN_WIDTH, input_width + output_width, header_width)
+        split = input_width + (width - input_width - output_width) / 2 if inputs else 0
+        header = _HEADER_WITH_SUBTITLE_HEIGHT if subtitle else _HEADER_HEIGHT
+        body = max(1, len(inputs)) * _INPUT_ROW_HEIGHT + _BODY_PADDING
+        sizes[node] = (
+            width,
+            header + body,
+            split,
+            header,
+            inputs,
+            output,
+            subtitle,
+        )
+    pitch = max(size[1] for size in sizes.values()) + _ROW_GAP
+    column_widths: dict[int, float] = defaultdict(float)
+    for node, size in sizes.items():
+        depth = int(positions[node][0])
+        column_widths[depth] = max(column_widths[depth], size[0])
+    column_x = {}
+    x = 0
+    for depth in sorted(column_widths):
+        column_x[depth] = x
+        x += column_widths[depth] + _GAP
+    result = {}
+    for node, size in sizes.items():
+        width, height, split, header, inputs, output, subtitle = size
+        top = positions[node][1] * pitch + height / 2
+        rows = tuple(
+            _Input(
+                source,
+                param,
+                label,
+                top - header - _FIRST_ROW_OFFSET - slot * _INPUT_ROW_HEIGHT,
+            )
+            for slot, (source, param, label) in enumerate(inputs)
+        )
+        output_y = (
+            sum(row.y for row in rows) / len(rows)
+            if rows
+            else top - header - _FIRST_ROW_OFFSET
+        )
+        result[node] = _Card(
+            node,
+            column_x[int(positions[node][0])],
+            top,
+            width,
+            height,
+            split,
+            dag[node].name,
+            subtitle,
+            dag[node].transform.side_effect,
+            rows,
+            output,
+            output_y,
+            not isinstance(
+                dag[node].transform.__transform_spec__.output_contract, VoidContract
+            ),
+        )
+    return result
+
+
+def _smoothstep(fraction: float) -> float:
+    fraction = max(0.0, min(1.0, fraction))
+    return fraction * fraction * (3 - 2 * fraction)
+
+
+def _ribbon_contours(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    samples: int = _RIBBON_SAMPLES,
+    start_width: float = _BAND,
+    end_width: float = _BAND,
+) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
+    # Monotone x and vertical offsets keep the two contours from folding over
+    # on steep branches. Both centreline and width have horizontal end tangents.
+    sx, sy = start
+    tx, ty = end
+    length = tx - sx
+    taper = min(_RIBBON_MAX_TAPER, length * _RIBBON_TAPER_FRACTION)
+    upper, lower = [], []
+    for index in range(samples + 1):
+        t = index / samples
+        x = sx + length * t
+        y = sy + (ty - sy) * _smoothstep(t)
+        start_blend = 1 - _smoothstep((x - sx) / taper)
+        end_blend = 1 - _smoothstep((tx - x) / taper)
+        half = (
+            _NECK
+            + (start_width - _NECK) * start_blend
+            + (end_width - _NECK) * end_blend
+        ) / 2
+        slope = (ty - sy) / length * 6 * t * (1 - t)
+        half += _NECK / 2 * (hypot(1, slope) - 1) * (1 - max(start_blend, end_blend))
+        upper.append((x, y + half))
+        lower.append((x, y - half))
+    return upper, lower
+
+
+def _pale(colour: str) -> tuple[float, float, float]:
+    # Preblend once: overlapping branches keep exactly the same pale fill.
+    red, green, blue = (
+        _PALE_WHITE_WEIGHT
+        + _PALE_COLOUR_WEIGHT * int(colour[i : i + 2], 16) / _RGB_CHANNEL_MAX
+        for i in (1, 3, 5)
+    )
+    return red, green, blue
+
+
+def _measure_text(
+    renderer: RendererAgg, dpi: float, text: str, size: float, bold: bool
+) -> float:
+    """Return the rendered text width in typographic points."""
+    from matplotlib.font_manager import FontProperties
+
+    font = FontProperties(size=size, weight="bold" if bold else "normal")
+    return (
+        renderer.get_text_width_height_descent(text, font, False)[0]
+        * _POINTS_PER_INCH
+        / dpi
+    )
+
+
+def _draw_label(
+    ax: Axes,
+    x: float,
+    y: float,
+    text: str,
+    size: float = _CONTRACT_FONT_SIZE,
+    colour: str = "#253d51",
+    bold: bool = False,
+    **kwargs,
+) -> None:
+    """Draw a vertically centred label above the diagram shapes."""
+    ax.text(
+        x,
+        y,
+        text,
+        fontsize=size,
+        color=colour,
+        fontweight="bold" if bold else "normal",
+        va="center",
+        zorder=_LABEL_ZORDER,
+        **kwargs,
+    )
+
+
+def _draw_band(ax: Axes, x: float, y: float, width: float, colour: str) -> None:
+    """Draw a rounded band behind an input or output label."""
+    from matplotlib.patches import FancyBboxPatch
+
+    ax.add_patch(
+        FancyBboxPatch(
+            (x, y - _BAND / 2),
+            width,
+            _BAND,
+            boxstyle=f"round,pad=0,rounding_size={_BAND / 2}",
+            linewidth=0,
+            facecolor=_pale(colour),
+            zorder=_RIBBON_ZORDER,
+        )
+    )
+
+
+def _draw_card_backgrounds(
+    ax: Axes, cards: Mapping[int, _Card], colours: Mapping[int, str]
+) -> None:
+    """Draw card backgrounds and input/output bands."""
+    from matplotlib.patches import FancyBboxPatch
+
+    for card in cards.values():
+        ax.add_patch(
+            FancyBboxPatch(
+                (card.x, card.bottom),
+                card.width,
+                card.height,
+                boxstyle=f"round,pad=0,rounding_size={_CARD_CORNER_RADIUS}",
+                linewidth=_BORDER_WIDTH,
+                edgecolor="#d8e0e8",
+                facecolor="white",
+                zorder=_CARD_ZORDER,
+            )
+        )
+        if card.has_output:
+            _draw_band(
+                ax,
+                card.x + card.split + _BAND_DIVIDER_GAP,
+                card.output_y,
+                card.width - card.split - _BAND_DIVIDER_GAP,
+                colours[card.node],
+            )
+        for row in card.inputs:
+            inset = _BAND_DIVIDER_GAP if row.source is None else 0
+            _draw_band(
+                ax,
+                card.x + inset,
+                row.y,
+                card.split - _BAND_DIVIDER_GAP - inset,
+                _CONTEXT_COLOUR if row.source is None else colours[row.source],
+            )
+
+
+def _draw_connecting_ribbons(
+    ax: Axes,
+    cards: Mapping[int, _Card],
+    colours: Mapping[int, str],
+    vertices_by_layer: Mapping[_Vertex, tuple[float, float]],
+    pitch: float,
+) -> None:
+    """Connect cards through the reserved routing slots."""
+    from matplotlib.patches import PathPatch
     from matplotlib.path import Path
 
-    nodes = list(dag.node_indices())
-    if not nodes:
-        fig, ax = plt.subplots(figsize=(7, 3))
-        fig.patch.set_facecolor("#f7f9fc")
-        ax.set_facecolor("#f7f9fc")
+    for card in cards.values():
+        for row in card.inputs:
+            if row.source is None:
+                continue
+            source = cards[row.source]
+            points = [(source.right - _RIBBON_CARD_OVERLAP, source.output_y)]
+            # Reuse the existing layout's reserved dummy slots for skipped
+            # generations. This needs no new obstacle-avoidance algorithm.
+            for vertex, (_, y) in vertices_by_layer.items():
+                if vertex.edge == (row.source, card.node, row.parameter):
+                    column = [
+                        cards[v.node]
+                        for v in vertices_by_layer
+                        if v.layer == vertex.layer and v.node is not None
+                    ]
+                    points.extend(
+                        [
+                            (min(c.x for c in column), y * pitch),
+                            (max(c.right for c in column), y * pitch),
+                        ]
+                    )
+            points.append((card.x + _RIBBON_CARD_OVERLAP, row.y))
+            upper, lower = [], []
+            for index, (start, end) in enumerate(pairwise(points)):
+                top, bottom = _ribbon_contours(
+                    start,
+                    end,
+                    start_width=_BAND if index == 0 else _NECK,
+                    end_width=_BAND if index == len(points) - 2 else _NECK,
+                )
+                upper.extend(top)
+                lower.extend(bottom)
+            vertices = upper + list(reversed(lower)) + [upper[0]]
+            path = Path(vertices, closed=True)
+            ax.add_patch(
+                PathPatch(
+                    path,
+                    facecolor=_pale(colours[row.source]),
+                    edgecolor="none",
+                    zorder=_RIBBON_ZORDER,
+                )
+            )
+
+
+def _draw_card_details(
+    ax: Axes, cards: Mapping[int, _Card], colours: Mapping[int, str]
+) -> None:
+    """Draw card labels, dividers, and side-effect badges."""
+    from matplotlib.patches import FancyBboxPatch
+
+    for card in cards.values():
+        header = _HEADER_WITH_SUBTITLE_HEIGHT if card.subtitle else _HEADER_HEIGHT
+        _draw_label(
+            ax,
+            card.x + _CARD_PADDING,
+            card.top - _TITLE_OFFSET,
+            card.title,
+            _TITLE_FONT_SIZE,
+            bold=True,
+        )
+        if card.subtitle:
+            _draw_label(
+                ax,
+                card.x + _CARD_PADDING,
+                card.top - _SUBTITLE_OFFSET,
+                card.subtitle,
+                _DETAIL_FONT_SIZE,
+                "#617185",
+            )
+        ax.plot(
+            [card.x, card.right],
+            [card.top - header] * 2,
+            color="#e4e9ef",
+            lw=_BORDER_WIDTH,
+            zorder=_DECORATION_ZORDER,
+        )
+        if card.inputs:
+            ax.plot(
+                [card.x + card.split] * 2,
+                [
+                    card.top - header - _DIVIDER_TOP_PADDING,
+                    card.bottom + _DIVIDER_BOTTOM_PADDING,
+                ],
+                color="#e4e9ef",
+                lw=_BORDER_WIDTH,
+                zorder=_DECORATION_ZORDER,
+            )
+            _draw_label(
+                ax,
+                card.x + _CARD_PADDING,
+                card.top - header - _SECTION_LABEL_OFFSET,
+                "INPUTS" if len(card.inputs) > 1 else "INPUT",
+                _SMALL_FONT_SIZE,
+                "#617185",
+                True,
+            )
+        _draw_label(
+            ax,
+            card.x + card.split + _CARD_PADDING,
+            card.top - header - _SECTION_LABEL_OFFSET,
+            "OUTPUT",
+            _SMALL_FONT_SIZE,
+            "#617185",
+            True,
+        )
+        for row in card.inputs:
+            _draw_label(
+                ax,
+                card.x + _INPUT_LABEL_PADDING,
+                row.y + _PARAMETER_LABEL_OFFSET,
+                row.parameter,
+                _SMALL_FONT_SIZE,
+                "#617185",
+            )
+            _draw_label(
+                ax,
+                card.x + _INPUT_LABEL_PADDING,
+                row.y - _CONTRACT_LABEL_OFFSET,
+                row.label,
+                _CONTRACT_FONT_SIZE,
+                _CONTEXT_COLOUR if row.source is None else colours[row.source],
+                True,
+            )
+        _draw_label(
+            ax,
+            card.x + card.split + _OUTPUT_LABEL_PADDING,
+            card.output_y,
+            card.output,
+            _CONTRACT_FONT_SIZE,
+            colours.get(card.node, "#617185"),
+            card.has_output,
+        )
+        if card.side_effect:
+            ax.add_patch(
+                FancyBboxPatch(
+                    (
+                        card.right - _BADGE_RIGHT_OFFSET,
+                        card.top - _BADGE_TOP_OFFSET,
+                    ),
+                    _BADGE_WIDTH,
+                    _BADGE_HEIGHT,
+                    boxstyle=f"round,pad=0,rounding_size={_BADGE_CORNER_RADIUS}",
+                    linewidth=0,
+                    facecolor="#fff0d9",
+                    zorder=_DECORATION_ZORDER,
+                )
+            )
+            _draw_label(
+                ax,
+                card.right - _BADGE_TEXT_RIGHT_OFFSET,
+                card.top - _TITLE_OFFSET,
+                "SIDE EFFECT",
+                _SMALL_FONT_SIZE,
+                "#a6631c",
+                True,
+            )
+
+
+def draw_pipeline(dag: rx.PyDiGraph[Step, str]) -> Figure:
+    """Return a figure showing named inputs and outputs joined by schema ribbons.
+
+    Args:
+        dag: Pipeline graph containing transform steps and named input edges.
+
+    Returns:
+        A Matplotlib figure without executing any pipeline steps.
+    """
+    from matplotlib import pyplot as plt
+    from matplotlib.backends.backend_agg import RendererAgg
+
+    fig, ax = plt.subplots(figsize=_EMPTY_FIGURE_SIZE)
+    fig.patch.set_facecolor("#f6f8fb")
+    ax.set_facecolor("#f6f8fb")
+    ax.axis("off")
+    if not dag.num_nodes():
         ax.text(
             0.5,
             0.5,
@@ -115,226 +716,59 @@ def draw_pipeline(dag: rx.PyDiGraph) -> Figure:
             color="#56677b",
             transform=ax.transAxes,
         )
-        ax.axis("off")
         return fig
 
-    pos = topological_layout(dag)
-    edges = list(dag.weighted_edge_list())
-    input_edges: dict[int, list[tuple[int, str]]] = defaultdict(list)
-    for source, target, parameter in edges:
-        input_edges[target].append((source, parameter))
-    for target, incoming in input_edges.items():
-        incoming.sort(key=lambda pair: (-pos[pair[0]][1], pair[1]))
+    renderer = RendererAgg(1, 1, fig.dpi)
 
-    width = 3.9
-    gap_x = 2.3
-    max_depth = max(x for x, _ in pos.values())
-    left = {i: pos[i][0] * (width + gap_x) for i in nodes}
-    height = {
-        i: 1.48
-        + 0.35 * len(input_edges[i])
-        + (0.35 if dag[i].transform.__transform_spec__.context_parameters else 0)
-        for i in nodes
+    vertices_by_layer = _layout_vertices(dag)
+    positions = {
+        vertex.node: position
+        for vertex, position in vertices_by_layer.items()
+        if vertex.node is not None
     }
-    row_pitch = max(height.values(), default=2) + 0.6
-    center_y = {i: pos[i][1] * row_pitch for i in nodes}
-    top = {i: center_y[i] + height[i] / 2 for i in nodes}
-    bottom = {i: center_y[i] - height[i] / 2 for i in nodes}
-    palette = {"frame": "#27887f", "value": "#7767a6", "void": "#8a98a7"}
-    side_effect_color = "#b76524"
-
-    # Scale with the graph, so saved figures remain readable even for wide pipelines.
-    ys = [value for i in nodes for value in (top[i], bottom[i])]
-    ymin, ymax = min(ys) - 1.0, max(ys) + 1.7
-    xmax = max_depth * (width + gap_x) + width + 0.9
-    fig, ax = plt.subplots(figsize=(max(8, xmax * 0.85), max(4, (ymax - ymin) * 0.85)))
-    fig.patch.set_facecolor("#f7f9fc")
-    ax.set_facecolor("#f7f9fc")
-    ax.set_xlim(-0.55, xmax)
+    cards = _cards(dag, positions, partial(_measure_text, renderer, fig.dpi))
+    colours = _output_colours(dag)
+    pitch = max(card.height for card in cards.values()) + _ROW_GAP
+    route_ys = [
+        y * pitch for vertex, (_, y) in vertices_by_layer.items() if vertex.edge
+    ]
+    xmin = -_FIGURE_MARGIN
+    xmax = (
+        max(_MIN_CONTENT_WIDTH, max(card.right for card in cards.values()))
+        + _FIGURE_MARGIN
+    )
+    ymin = min([card.bottom for card in cards.values()] + route_ys) - _FIGURE_MARGIN
+    ymax = max([card.top for card in cards.values()] + route_ys) + _FIGURE_TOP_MARGIN
+    # One coordinate unit is one typographic point, including during measurement.
+    fig.set_size_inches(
+        (xmax - xmin) / _POINTS_PER_INCH, (ymax - ymin) / _POINTS_PER_INCH
+    )
+    ax.set_position((0, 0, 1, 1))
+    ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    ax.set_aspect("equal", adjustable="box")
-    ax.axis("off")
+    ax.set_aspect("equal")
 
-    # Edges are drawn first so their ends sit beneath the cards and port dots.
-    for source, target, parameter in edges:
-        source_contract = dag[source].transform.__transform_spec__.output_contract
-        _, kind = _contract_label(source_contract)
-        slot = next(
-            i
-            for i, pair in enumerate(input_edges[target])
-            if pair == (source, parameter)
-        )
-        sy = bottom[source] + 0.32
-        ty = top[target] - 0.82 - slot * 0.35
-        sx = left[source] + width
-        tx = left[target]
-        color = palette[kind]
-        bend = min((tx - sx) * 0.5, gap_x * 0.8)
-        path = Path(
-            [(sx, sy), (sx + bend, sy), (tx - bend, ty), (tx, ty)],
-            [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4],
-        )
-        arrow = FancyArrowPatch(
-            path=path,
-            arrowstyle="-|>",
-            mutation_scale=12,
-            linewidth=1.7,
-            color=color,
-            alpha=0.76,
-            zorder=1,
-        )
-        ax.add_patch(arrow)
+    # Draw all bands before ribbons so their shared layer overlaps consistently.
+    _draw_card_backgrounds(ax, cards, colours)
+    _draw_connecting_ribbons(ax, cards, colours, vertices_by_layer, pitch)
+    _draw_card_details(ax, cards, colours)
 
-    for i in nodes:
-        step = dag[i]
-        spec = step.transform.__transform_spec__
-        output, kind = _contract_label(spec.output_contract)
-        accent = side_effect_color if step.transform.side_effect else palette[kind]
-        x, y = left[i], top[i]
-        ax.add_patch(
-            FancyBboxPatch(
-                (x + 0.035, bottom[i] - 0.055),
-                width,
-                height[i],
-                boxstyle="round,pad=0.02,rounding_size=0.14",
-                linewidth=0,
-                facecolor="#dfe6ee",
-                alpha=0.65,
-                zorder=2,
-            )
-        )
-        ax.add_patch(
-            FancyBboxPatch(
-                (x, bottom[i]),
-                width,
-                height[i],
-                boxstyle="round,pad=0.02,rounding_size=0.14",
-                linewidth=0.9,
-                edgecolor="#d6dfe8",
-                facecolor="white",
-                zorder=3,
-            )
-        )
-        ax.add_patch(
-            FancyBboxPatch(
-                (x, y - 0.10),
-                0.065,
-                -height[i] + 0.20,
-                boxstyle="round,pad=0,rounding_size=0.03",
-                linewidth=0,
-                facecolor=accent,
-                zorder=4,
-            )
-        )
-        ax.text(
-            x + 0.27,
-            y - 0.31,
-            shorten(step.name, width=34, placeholder="…"),
-            fontsize=12,
-            fontweight="bold",
-            color="#1e3043",
-            va="center",
-            zorder=5,
-        )
-        transform_name = step.transform.default_name or type(step.transform).__name__
-        ax.text(
-            x + 0.27,
-            y - 0.62,
-            shorten(transform_name, width=42, placeholder="…"),
-            fontsize=8.5,
-            color="#697b8c",
-            va="center",
-            zorder=5,
-        )
-        for slot, (source, parameter) in enumerate(input_edges[i]):
-            py = y - 0.82 - slot * 0.35
-            input_type, input_kind = _contract_label(spec.input_contracts[parameter])
-            ax.add_patch(Circle((x, py), 0.06, color=palette[input_kind], zorder=6))
-            ax.text(
-                x + 0.27,
-                py,
-                shorten(parameter, width=19, placeholder="…"),
-                fontsize=9,
-                color="#35485b",
-                va="center",
-                zorder=5,
-            )
-            ax.text(
-                x + width - 0.22,
-                py,
-                shorten(input_type, width=21, placeholder="…"),
-                fontsize=8.2,
-                color="#748597",
-                ha="right",
-                va="center",
-                zorder=5,
-            )
-        if not input_edges[i] and not spec.context_parameters:
-            ax.text(
-                x + 0.27,
-                y - 0.90,
-                "SOURCE",
-                fontsize=8,
-                fontweight="bold",
-                color="#789187",
-                va="center",
-                zorder=5,
-            )
-        if spec.context_parameters:
-            context_names = ", ".join(spec.context_parameters)
-            ax.text(
-                x + 0.27,
-                bottom[i] + 0.57,
-                "Context: " + shorten(context_names, width=38, placeholder="…"),
-                fontsize=8,
-                color="#8a718a",
-                va="center",
-                zorder=5,
-            )
-        ax.text(
-            x + 0.27,
-            bottom[i] + 0.26,
-            "SIDE EFFECT" if step.transform.side_effect else "OUT",
-            fontsize=7.5,
-            fontweight="bold",
-            color=accent if step.transform.side_effect else "#8292a2",
-            va="center",
-            zorder=5,
-        )
-        ax.text(
-            x + (1.35 if step.transform.side_effect else 0.72),
-            bottom[i] + 0.26,
-            shorten(output, width=37, placeholder="…"),
-            fontsize=9,
-            color=accent,
-            va="center",
-            zorder=5,
-        )
-        if kind != "void":
-            ax.add_patch(
-                Circle(
-                    (x + width, bottom[i] + 0.32), 0.065, color=palette[kind], zorder=6
-                )
-            )
-
-    ax.text(
-        -0.02,
-        ymax - 0.40,
+    _draw_label(
+        ax,
+        0,
+        ymax - _DIAGRAM_TITLE_OFFSET,
         "PIPELINE  /  DATA FLOW",
-        fontsize=11,
-        fontweight="bold",
-        color="#253d51",
-        va="center",
+        _DIAGRAM_TITLE_FONT_SIZE,
+        bold=True,
     )
-    ax.text(
-        xmax - 0.25,
-        ymax - 0.40,
-        f"{len(nodes)} {'STEP' if len(nodes) == 1 else 'STEPS'}   ·   "
-        f"{len(edges)} {'CONNECTION' if len(edges) == 1 else 'CONNECTIONS'}",
-        fontsize=9,
-        color="#708293",
+    count, edges = dag.num_nodes(), dag.num_edges()
+    _draw_label(
+        ax,
+        xmax - _FIGURE_MARGIN,
+        ymax - _DIAGRAM_TITLE_OFFSET,
+        f"{count} {'STEP' if count == 1 else 'STEPS'}   ·   {edges} {'CONNECTION' if edges == 1 else 'CONNECTIONS'}",
+        _DETAIL_FONT_SIZE,
+        "#708293",
         ha="right",
-        va="center",
     )
-    fig.tight_layout(pad=0.3)
     return fig
